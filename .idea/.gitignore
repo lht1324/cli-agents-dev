@@ -1,0 +1,5 @@
+# JetBrains 개인 설정 제외 (공유 설정은 추적)
+workspace.xml
+tasks.xml
+shelf/
+usage.statistics.xml
