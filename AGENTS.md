@@ -26,10 +26,9 @@
     * [Update] [결제사 변경 계획안 업데이트]
 * 사장은 master, develop, sub-branch 형태로 이어지는 Git Flow 방식을 사용합니다.
 * 작업은 develop에서 합니다 (큰 작업은 sub-branch). master에 직접 커밋하지 마십시오.
-* master 머지는 사장이 릴리즈 판단을 내릴 때만 하며, 반드시 `--no-ff`로 합류 커밋을 남깁니다
-  (fast-forward 병합 금지 — 그래프 추적용).
+* develop을 master에 머지하면 배포로 봅니다. 머지는 사장이 릴리즈 판단을 내릴 때만 합니다.
 * push는 평소 develop만, master push는 릴리즈 머지 때만 합니다.
-* 머지·푸시는 배포가 아닙니다. prod 반영은 별도 배포 명령으로 하며 사장 컨펌 후 실행합니다.
+* 작업은 HotFix 등 특수한 경우가 아니라면 기본적으로 develop에 커밋 후 푸시합니다.
 
 ## 스킬 관리 (온보딩)
 * 세션 시작 시 `/SKILLS.md`를 읽어 프로젝트의 스킬 관리 체계와 설치된 스킬 목록을 파악하십시오.
