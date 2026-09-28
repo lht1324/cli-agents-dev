@@ -1,0 +1,17 @@
+{
+  "name": "cliagent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Resident daemon for cliagents session sync",
+  "bin": {
+    "cliagent": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.3",
+    "typescript": "7.0.2"
+  }
+}
