@@ -4,10 +4,11 @@
 # Dependencies
 node_modules/
 
-# Next.js
+# Build output
 .next/
 out/
 build/
+dist/
 
 # Env
 .env
