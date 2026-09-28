@@ -18,27 +18,37 @@ function basicAuth(auth: { username: string; password: string }): string {
 }
 
 async function probeHealth(url: string, auth: { username: string; password: string } | null): Promise<{ version?: string; prefix: string } | null> {
-    for (const prefix of ["", "/api"]) {
-        const path = `${prefix}/global/health`;
+    for (const prefix of ["/api", ""]) {
+        const path = `${prefix}/session`;
         const headers: Record<string, string> = { Accept: "application/json" };
         try {
-            let res = await fetch(`${url}${path}`, { headers, signal: AbortSignal.timeout(2000) });
-            if (res.status === 401 && auth) {
-                headers.Authorization = basicAuth(auth);
-                res = await fetch(`${url}${path}`, { headers, signal: AbortSignal.timeout(2000) });
+            const authed = auth
+                ? { ...headers, Authorization: basicAuth(auth) }
+                : headers;
+            const tryFetch = async (h: Record<string, string>) => {
+                const res = await fetch(`${url}${path}`, { headers: h, signal: AbortSignal.timeout(2000) });
+                if (res.status === 401 && auth && !h.Authorization) {
+                    return null;
+                }
+                return res;
+            };
+            let res = await tryFetch(headers);
+            if (res === null) {
+                res = await tryFetch(authed);
             }
             if (!res.ok) {
                 continue;
             }
             const text = await res.text();
-            if (!text.trimStart().startsWith("{")) {
+            if (!text.trimStart().startsWith("{") && !text.trimStart().startsWith("[")) {
                 continue;
             }
-            const body = JSON.parse(text) as { healthy?: boolean; version?: string };
-            if (body.healthy === false) {
+            const body = JSON.parse(text) as { data?: unknown } | unknown[];
+            const list = Array.isArray(body) ? body : body.data;
+            if (!Array.isArray(list)) {
                 continue;
             }
-            return { version: body.version, prefix };
+            return { prefix };
         } catch {
             continue;
         }

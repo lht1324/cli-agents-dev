@@ -3,7 +3,8 @@ import { apiGet, discoverServer, type DiscoveredServer } from "./server";
 interface SessionRow {
     id: string;
     title?: string;
-    time_updated?: number;
+    outcome?: string;
+    time?: { updated?: number };
 }
 
 async function requireServer(): Promise<DiscoveredServer> {
@@ -16,15 +17,15 @@ async function requireServer(): Promise<DiscoveredServer> {
 
 async function onStatus(): Promise<void> {
     const server = await requireServer();
-    const health = (await apiGet(server, "/global/health")) as { healthy: boolean; version: string };
-    console.log(`server: ${server.url} (v${health.version}, healthy=${health.healthy})`);
+    console.log(`server: ${server.url}${server.version ? ` (v${server.version})` : ""}`);
 }
 
 async function onSessions(): Promise<void> {
     const server = await requireServer();
-    const sessions = (await apiGet(server, "/session")) as SessionRow[];
+    const body = (await apiGet(server, "/session")) as { data?: SessionRow[] } | SessionRow[];
+    const sessions = Array.isArray(body) ? body : (body.data ?? []);
     for (const s of sessions) {
-        console.log(`${s.id}\t${s.title ?? "(untitled)"}`);
+        console.log(`${s.id}\t${s.title ?? s.outcome ?? "(untitled)"}`);
     }
     console.log(`total: ${sessions.length}`);
 }
