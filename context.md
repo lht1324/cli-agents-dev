@@ -1,4 +1,4 @@
-2026-09-29 00:40
+2026-09-29 01:02
 
 # context.md - cli-agents-dev
 
@@ -86,5 +86,12 @@
 - [ ] MVP 범위 확정 (통합 목록+승인)
 - [ ] 도메인 구매 (`cliagents.dev`, Cloudflare에서 재확인)
 - [x] Next.js + Drizzle + Neon 보일러플레이트 (Storage 제외, OAuth Google+GitHub)
-- [ ] Neon Auth dev/prod 분리 확인 (브랜치별 Auth URL + GitHub 콜백 2개)
-- [ ] `daemon/` 스캐폴드 (서버 탐색·인증·fork 실행 뼈대)
+- [x] Neon Auth dev/prod 분리 (브랜치별 Auth URL, `.env` 교체済み. GitHub 콜백 2개目は 배포 시)
+- [x] `daemon/` 스캐폴드 (서버 탐색·인증·세션 목록, 종단 검증済み)
+- [ ] 데몬 다음 기능 (승인 중계 vs fork 실행 중 택1)
+- [ ] 웹 원격 inbox UI (보기·승인)
+
+## 데몬 종단 검증 (2026-09-29, 이 PC)
+- 명령: `daemon/`에서 build 후 자체 serve(번들 CLI 2.0.18, 4096, 비번) → `status`·`sessions` 성공. 세션 5개 제목 출력 확인.
+- 교훈 3개: (1) 데스크톱 v2 API는 `/api/*` 아래 + 인증 필수. HTML 폴백에 속지 말 것. (2) health 엔드포인트 없음. 탐색 기준은 `/api/session` 목록 조회로 변경. 목록 형태 `{data:[...]}` 래퍼 주의. (3) 시스템 CLI 1.18과 데스크톱 번들 2.0.18 버전 꼬임. serve는 번들 CLI로 띄울 것.
+- `daemon/tsconfig.json` 수정 1건 (`lib` DOM + `types` node)._tsbuildinfo 계열은 `.gitignore`済み.
