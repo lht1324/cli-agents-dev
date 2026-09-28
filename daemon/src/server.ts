@@ -13,50 +13,76 @@ function authFromEnv(): { username: string; password: string } | null {
     return { username: process.env.OPENCODE_SERVER_USERNAME ?? "opencode", password };
 }
 
-async function probe(url: string, auth: { username: string; password: string } | null): Promise<boolean> {
-    const headers: Record<string, string> = {};
-    if (auth) {
-        headers.Authorization = `Basic ${Buffer.from(`${auth.username}:${auth.password}`).toString("base64")}`;
-    }
-    try {
-        const res = await fetch(`${url}/global/health`, { headers, signal: AbortSignal.timeout(2000) });
-        if (!res.ok) {
-            return false;
+function basicAuth(auth: { username: string; password: string }): string {
+    return `Basic ${Buffer.from(`${auth.username}:${auth.password}`).toString("base64")}`;
+}
+
+async function probeHealth(url: string, auth: { username: string; password: string } | null): Promise<{ version?: string; prefix: string } | null> {
+    for (const prefix of ["", "/api"]) {
+        const path = `${prefix}/global/health`;
+        const headers: Record<string, string> = { Accept: "application/json" };
+        try {
+            let res = await fetch(`${url}${path}`, { headers, signal: AbortSignal.timeout(2000) });
+            if (res.status === 401 && auth) {
+                headers.Authorization = basicAuth(auth);
+                res = await fetch(`${url}${path}`, { headers, signal: AbortSignal.timeout(2000) });
+            }
+            if (!res.ok) {
+                continue;
+            }
+            const text = await res.text();
+            if (!text.trimStart().startsWith("{")) {
+                continue;
+            }
+            const body = JSON.parse(text) as { healthy?: boolean; version?: string };
+            if (body.healthy === false) {
+                continue;
+            }
+            return { version: body.version, prefix };
+        } catch {
+            continue;
         }
-        const body = (await res.json()) as { healthy?: boolean };
-        return body.healthy === true;
-    } catch {
-        return false;
     }
+    return null;
 }
 
 export interface DiscoveredServer {
     url: string;
     auth: { username: string; password: string } | null;
+    version?: string;
+    prefix: string;
 }
 
 // 기존 serve를 찾아 붙는다. 없으면 직접 띄우라는 안내를 위해 null을 낸다.
 export async function discoverServer(): Promise<DiscoveredServer | null> {
     const auth = authFromEnv();
     const fromEnv = baseUrlFromEnv();
-    if (fromEnv && (await probe(fromEnv, auth))) {
-        return { url: fromEnv, auth };
+    if (fromEnv) {
+        const found = await probeHealth(fromEnv, auth);
+        if (found) {
+            return { url: fromEnv, auth, version: found.version, prefix: found.prefix };
+        }
+        return null;
     }
     for (const port of DEFAULT_PORTS) {
         const url = `http://127.0.0.1:${port}`;
-        if (await probe(url, auth)) {
-            return { url, auth };
+        const found = await probeHealth(url, auth);
+        if (found) {
+            return { url, auth, version: found.version, prefix: found.prefix };
         }
     }
     return null;
 }
 
 export async function apiGet(server: DiscoveredServer, path: string): Promise<unknown> {
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = { Accept: "application/json" };
     if (server.auth) {
-        headers.Authorization = `Basic ${Buffer.from(`${server.auth.username}:${server.auth.password}`).toString("base64")}`;
+        headers.Authorization = basicAuth(server.auth);
     }
-    const res = await fetch(`${server.url}${path}`, { headers, signal: AbortSignal.timeout(10000) });
+    const res = await fetch(`${server.url}${server.prefix}${path}`, { headers, signal: AbortSignal.timeout(10000) });
+    if (res.status === 401) {
+        throw new Error("server requires authentication. set OPENCODE_SERVER_PASSWORD");
+    }
     if (!res.ok) {
         throw new Error(`server responded ${res.status} for ${path}`);
     }
