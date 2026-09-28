@@ -36,7 +36,7 @@ async function probeHealth(url: string, auth: { username: string; password: stri
             if (res === null) {
                 res = await tryFetch(authed);
             }
-            if (!res.ok) {
+            if (res === null || !res.ok) {
                 continue;
             }
             const text = await res.text();
