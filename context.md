@@ -1,4 +1,4 @@
-2026-09-28 04:23
+2026-09-29 00:40
 
 # context.md - cli-agents-dev
 
@@ -21,6 +21,9 @@
 - MVP 범위: 통합 목록 + 상태 + 원격 승인 1개. 전문 미러링은 2단계.
 - 분배 확정: 플러그인·per-project npm 아님. 상주 데몬 1개 (`npx cliagent login` 1방).
 - 클라이언트 확정: 웹 뷰어 1개. CLI 클라이언트는 중복, Electron은 과함. 터미널 부착은 2단계 이후.
+- 기능 분리 확정 (2026-09-29): 본체 = PC 간 탭 복원. 부속 = 웹 리모컨(보기·승인·새 지시, 실행은 PC 서버). 웹에 터미널 재현 없음.
+- 웹 범위 확정: 랜딩·설명서·요금제 + 프로필·구독 관리 + 원격 inbox. 계정면 + 마케팅면 + 동반 기능.
+- 레포 구조 확정: 데몬은 별도 레포 아님. 같은 레포 `daemon/` 하위. 타입 공유·단일 푸시. 패키지 분리는 2번째 프로젝트 때.
 
 ## 데이터·요금 원칙
 - Neon에는 세션 메타/요약만. transcript 전문 상시 동기화 없음 (요금+개인정보).
@@ -50,10 +53,14 @@
 - OAuth는 Google+GitHub 먼저, X는 나중 (심사·유료티어·스펙변경).
 - Storage는 이번 보일러플레이트에서 제외. 필요해지면 Neon Object Storage로 붙임 (아래 참고).
 
-## 세션 정의 문제 (다음 논의용 — 미결)
-- GUI 탭 1개 = 세션인가, 압축 전후 대화 = 세션인가. OpenCode는 컨텍스트 초과 시 자동 압축하며, `session_context_epoch`(baseline/snapshot) 테이블에 압축 경계가 저장됨.
-- 사장 아이디어 (카톡 PC·모바일 방식): 현재 컨텍스트가 나타내는 구간만 동기화하고, 나머지는 '원래 기기에서 확인'으로 잘라버리기. 구간만 자르면 동기화량·요금·개인정보 문제가 단순화될 수 있음.
-- 결정 필요: (a) 글자 그대로 보기 vs (b) 이어서 실행. (b)는 workspace 파일 상태까지 필요해서 세션 로그만으로 불가.
+## 세션 정의 (2026-09-29 확정)
+- 탭 1개 = 세션 1행. GUI 멘탈모델과 DB 일치.
+- 동기화 범위 = 현재 epoch 전문 + 이전 epoch 접기(요약 1줄). 압축 발동 시 compaction 행 기준으로 자름. 서버는 전부 보유, 클라우드는 현재만(큐, flush는 우리 DB에서만).
+- 복원 3층: 텍스트 항상 + tool 메타 유료 + payload 제외(온디맨드 1건). 전송 gzip. 키는 user_id Partition + (session_id, seq).
+- 연산: 로그 INSERT-only + 헤더 UPDATE(제목·비용·토큰·시간) + flush DELETE(클라우드 전용).
+- MVP = 보기 + 새 턴 잇기. 이어서 실행은 workspace 동기화 붙는 2단계.
+- 전용 세션 = fork 분기. 기존 탭은 읽기·승인만. TUI 직접 운전 금지.
+- 로컬 큐-DELETE 없음. 우리 탭은 입력 통제로 마르게 + 세대 교체는 fork. 이식은 import 우선, 선택 이식은 직접 SQL(2단계).
 
 ## 결제사 점검 결과
 - Polar / Paddle / Lemon Squeezy / Creem / Fungies.io 모두 devtool SaaS 허용.
@@ -74,8 +81,10 @@
 - `tailored-ad`는 손대지 않음 (SKILLS.md 99줄 동일 사본 존재, Paddle 포함).
 
 ## 다음 할 일
-- [ ] 세션 정의 확정 (GUI 탭 vs 압축 구간, 카톡식 구간 동기화 여부)
-- [ ] MVP 플로우 3개 고정 (첫 메시지 내용·승인 모양·오프라인 기준)
+- [x] 세션 정의 확정 (탭=세션, 현재 epoch 전문 + 이전 접기)
+- [x] MVP 플로우 3개 고정 (전문+초과 폴백 / 허용·거부 2버튼 / 주기+수동 버튼)
 - [ ] MVP 범위 확정 (통합 목록+승인)
 - [ ] 도메인 구매 (`cliagents.dev`, Cloudflare에서 재확인)
-- [ ] Next.js + Drizzle + Neon 보일러플레이트 (Storage 제외, OAuth Google+GitHub)
+- [x] Next.js + Drizzle + Neon 보일러플레이트 (Storage 제외, OAuth Google+GitHub)
+- [ ] Neon Auth dev/prod 분리 확인 (브랜치별 Auth URL + GitHub 콜백 2개)
+- [ ] `daemon/` 스캐폴드 (서버 탐색·인증·fork 실행 뼈대)
