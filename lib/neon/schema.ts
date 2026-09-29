@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { integer, pgTable, primaryKey, real, text, timestamp } from "drizzle-orm/pg-core";
 
 // 상주 데몬 1대 = 1행. 페어링 코드로 웹 계정과 연결한다.
 export const devices = pgTable("devices", {
@@ -21,3 +21,69 @@ export const sessionsMeta = pgTable("sessions_meta", {
     lastSyncAt: timestamp("last_sync_at", { withTimezone: true }),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// 웹 → PC 명령 우체통. 데몬이 폴링해서 가져간다.
+// status 흐름: pending → delivered → done, 기한 지나면 expired.
+export const commands = pgTable("commands", {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull(),
+    deviceId: text("device_id")
+        .notNull()
+        .references(() => devices.id),
+    type: text("type").notNull(),
+    payload: text("payload").notNull(),
+    status: text("status").notNull().default("pending"),
+    idempotencyKey: text("idempotency_key").notNull().unique(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    doneAt: timestamp("done_at", { withTimezone: true }),
+    result: text("result"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// 탭 거울 헤더. UPDATE 전용. 로컬 탭 1개 = 1행.
+export const cloudTabs = pgTable("cloud_tabs", {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull(),
+    deviceId: text("device_id")
+        .notNull()
+        .references(() => devices.id),
+    provider: text("provider").notNull(),
+    title: text("title").notNull(),
+    status: text("status").notNull(),
+    epoch: integer("epoch").notNull().default(0),
+    cost: real("cost").notNull().default(0),
+    tokensInput: integer("tokens_input").notNull().default(0),
+    tokensOutput: integer("tokens_output").notNull().default(0),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// 대화 로그. INSERT-only. 텍스트 항상, tool은 메타만, 무거운 payload 제외.
+export const cloudMessages = pgTable(
+    "cloud_messages",
+    {
+        tabId: text("tab_id")
+            .notNull()
+            .references(() => cloudTabs.id, { onDelete: "cascade" }),
+        seq: integer("seq").notNull(),
+        role: text("role").notNull(),
+        kind: text("kind").notNull(),
+        body: text("body").notNull(),
+        createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    },
+    (t) => [primaryKey({ columns: [t.tabId, t.seq] })],
+);
+
+// 이전 epoch 접기. 압축 발동 시 이전 구간 요약 1줄만 보관한다.
+export const cloudFolds = pgTable(
+    "cloud_folds",
+    {
+        tabId: text("tab_id")
+            .notNull()
+            .references(() => cloudTabs.id, { onDelete: "cascade" }),
+        epoch: integer("epoch").notNull(),
+        summary: text("summary").notNull(),
+        createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    },
+    (t) => [primaryKey({ columns: [t.tabId, t.epoch] })],
+);
