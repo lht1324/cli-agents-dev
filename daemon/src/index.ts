@@ -1,4 +1,5 @@
 import { apiGet, discoverServer, type DiscoveredServer } from "./server";
+import { pollCommands } from "./commands";
 
 interface SessionRow {
     id: string;
@@ -42,8 +43,10 @@ async function main(): Promise<void> {
         await onSessions();
     } else if (cmd === "login") {
         await onLogin();
+    } else if (cmd === "poll") {
+        await pollCommands();
     } else {
-        console.log("usage: cliagent <login|status|sessions>");
+        console.log("usage: cliagent <login|status|sessions|poll>");
         process.exitCode = 1;
     }
 }
