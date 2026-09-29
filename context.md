@@ -1,4 +1,4 @@
-2026-09-29 01:02
+2026-09-30 00:09
 
 # context.md - cli-agents-dev
 
@@ -62,6 +62,17 @@
 - 전용 세션 = fork 분기. 기존 탭은 읽기·승인만. TUI 직접 운전 금지.
 - 로컬 큐-DELETE 없음. 우리 탭은 입력 통제로 마르게 + 세대 교체는 fork. 이식은 import 우선, 선택 이식은 직접 SQL(2단계).
 
+## 용어 확정 (2026-09-30)
+- 탭 > 세션. 탭 = 대화 공간(CLI 터미널 탭·GUI 탭, `session_v2` 1행). 세션 = 사용량 0→100% 구간 1개(압축 경계). 동기화 단위는 세션.
+- 기존 "탭 1개 = 세션 1행" 표현은 폐기.
+
+## 터미널풍 UI + 입력 (2026-09-30 확정)
+- 모양은 터미널풍 스크롤 + 입력창 가능. OpenCode 웹 통째 이식은 아님.
+- 입력 경로: 웹 입력 → 클라우드 명령 outbox → 데몬 → 로컬 서버 실행. Neon 역할 2개 (세션 저장소 + 명령 outbox).
+- 첨부: user 행에 base64 임베드 확인(PNG 클립보드 15KB·스크린샷 300KB대, `source: inline`). 저장은 영구, 기억은 윈도우 한정. 파일 메타만 항상 동기화, 본문 온디맨드.
+- presence: heartbeat 3-state (online·stale·offline) + last seen. 수면·꺼짐·단선 구분 불가. 주기는 동기화 플랜과 묶음.
+- 예약 실행: outbox 상태 4개 + 만료(예 7일) + 멱등키. offline·stale 기기엔 "PC 켜지면 실행됩니다" 경고.
+
 ## 결제사 점검 결과
 - Polar / Paddle / Lemon Squeezy / Creem / Fungies.io 모두 devtool SaaS 허용.
 - 금지는 AI 이미지·딥페이크·음성복제·스파이웨어 한정. 세션 매니저는 workflow측이라 통과 라인.
@@ -81,15 +92,23 @@
 - `tailored-ad`는 손대지 않음 (SKILLS.md 99줄 동일 사본 존재, Paddle 포함).
 
 ## 다음 할 일
-- [x] 세션 정의 확정 (탭=세션, 현재 epoch 전문 + 이전 접기)
+- [x] 세션 정의 확정 (탭>세션, 현재 epoch 전문 + 이전 접기)
 - [x] MVP 플로우 3개 고정 (전문+초과 폴백 / 허용·거부 2버튼 / 주기+수동 버튼)
 - [ ] MVP 범위 확정 (통합 목록+승인)
-- [ ] 도메인 구매 (`cliagents.dev`, Cloudflare에서 재확인)
+- [x] 도메인 구입 (`cliagents.dev` 구입済み. consigliere는 별명·기능명 후보, `.salon` 반대)
 - [x] Next.js + Drizzle + Neon 보일러플레이트 (Storage 제외, OAuth Google+GitHub)
 - [x] Neon Auth dev/prod 분리 (브랜치별 Auth URL, `.env` 교체済み. GitHub 콜백 2개目は 배포 시)
 - [x] `daemon/` 스캐폴드 (서버 탐색·인증·세션 목록, 종단 검증済み)
-- [ ] 데몬 다음 기능 (승인 중계 vs fork 실행 중 택1)
-- [ ] 웹 원격 inbox UI (보기·승인)
+- [ ] 데몬 승인 중계 (`permissions` 조회·응답)
+- [ ] 명령 outbox + heartbeat 테이블 (Neon: 상태 pending→delivered→done→expired, 만료·멱등키)
+- [ ] 웹 원격 inbox UI (보기·승인) + 기기 목록 (per-기기 on/off)
+- [ ] `cliagent fork` 등 데몬 CLI 생성 명령
+
+## 실행 계획 (2026-09-30)
+- P1: outbox·heartbeat 스키마 + 데몬 승인 중계. 돈값 코어의 로컬 절반.
+- P2: 웹 inbox (보기·승인) + 기기 목록. P1과 합쳐져 첫 종단(폰 승인) 완성.
+- P3: fork 실행·새 지시 + 예약 실행("PC 켜지면 실행" 경고付き). bypass 세션은 배지 + 원격 지시 주의.
+- P4: 도메인 연결·배포·과금. Storage·이어서 실행·자동화 관제는 2단계.
 
 ## 데몬 종단 검증 (2026-09-29, 이 PC)
 - 명령: `daemon/`에서 build 후 자체 serve(번들 CLI 2.0.18, 4096, 비번) → `status`·`sessions` 성공. 세션 5개 제목 출력 확인.
