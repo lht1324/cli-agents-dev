@@ -5,6 +5,8 @@ export const devices = pgTable("devices", {
     id: text("id").primaryKey(),
     userId: text("user_id").notNull(),
     label: text("label").notNull(),
+    platform: text("platform"),
+    hostname: text("hostname"),
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
