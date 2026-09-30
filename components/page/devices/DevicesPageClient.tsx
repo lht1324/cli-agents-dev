@@ -12,6 +12,27 @@ export interface DeviceRow {
 
 type Presence = "online" | "stale" | "offline";
 
+function relativeSeen(lastSeenAt: string | null): string {
+    if (!lastSeenAt) {
+        return "never seen";
+    }
+    const minutes = Math.floor((Date.now() - new Date(lastSeenAt).getTime()) / 60000);
+    if (minutes < 2) {
+        return "online";
+    }
+    if (minutes < 10) {
+        return `stale · last seen ${minutes} min ago`;
+    }
+    if (minutes < 60) {
+        return `last seen ${minutes} min ago`;
+    }
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) {
+        return `last seen ${hours} hours ago`;
+    }
+    return `last seen ${Math.floor(hours / 24)} days ago`;
+}
+
 function presenceOf(lastSeenAt: string | null): { state: Presence; label: string } {
     if (!lastSeenAt) {
         return { state: "offline", label: "never seen" };
@@ -21,9 +42,9 @@ function presenceOf(lastSeenAt: string | null): { state: Presence; label: string
         return { state: "online", label: "online" };
     }
     if (minutes < 10) {
-        return { state: "stale", label: `last seen ${Math.floor(minutes)} min ago` };
+        return { state: "stale", label: relativeSeen(lastSeenAt) };
     }
-    return { state: "offline", label: `last seen ${Math.floor(minutes)} min ago` };
+    return { state: "offline", label: relativeSeen(lastSeenAt) };
 }
 
 export default function DevicesPageClient({ items }: { items: DeviceRow[] }) {
@@ -50,9 +71,6 @@ export default function DevicesPageClient({ items }: { items: DeviceRow[] }) {
                 {rows.map((row) => (
                     <li key={row.id}>
                         <span>{row.label}</span>
-                        <span>
-                            {[row.platform, row.hostname].filter(Boolean).join(" · ")}
-                        </span>
                         <span>{row.presence.label}</span>
                     </li>
                 ))}
