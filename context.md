@@ -1,4 +1,4 @@
-2026-10-01 00:17
+2026-10-01 01:24
 
 # context.md - cli-agents-dev
 
@@ -104,12 +104,28 @@
 - [x] heartbeat 방식 결정 (`devices.lastSeenAt` 갱신으로 확정)
 - [x] 웹 원격 inbox UI (보기·승인) + 기기 목록 (웹→PC 종단済み: sync→Allow→poll→실행)
 - [ ] `cliagent fork` 등 데몬 CLI 생성 명령
+- [ ] 새 지시 종단 (웹 전송 → poll → 에이전트 응답)
+- [ ] 상세 307 블로커 해소
+- [ ] 예약 실행 ("PC 켜지면 실행" 경고 + 부팅 catch-up)
 
 ## 실행 계획 (2026-09-30)
 - P1: outbox·heartbeat 스키마 + 데몬 승인 중계. 돈값 코어의 로컬 절반.
 - P2: 웹 inbox (보기·승인) + 기기 목록. P1과 합쳐져 첫 종단(폰 승인) 완성.
 - P3: fork 실행·새 지시 + 예약 실행("PC 켜지면 실행" 경고付き). bypass 세션은 배지 + 원격 지시 주의.
 - P4: 도메인 연결·배포·과금. Storage·이어서 실행·자동화 관제는 2단계.
+
+## 기기·로그인 결정 (2026-10-01)
+- `devices`에 `platform`·`hostname` 컬럼 추가, dev 적용済み. 값은 Node `os` 모듈.
+- device_id = UUIDv7 (시간+랜덤). hostname 합성 반대. user_id = Auth id 그대로.
+- 식별은 env 아님. 상태 파일(`~/.config/cliagent/device.json`, 600). env는 배포 설정만.
+- 로그인은 loopback 우선 (`cliagent login` → 브라우저 OAuth → localhost 콜백 → whoami → 상태 파일). 페어링 코드는 headless 폴백.
+- OS 표시는 전부 텍스트. Apple·MS 로고는 상표 허가 필요라 제외. Linux 펭귄도 통일상 제외.
+- Fungies KYC 완료. Waffo 거절 메일 발송済み (출금 중국 한정).
+
+## P3 진행 (2026-10-01, 진행 중)
+- fork: `daemon/src/fork.ts` + `fork` 명령 + `sessions_meta` 대장 등록. 실측 6세션(`CLIAgentsDev (fork #1)`) 확인済み.
+- 새 지시: outbox `message` 타입 + 상세 입력창. 코드 완료, 종단 미검증.
+- 현재 블로커: 상세 화면 307 리다이렉트. db 행 존재·id 일치·user 일치·서버 재시작後도 지속. 다음 의심 순서: (1) 시크릿 창 캐시 배제 (2) 앱 `.env` 브랜치 대조.
 
 ## 데몬 종단 검증 (2026-09-29, 이 PC)
 - 명령: `daemon/`에서 build 후 자체 serve(번들 CLI 2.0.18, 4096, 비번) → `status`·`sessions` 성공. 세션 5개 제목 출력 확인.
