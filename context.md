@@ -99,10 +99,10 @@
 - [x] Next.js + Drizzle + Neon 보일러플레이트 (Storage 제외, OAuth Google+GitHub)
 - [x] Neon Auth dev/prod 분리 (브랜치별 Auth URL, `.env` 교체済み. GitHub 콜백 2개目は 배포 시)
 - [x] `daemon/` 스캐폴드 (서버 탐색·인증·세션 목록, 종단 검증済み)
-- [ ] 데몬 승인 중계 (`permissions` 조회·응답)
+- [x] 데몬 승인 중계 (`permissions` 조회·응답 + `sync` 거울, 실사격済み)
 - [x] 명령 outbox 테이블 (commands + cloud_tabs/messages/folds, Neon dev 적용済み)
-- [ ] heartbeat 방식 결정 (`lastSeenAt` 갱신 vs 전용 테이블)
-- [ ] 웹 원격 inbox UI (보기·승인) + 기기 목록 (per-기기 on/off)
+- [x] heartbeat 방식 결정 (`devices.lastSeenAt` 갱신으로 확정)
+- [x] 웹 원격 inbox UI (보기·승인) + 기기 목록 (웹→PC 종단済み: sync→Allow→poll→실행)
 - [ ] `cliagent fork` 등 데몬 CLI 생성 명령
 
 ## 실행 계획 (2026-09-30)
@@ -115,6 +115,11 @@
 - 명령: `daemon/`에서 build 후 자체 serve(번들 CLI 2.0.18, 4096, 비번) → `status`·`sessions` 성공. 세션 5개 제목 출력 확인.
 - 교훈 3개: (1) 데스크톱 v2 API는 `/api/*` 아래 + 인증 필수. HTML 폴백에 속지 말 것. (2) health 엔드포인트 없음. 탐색 기준은 `/api/session` 목록 조회로 변경. 목록 형태 `{data:[...]}` 래퍼 주의. (3) 시스템 CLI 1.18과 데스크톱 번들 2.0.18 버전 꼬임. serve는 번들 CLI로 띄울 것.
 - `daemon/tsconfig.json` 수정 1건 (`lib` DOM + `types` node)._tsbuildinfo 계열은 `.gitignore`済み.
+
+## 승인 종단 (2026-10-01 완료, 이 PC)
+- 흐름: ask 설정 serve(4097) → bash 지시 → pending 포착 → 데몬 `sync` 거울 → 웹 상세 Allow → outbox → 데몬 `poll` 응답 → 에이전트 실행 → 파일 `WEB-APPROVE-OK` 확인. 대기 목록 비움 확인.
+- 테스트 세션·파일·serve 정리済み. `pkill -f` 자기매칭 주의 (PID 지정으로 대체).
+- 남은 것: P3 (fork·새 지시·예약 실행), P4 (도메인·배포·과금).
 
 ## outbox 종단 (2026-09-30 완료, 이 PC)
 - 스키마: `commands`(우체통, pending→delivered→done→expired + 멱등키·만료) + 거울 3종(`cloud_tabs` UPDATE 헤더, `cloud_messages` INSERT-only 복합키, `cloud_folds` epoch 요약). `0001_massive_plazm.sql` → Neon dev 적용, 6 테이블 실측 확인.
