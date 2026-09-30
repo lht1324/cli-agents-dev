@@ -1,5 +1,6 @@
-import { apiGet, discoverServer, type DiscoveredServer } from "./server";
+import { apiGet, apiPost, discoverServer, type DiscoveredServer } from "./server";
 import { hostInfo, newDeviceId, readState, writeState } from "./device";
+import { listPending, reply, type ReplyDecision } from "./permissions";
 import { db } from "./db";
 import { pollCommands } from "./commands";
 
@@ -53,6 +54,31 @@ async function onRegister(userId: string | undefined, deviceId: string | undefin
     console.log(`registered: ${id} (${host.label})`);
 }
 
+async function onApprove(requestID: string | undefined, decision: string | undefined): Promise<void> {
+    const server = await requireServer();
+    if (!requestID) {
+        const pending = await listPending(server);
+        if (pending.length === 0) {
+            console.log("no pending requests");
+            return;
+        }
+        for (const p of pending) {
+            console.log(`${p.id}\tsession=${p.sessionID}\taction=${p.action}\tresources=${p.resources.join(",")}${p.message ? `\t${p.message.slice(0, 120)}` : ""}`);
+        }
+        return;
+    }
+    if (decision !== "once" && decision !== "always" && decision !== "reject") {
+        throw new Error("usage: cliagent approve <request-id> <once|always|reject>");
+    }
+    const pending = await listPending(server);
+    const target = pending.find((p) => p.id === requestID);
+    if (!target) {
+        throw new Error(`request not found or already resolved: ${requestID}`);
+    }
+    await reply(server, target.sessionID, requestID, decision as ReplyDecision);
+    console.log(`replied: ${requestID} -> ${decision}`);
+}
+
 async function onHeartbeat(): Promise<void> {
     const state = readState();
     if (!state) {
@@ -86,8 +112,10 @@ async function main(): Promise<void> {
         await onHeartbeat();
     } else if (cmd === "poll") {
         await pollCommands();
+    } else if (cmd === "approve") {
+        await onApprove(process.argv[3], process.argv[4]);
     } else {
-        console.log("usage: cliagent <login|register|status|sessions|poll|heartbeat>");
+        console.log("usage: cliagent <login|register|status|sessions|poll|heartbeat|approve>");
         process.exitCode = 1;
     }
 }

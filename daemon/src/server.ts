@@ -84,6 +84,25 @@ export async function discoverServer(): Promise<DiscoveredServer | null> {
     return null;
 }
 
+export async function apiPost(server: DiscoveredServer, path: string, body: unknown): Promise<void> {
+    const headers: Record<string, string> = { Accept: "application/json", "Content-Type": "application/json" };
+    if (server.auth) {
+        headers.Authorization = basicAuth(server.auth);
+    }
+    const res = await fetch(`${server.url}${server.prefix}${path}`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(10000),
+    });
+    if (res.status === 401) {
+        throw new Error("server requires authentication. set OPENCODE_SERVER_PASSWORD");
+    }
+    if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`server responded ${res.status} for ${path}: ${text.slice(0, 200)}`);
+    }
+}
 export async function apiGet(server: DiscoveredServer, path: string): Promise<unknown> {
     const headers: Record<string, string> = { Accept: "application/json" };
     if (server.auth) {
