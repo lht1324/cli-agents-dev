@@ -1,4 +1,6 @@
 import { apiGet, discoverServer, type DiscoveredServer } from "./server";
+import { hostInfo, newDeviceId, readState, writeState } from "./device";
+import { db } from "./db";
 import { pollCommands } from "./commands";
 
 interface SessionRow {
@@ -35,6 +37,41 @@ async function onLogin(): Promise<void> {
     console.log("pairing is not implemented yet. run `cliagent status` to verify local discovery first.");
 }
 
+async function onRegister(userId: string | undefined, deviceId: string | undefined): Promise<void> {
+    if (!userId) {
+        throw new Error("usage: cliagent register <user-id> [device-id]");
+    }
+    const id = deviceId ?? newDeviceId();
+    writeState({ deviceId: id, userId });
+    const host = hostInfo();
+    const sql = db();
+    await sql`
+        INSERT INTO devices (id, user_id, label, platform, hostname, last_seen_at)
+        VALUES (${id}, ${userId}, ${host.label}, ${host.platform}, ${host.hostname}, NOW())
+        ON CONFLICT (id) DO UPDATE SET user_id = EXCLUDED.user_id, last_seen_at = NOW()
+    `;
+    console.log(`registered: ${id} (${host.label})`);
+}
+
+async function onHeartbeat(): Promise<void> {
+    const state = readState();
+    if (!state) {
+        throw new Error("not registered. run `cliagent register <user-id>` first");
+    }
+    const host = hostInfo();
+    const sql = db();
+    const rows = await sql`
+        UPDATE devices
+        SET last_seen_at = NOW(), platform = ${host.platform}, hostname = ${host.hostname}
+        WHERE id = ${state.deviceId}
+        RETURNING id
+    `;
+    if (rows.length === 0) {
+        throw new Error("device row missing. run `cliagent register` again");
+    }
+    console.log(`heartbeat: ${state.deviceId} (${host.label})`);
+}
+
 async function main(): Promise<void> {
     const cmd = process.argv[2];
     if (cmd === "status") {
@@ -43,10 +80,14 @@ async function main(): Promise<void> {
         await onSessions();
     } else if (cmd === "login") {
         await onLogin();
+    } else if (cmd === "register") {
+        await onRegister(process.argv[3], process.argv[4]);
+    } else if (cmd === "heartbeat") {
+        await onHeartbeat();
     } else if (cmd === "poll") {
         await pollCommands();
     } else {
-        console.log("usage: cliagent <login|status|sessions|poll>");
+        console.log("usage: cliagent <login|register|status|sessions|poll|heartbeat>");
         process.exitCode = 1;
     }
 }
