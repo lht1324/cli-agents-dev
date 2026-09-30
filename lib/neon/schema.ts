@@ -76,6 +76,23 @@ export const cloudMessages = pgTable(
     (t) => [primaryKey({ columns: [t.tabId, t.seq] })],
 );
 
+// 대기 승인 거울. 로컬에만 있는 pending을 웹에 보여주기 위해 데몬이 올린다.
+// status 흐름: open → resolved. 해결된 건 데몬이 표시한다.
+export const pendingApprovals = pgTable("pending_approvals", {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull(),
+    deviceId: text("device_id")
+        .notNull()
+        .references(() => devices.id),
+    sessionId: text("session_id").notNull(),
+    action: text("action").notNull(),
+    resources: text("resources").notNull(),
+    message: text("message"),
+    status: text("status").notNull().default("open"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+});
+
 // 이전 epoch 접기. 압축 발동 시 이전 구간 요약 1줄만 보관한다.
 export const cloudFolds = pgTable(
     "cloud_folds",
