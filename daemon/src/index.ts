@@ -1,5 +1,6 @@
 import { apiGet, apiPost, discoverServer, type DiscoveredServer } from "./server";
 import { hostInfo, newDeviceId, readState, writeState } from "./device";
+import { forkAndRegister } from "./fork";
 import { listPending, reply, pushPending, type ReplyDecision } from "./permissions";
 import { db } from "./db";
 import { pollCommands } from "./commands";
@@ -79,6 +80,15 @@ async function onApprove(requestID: string | undefined, decision: string | undef
     console.log(`replied: ${requestID} -> ${decision}`);
 }
 
+async function onFork(sessionID: string | undefined): Promise<void> {
+    if (!sessionID) {
+        throw new Error("usage: cliagent fork <session-id>");
+    }
+    const server = await requireServer();
+    const id = await forkAndRegister(server, sessionID);
+    console.log(`forked: ${id}`);
+}
+
 async function onSync(): Promise<void> {
     const server = await requireServer();
     const result = await pushPending(server);
@@ -118,12 +128,14 @@ async function main(): Promise<void> {
         await onHeartbeat();
     } else if (cmd === "sync") {
         await onSync();
+    } else if (cmd === "fork") {
+        await onFork(process.argv[3]);
     } else if (cmd === "poll") {
         await pollCommands();
     } else if (cmd === "approve") {
         await onApprove(process.argv[3], process.argv[4]);
     } else {
-        console.log("usage: cliagent <login|register|status|sessions|poll|heartbeat|approve|sync>");
+        console.log("usage: cliagent <login|register|status|sessions|poll|heartbeat|approve|sync|fork>");
         process.exitCode = 1;
     }
 }
