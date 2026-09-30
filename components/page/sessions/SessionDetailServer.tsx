@@ -28,18 +28,25 @@ export default async function SessionDetailServer({ id }: { id: string }) {
             ),
         )
         .orderBy(desc(pendingApprovals.createdAt));
-    if (rows.length === 0) {
+    const meta = await db
+        .select({
+            title: sessionsMeta.title,
+            status: sessionsMeta.status,
+            deviceId: sessionsMeta.deviceId,
+            lastSyncAt: sessionsMeta.lastSyncAt,
+        })
+        .from(sessionsMeta)
+        .innerJoin(devices, eq(sessionsMeta.deviceId, devices.id))
+        .where(and(eq(sessionsMeta.id, id), eq(devices.userId, session.user.id)));
+    const deviceId = rows.length > 0 ? rows[0].deviceId : (meta[0]?.deviceId ?? null);
+    if (!deviceId) {
         redirect("/sessions");
     }
-    const meta = await db
-        .select({ title: sessionsMeta.title, status: sessionsMeta.status, lastSyncAt: sessionsMeta.lastSyncAt })
-        .from(sessionsMeta)
-        .where(eq(sessionsMeta.id, id));
     const info: SessionInfo = {
         id,
         title: meta[0]?.title ?? id,
         status: meta[0]?.status ?? "unknown",
-        deviceId: rows[0].deviceId,
+        deviceId,
         lastSyncAt: meta[0]?.lastSyncAt?.toISOString() ?? null,
     };
     const approvals: ApprovalRow[] = rows.map((r) => ({
