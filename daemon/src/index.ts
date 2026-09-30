@@ -1,6 +1,6 @@
 import { apiGet, apiPost, discoverServer, type DiscoveredServer } from "./server";
 import { hostInfo, newDeviceId, readState, writeState } from "./device";
-import { listPending, reply, type ReplyDecision } from "./permissions";
+import { listPending, reply, pushPending, type ReplyDecision } from "./permissions";
 import { db } from "./db";
 import { pollCommands } from "./commands";
 
@@ -79,6 +79,12 @@ async function onApprove(requestID: string | undefined, decision: string | undef
     console.log(`replied: ${requestID} -> ${decision}`);
 }
 
+async function onSync(): Promise<void> {
+    const server = await requireServer();
+    const result = await pushPending(server);
+    console.log(`pushed: ${result.open} open`);
+}
+
 async function onHeartbeat(): Promise<void> {
     const state = readState();
     if (!state) {
@@ -110,12 +116,14 @@ async function main(): Promise<void> {
         await onRegister(process.argv[3], process.argv[4]);
     } else if (cmd === "heartbeat") {
         await onHeartbeat();
+    } else if (cmd === "sync") {
+        await onSync();
     } else if (cmd === "poll") {
         await pollCommands();
     } else if (cmd === "approve") {
         await onApprove(process.argv[3], process.argv[4]);
     } else {
-        console.log("usage: cliagent <login|register|status|sessions|poll|heartbeat|approve>");
+        console.log("usage: cliagent <login|register|status|sessions|poll|heartbeat|approve|sync>");
         process.exitCode = 1;
     }
 }

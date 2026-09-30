@@ -1,0 +1,95 @@
+"use client";
+
+import { useCallback, useMemo, useState } from "react";
+
+export interface SessionInfo {
+    id: string;
+    title: string;
+    status: string;
+    deviceId: string;
+    lastSyncAt: string | null;
+}
+
+export interface ApprovalRow {
+    id: string;
+    action: string;
+    resources: string;
+    message: string | null;
+}
+
+async function onDecide(
+    userId: string,
+    deviceId: string,
+    sessionID: string,
+    requestID: string,
+    decision: "once" | "reject",
+    setBusy: (v: string | null) => void,
+    setDone: (v: string | null) => void,
+): Promise<void> {
+    setBusy(requestID);
+    setDone(null);
+    try {
+        const res = await fetch("/api/commands", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                userId,
+                deviceId,
+                type: "approve",
+                payload: JSON.stringify({ sessionID, requestID, decision }),
+            }),
+        });
+        if (!res.ok) {
+            setDone("failed to queue");
+            return;
+        }
+        setDone(`${requestID} -> ${decision} queued. runs when the PC syncs.`);
+    } finally {
+        setBusy(null);
+    }
+}
+
+export default function SessionDetailClient({
+    info,
+    approvals,
+    userId,
+}: {
+    info: SessionInfo;
+    approvals: ApprovalRow[];
+    userId: string;
+}) {
+    const [busy, setBusy] = useState<string | null>(null);
+    const [done, setDone] = useState<string | null>(null);
+    const rows = useMemo(() => approvals, [approvals]);
+    const onClickDecide = useCallback(
+        (requestID: string, decision: "once" | "reject") =>
+            onDecide(userId, info.deviceId, info.id, requestID, decision, setBusy, setDone),
+        [info, userId],
+    );
+    return (
+        <main>
+            <h1>{info.title}</h1>
+            <p>
+                {info.status} · {info.lastSyncAt ? `synced ${info.lastSyncAt}` : "never synced"}
+            </p>
+            <h2>Pending approvals</h2>
+            {rows.length === 0 && <p>No pending requests.</p>}
+            <ul>
+                {rows.map((row) => (
+                    <li key={row.id}>
+                        <span>{row.action}</span>
+                        <span>{row.resources}</span>
+                        {row.message && <span>{row.message.slice(0, 200)}</span>}
+                        <button onClick={() => onClickDecide(row.id, "once")} disabled={busy === row.id}>
+                            Allow
+                        </button>
+                        <button onClick={() => onClickDecide(row.id, "reject")} disabled={busy === row.id}>
+                            Deny
+                        </button>
+                    </li>
+                ))}
+            </ul>
+            {done && <p>{done}</p>}
+        </main>
+    );
+}

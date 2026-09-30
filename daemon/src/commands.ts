@@ -1,4 +1,6 @@
 import { db } from "./db";
+import { readState } from "./device";
+import { discoverServer, reply } from "./permissions";
 
 interface CommandRow {
     id: string;
@@ -13,16 +15,41 @@ interface ExecResult {
 }
 
 function deviceId(): string {
-    const id = process.env.CLIAGENT_DEVICE_ID;
-    if (!id) {
-        throw new Error("CLIAGENT_DEVICE_ID is not set. pairing(login) 구현 전까지 수동으로 넣는다");
+    const fromEnv = process.env.CLIAGENT_DEVICE_ID;
+    if (fromEnv) {
+        return fromEnv;
     }
-    return id;
+    const state = readState();
+    if (!state) {
+        throw new Error("CLIAGENT_DEVICE_ID is not set and no state file. run `cliagent register <user-id>` first");
+    }
+    return state.deviceId;
+}
+
+interface ApprovePayload {
+    sessionID?: unknown;
+    requestID?: unknown;
+    decision?: unknown;
 }
 
 async function execute(type: string, payload: string): Promise<ExecResult> {
     if (type === "ping") {
         return { ok: true, data: "pong" };
+    }
+    if (type === "approve") {
+        const body = JSON.parse(payload) as ApprovePayload;
+        if (typeof body.sessionID !== "string" || typeof body.requestID !== "string") {
+            return { ok: false, error: "approve payload needs sessionID and requestID" };
+        }
+        if (body.decision !== "once" && body.decision !== "always" && body.decision !== "reject") {
+            return { ok: false, error: "approve payload needs decision once|always|reject" };
+        }
+        const server = await discoverServer();
+        if (!server) {
+            return { ok: false, error: "no running opencode server" };
+        }
+        await reply(server, body.sessionID, body.requestID, body.decision);
+        return { ok: true, data: `${body.requestID} -> ${body.decision}` };
     }
     return { ok: false, error: `unknown command type: ${type} (payload kept: ${payload.length} chars)` };
 }
