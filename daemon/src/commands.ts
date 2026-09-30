@@ -1,6 +1,7 @@
 import { db } from "./db";
 import { readState } from "./device";
-import { discoverServer, reply } from "./permissions";
+import { discoverServer } from "./server";
+import { reply } from "./permissions";
 
 interface CommandRow {
     id: string;
