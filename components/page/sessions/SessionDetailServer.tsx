@@ -10,43 +10,43 @@ export default async function SessionDetailServer({ id }: { id: string }) {
         redirect("/auth/sign-in");
     }
     const db = getDb();
-    const meta = await db
-        .select({
-            id: sessionsMeta.id,
-            title: sessionsMeta.title,
-            status: sessionsMeta.status,
-            deviceId: sessionsMeta.deviceId,
-            lastSyncAt: sessionsMeta.lastSyncAt,
-        })
-        .from(sessionsMeta)
-        .innerJoin(devices, eq(sessionsMeta.deviceId, devices.id))
-        .where(and(eq(sessionsMeta.id, id), eq(devices.userId, session.user.id)));
-    if (meta.length === 0) {
-        redirect("/sessions");
-    }
-    const info: SessionInfo = {
-        id: meta[0].id,
-        title: meta[0].title,
-        status: meta[0].status,
-        deviceId: meta[0].deviceId,
-        lastSyncAt: meta[0].lastSyncAt?.toISOString() ?? null,
-    };
     const rows = await db
         .select({
             id: pendingApprovals.id,
             action: pendingApprovals.action,
             resources: pendingApprovals.resources,
             message: pendingApprovals.message,
+            deviceId: pendingApprovals.deviceId,
         })
         .from(pendingApprovals)
+        .innerJoin(devices, eq(pendingApprovals.deviceId, devices.id))
         .where(
             and(
                 eq(pendingApprovals.sessionId, id),
-                eq(pendingApprovals.deviceId, meta[0].deviceId),
+                eq(devices.userId, session.user.id),
                 eq(pendingApprovals.status, "open"),
             ),
         )
         .orderBy(desc(pendingApprovals.createdAt));
-    const approvals: ApprovalRow[] = rows.map((r) => ({ ...r, message: r.message ?? null }));
+    if (rows.length === 0) {
+        redirect("/sessions");
+    }
+    const meta = await db
+        .select({ title: sessionsMeta.title, status: sessionsMeta.status, lastSyncAt: sessionsMeta.lastSyncAt })
+        .from(sessionsMeta)
+        .where(eq(sessionsMeta.id, id));
+    const info: SessionInfo = {
+        id,
+        title: meta[0]?.title ?? id,
+        status: meta[0]?.status ?? "unknown",
+        deviceId: rows[0].deviceId,
+        lastSyncAt: meta[0]?.lastSyncAt?.toISOString() ?? null,
+    };
+    const approvals: ApprovalRow[] = rows.map((r) => ({
+        id: r.id,
+        action: r.action,
+        resources: r.resources,
+        message: r.message ?? null,
+    }));
     return <SessionDetailClient info={info} approvals={approvals} userId={session.user.id} />;
 }
