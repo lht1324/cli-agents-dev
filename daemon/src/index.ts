@@ -60,13 +60,13 @@ async function onHeartbeat(): Promise<void> {
     }
     const host = hostInfo();
     const sql = db();
-    const rows = await sql`
+    await sql`
         UPDATE devices
         SET last_seen_at = NOW(), platform = ${host.platform}, hostname = ${host.hostname}
         WHERE id = ${state.deviceId}
-        RETURNING id
     `;
-    if (rows.length === 0) {
+    const found = (await sql`SELECT id FROM devices WHERE id = ${state.deviceId}`) as { id: string }[];
+    if (found.length === 0) {
         throw new Error("device row missing. run `cliagent register` again");
     }
     console.log(`heartbeat: ${state.deviceId} (${host.label})`);
