@@ -60,12 +60,44 @@ export default function SessionDetailClient({
 }) {
     const [busy, setBusy] = useState<string | null>(null);
     const [done, setDone] = useState<string | null>(null);
+    const [draft, setDraft] = useState("");
     const rows = useMemo(() => approvals, [approvals]);
     const onClickDecide = useCallback(
         (requestID: string, decision: "once" | "reject") =>
             onDecide(userId, info.deviceId, info.id, requestID, decision, setBusy, setDone),
         [info, userId],
     );
+    const onClickSend = useCallback(async () => {
+        const text = draft.trim();
+        if (text.length === 0) {
+            return;
+        }
+        setBusy("send");
+        setDone(null);
+        try {
+            const res = await fetch("/api/commands", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    userId,
+                    deviceId: info.deviceId,
+                    type: "message",
+                    payload: JSON.stringify({ sessionID: info.id, text }),
+                }),
+            });
+            if (!res.ok) {
+                setDone("failed to queue");
+                return;
+            }
+            setDraft("");
+            setDone("message queued. runs when the PC syncs.");
+        } finally {
+            setBusy(null);
+        }
+    }, [draft, info, userId]);
+    const onChangeDraft = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        setDraft(e.target.value);
+    }, []);
     return (
         <main>
             <h1>{info.title}</h1>
@@ -90,6 +122,11 @@ export default function SessionDetailClient({
                 ))}
             </ul>
             {done && <p>{done}</p>}
+            <h2>Send a message</h2>
+            <textarea value={draft} onChange={onChangeDraft} rows={3} />
+            <button onClick={onClickSend} disabled={busy !== null || draft.trim().length === 0}>
+                Send
+            </button>
         </main>
     );
 }

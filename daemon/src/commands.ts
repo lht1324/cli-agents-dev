@@ -1,6 +1,6 @@
 import { db } from "./db";
 import { readState } from "./device";
-import { discoverServer } from "./server";
+import { apiPost, discoverServer } from "./server";
 import { reply } from "./permissions";
 
 interface CommandRow {
@@ -36,6 +36,18 @@ interface ApprovePayload {
 async function execute(type: string, payload: string): Promise<ExecResult> {
     if (type === "ping") {
         return { ok: true, data: "pong" };
+    }
+    if (type === "message") {
+        const body = JSON.parse(payload) as { sessionID?: unknown; text?: unknown };
+        if (typeof body.sessionID !== "string" || typeof body.text !== "string" || body.text.length === 0) {
+            return { ok: false, error: "message payload needs sessionID and text" };
+        }
+        const server = await discoverServer();
+        if (!server) {
+            return { ok: false, error: "no running opencode server" };
+        }
+        await apiPost(server, `/session/${body.sessionID}/prompt`, { text: body.text });
+        return { ok: true, data: `sent to ${body.sessionID}` };
     }
     if (type === "approve") {
         const body = JSON.parse(payload) as ApprovePayload;
