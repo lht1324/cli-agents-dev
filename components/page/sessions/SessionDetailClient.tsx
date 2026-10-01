@@ -361,7 +361,7 @@ export default function SessionDetailClient({
                             onChange={onChangeAgent}
                             className="flex-1 rounded border border-line bg-panel p-2 font-mono text-sm"
                         >
-                            <option value="">Agent…</option>
+                            {agent.length === 0 && <option value="">Agent…</option>}
                             {catalog.agents.map((a, i) => (
                                 <option key={a.id ?? i} value={a.id ?? ""}>
                                     {a.name ?? a.id}
@@ -382,7 +382,7 @@ export default function SessionDetailClient({
                             onChange={onChangeModel}
                             className="flex-1 rounded border border-line bg-panel p-2 font-mono text-sm"
                         >
-                            <option value="">Model…</option>
+                            {modelId.length === 0 && <option value="">Model…</option>}
                             {providers.map(([providerID, models]) => (
                                 <optgroup key={providerID} label={providerID}>
                                     {models.map((m) => (
@@ -399,7 +399,7 @@ export default function SessionDetailClient({
                             disabled={variants.length === 0}
                             className="rounded border border-line bg-panel p-2 font-mono text-sm disabled:opacity-50"
                         >
-                            <option value="">Variant…</option>
+                            {variant.length === 0 && <option value="">Variant…</option>}
                             {variants.map((v) => (
                                 <option key={v.id} value={v.id}>
                                     {v.id}
