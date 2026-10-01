@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { parseToolCall, toolDetail, toolSummary } from "./toolFormat";
 import MarkdownText from "./MarkdownText";
 
@@ -130,8 +130,22 @@ export default function SessionDetailClient({
     const [busy, setBusy] = useState<string | null>(null);
     const [done, setDone] = useState<string | null>(null);
     const [draft, setDraft] = useState("");
-    const rows = useMemo(() => approvals, [approvals]);
+    const [showJump, setShowJump] = useState(false);
+    const endRef = useRef<HTMLDivElement | null>(null);
+    const scrollToEnd = useCallback(() => {
+        endRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, []);
+    const onScrollPage = useCallback(() => {
+        const distance = document.documentElement.scrollHeight - window.innerHeight - window.scrollY;
+        setShowJump(distance > 400);
+    }, []);
+    useEffect(() => {
+        endRef.current?.scrollIntoView();
+        window.addEventListener("scroll", onScrollPage, { passive: true });
+        return () => window.removeEventListener("scroll", onScrollPage);
+    }, [onScrollPage]);
     const thread = useMemo(() => messages, [messages]);
+    const rows = useMemo(() => approvals, [approvals]);
     const catalog = useMemo(() => parseCatalog(catalogJson), [catalogJson]);
     const currentModel = useMemo(() => parseCurrentModel(info.model), [info.model]);
     const [agent, setAgent] = useState(info.agent ?? "");
@@ -463,6 +477,16 @@ export default function SessionDetailClient({
             >
                 Send
             </button>
+            <div ref={endRef} />
+            {showJump && (
+                <button
+                    onClick={scrollToEnd}
+                    aria-label="Scroll to bottom"
+                    className="fixed bottom-6 right-6 rounded-full border border-line bg-panel px-4 py-2 font-mono text-lg text-fog"
+                >
+                    ↓
+                </button>
+            )}
         </main>
     );
 }
