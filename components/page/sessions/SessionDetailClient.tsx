@@ -8,6 +8,7 @@ export interface SessionInfo {
     status: string;
     deviceId: string;
     lastSyncAt: string | null;
+    deviceLastSeenAt: string | null;
 }
 
 export interface ApprovalRow {
@@ -62,6 +63,13 @@ export default function SessionDetailClient({
     const [done, setDone] = useState<string | null>(null);
     const [draft, setDraft] = useState("");
     const rows = useMemo(() => approvals, [approvals]);
+    const offlineNote = useMemo(() => {
+        if (!info.deviceLastSeenAt) {
+            return "PC가 오프라인이면 켜질 때 실행됩니다.";
+        }
+        const minutes = (Date.now() - new Date(info.deviceLastSeenAt).getTime()) / 60000;
+        return minutes >= 2 ? "PC가 오프라인이면 켜질 때 실행됩니다." : null;
+    }, [info.deviceLastSeenAt]);
     const onClickDecide = useCallback(
         (requestID: string, decision: "once" | "reject") =>
             onDecide(userId, info.deviceId, info.id, requestID, decision, setBusy, setDone),
@@ -123,6 +131,7 @@ export default function SessionDetailClient({
             </ul>
             {done && <p>{done}</p>}
             <h2>Send a message</h2>
+            {offlineNote && <p>{offlineNote}</p>}
             <textarea value={draft} onChange={onChangeDraft} rows={3} />
             <button onClick={onClickSend} disabled={busy !== null || draft.trim().length === 0}>
                 Send

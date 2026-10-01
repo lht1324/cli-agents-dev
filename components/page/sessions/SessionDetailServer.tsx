@@ -34,6 +34,7 @@ export default async function SessionDetailServer({ id }: { id: string }) {
             status: sessionsMeta.status,
             deviceId: sessionsMeta.deviceId,
             lastSyncAt: sessionsMeta.lastSyncAt,
+            deviceLastSeenAt: devices.lastSeenAt,
         })
         .from(sessionsMeta)
         .innerJoin(devices, eq(sessionsMeta.deviceId, devices.id))
@@ -48,6 +49,7 @@ export default async function SessionDetailServer({ id }: { id: string }) {
         status: meta[0]?.status ?? "unknown",
         deviceId,
         lastSyncAt: meta[0]?.lastSyncAt?.toISOString() ?? null,
+        deviceLastSeenAt: meta[0]?.deviceLastSeenAt?.toISOString() ?? null,
     };
     const approvals: ApprovalRow[] = rows.map((r) => ({
         id: r.id,
