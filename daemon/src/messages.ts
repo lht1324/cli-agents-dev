@@ -6,6 +6,7 @@ interface ServerMessage {
     id: string;
     type: string;
     time?: { created?: number };
+    text?: string;
     payload?: { text?: string };
     content?: { type: string; text?: string; name?: string; state?: { input?: unknown } }[];
     summary?: string;
@@ -27,9 +28,14 @@ function flatten(messages: ServerMessage[]): PlainRow[] {
     const rows: PlainRow[] = [];
     messages.forEach((m, seq) => {
         if (m.type === "user") {
-            const text = m.payload?.text ?? "";
+            const text = m.text ?? m.payload?.text ?? "";
             if (text.length > 0) {
                 rows.push({ seq, role: "user", kind: "text", body: cap(text, 8000) });
+            }
+            const files = (m as { files?: { name?: string; mime?: string; data?: string }[] }).files ?? [];
+            for (const f of files) {
+                const kb = f.data ? Math.round(f.data.length / 1024) : 0;
+                rows.push({ seq, role: "user", kind: "file", body: `${f.name ?? "file"} (${f.mime ?? "?"}, ${kb}KB, on-demand)` });
             }
             return;
         }
