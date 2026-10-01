@@ -1,2 +1,18 @@
 @import "tailwindcss";
 @import "@neondatabase/auth-ui/tailwind";
+
+@theme {
+    --color-ink: #0a0c10;
+    --color-panel: #12151c;
+    --color-line: #232936;
+    --color-fog: #e6e9ef;
+    --color-dim: #8b93a5;
+    --color-go: #3fb950;
+    --color-warn: #d29922;
+    --color-stop: #f85149;
+}
+
+body {
+    background-color: var(--color-ink);
+    color: var(--color-fog);
+}

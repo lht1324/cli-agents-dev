@@ -65,10 +65,10 @@ export default function SessionDetailClient({
     const rows = useMemo(() => approvals, [approvals]);
     const offlineNote = useMemo(() => {
         if (!info.deviceLastSeenAt) {
-            return "PC가 오프라인이면 켜질 때 실행됩니다.";
+            return "Runs when the PC is back online.";
         }
         const minutes = (Date.now() - new Date(info.deviceLastSeenAt).getTime()) / 60000;
-        return minutes >= 2 ? "PC가 오프라인이면 켜질 때 실행됩니다." : null;
+        return minutes >= 2 ? "Runs when the PC is back online." : null;
     }, [info.deviceLastSeenAt]);
     const onClickDecide = useCallback(
         (requestID: string, decision: "once" | "reject") =>
@@ -107,33 +107,55 @@ export default function SessionDetailClient({
         setDraft(e.target.value);
     }, []);
     return (
-        <main>
-            <h1>{info.title}</h1>
-            <p>
+        <main className="mx-auto max-w-3xl px-4 py-10">
+            <h1 className="text-2xl font-bold">{info.title}</h1>
+            <p className="mt-1 font-mono text-xs text-dim">
                 {info.status} · {info.lastSyncAt ? `synced ${info.lastSyncAt}` : "never synced"}
             </p>
-            <h2>Pending approvals</h2>
-            {rows.length === 0 && <p>No pending requests.</p>}
-            <ul>
+            <h2 className="mt-8 font-mono text-sm font-bold text-dim">Pending approvals</h2>
+            {rows.length === 0 && <p className="mt-2 text-dim">No pending requests.</p>}
+            <ul className="mt-2 space-y-2">
                 {rows.map((row) => (
-                    <li key={row.id}>
-                        <span>{row.action}</span>
-                        <span>{row.resources}</span>
-                        {row.message && <span>{row.message.slice(0, 200)}</span>}
-                        <button onClick={() => onClickDecide(row.id, "once")} disabled={busy === row.id}>
-                            Allow
-                        </button>
-                        <button onClick={() => onClickDecide(row.id, "reject")} disabled={busy === row.id}>
-                            Deny
-                        </button>
+                    <li key={row.id} className="rounded border border-line bg-panel p-4">
+                        <p className="font-mono text-sm">
+                            {row.action} <span className="text-dim">{row.resources}</span>
+                        </p>
+                        {row.message && (
+                            <p className="mt-1 text-sm text-dim">{row.message.slice(0, 200)}</p>
+                        )}
+                        <div className="mt-3 flex gap-2">
+                            <button
+                                onClick={() => onClickDecide(row.id, "once")}
+                                disabled={busy === row.id}
+                                className="rounded bg-go px-3 py-1 font-mono text-xs font-bold text-ink disabled:opacity-50"
+                            >
+                                Allow
+                            </button>
+                            <button
+                                onClick={() => onClickDecide(row.id, "reject")}
+                                disabled={busy === row.id}
+                                className="rounded border border-line px-3 py-1 font-mono text-xs text-fog disabled:opacity-50"
+                            >
+                                Deny
+                            </button>
+                        </div>
                     </li>
                 ))}
             </ul>
-            {done && <p>{done}</p>}
-            <h2>Send a message</h2>
-            {offlineNote && <p>{offlineNote}</p>}
-            <textarea value={draft} onChange={onChangeDraft} rows={3} />
-            <button onClick={onClickSend} disabled={busy !== null || draft.trim().length === 0}>
+            {done && <p className="mt-2 font-mono text-xs text-go">{done}</p>}
+            <h2 className="mt-8 font-mono text-sm font-bold text-dim">Send a message</h2>
+            {offlineNote && <p className="mt-2 font-mono text-xs text-warn">{offlineNote}</p>}
+            <textarea
+                value={draft}
+                onChange={onChangeDraft}
+                rows={3}
+                className="mt-2 w-full rounded border border-line bg-panel p-3 font-mono text-sm"
+            />
+            <button
+                onClick={onClickSend}
+                disabled={busy !== null || draft.trim().length === 0}
+                className="mt-2 rounded bg-go px-4 py-2 font-mono text-sm font-bold text-ink disabled:opacity-50"
+            >
                 Send
             </button>
         </main>
