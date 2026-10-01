@@ -1,4 +1,5 @@
 import { apiGet, type DiscoveredServer } from "./server";
+import { formatToolCall, formatToolExit } from "./tools";
 import { db } from "./db";
 import { readState } from "./device";
 
@@ -8,7 +9,12 @@ interface ServerMessage {
     time?: { created?: number };
     text?: string;
     payload?: { text?: string };
-    content?: { type: string; text?: string; name?: string; state?: { input?: unknown } }[];
+    content?: {
+        type: string;
+        text?: string;
+        name?: string;
+        state?: { input?: unknown; content?: { type?: string; text?: string }[] };
+    }[];
     summary?: string;
 }
 
@@ -50,8 +56,18 @@ function flatten(messages: ServerMessage[]): PlainRow[] {
                 if (part.type === "text" && part.text && part.text.length > 0) {
                     rows.push({ seq, role: "assistant", kind: "text", body: cap(part.text, 8000), createdAt });
                 } else if (part.type === "tool") {
-                    const input = part.state?.input ? JSON.stringify(part.state.input).slice(0, 200) : "";
-                    rows.push({ seq, role: "assistant", kind: "tool", body: `${part.name ?? "tool"} ${input}`.trim(), createdAt });
+                    const toolName = part.name ?? "tool";
+                    const outputs = part.state?.content ?? [];
+                    const texts = outputs.filter((o) => o.type === "text").map((o) => o.text ?? "");
+                    const exit = formatToolExit(toolName, texts.join("\n"));
+                    const hasImage = outputs.some((o) => o.type === "file");
+                    const summary = formatToolCall(toolName, part.state?.input);
+                    const suffix = `${exit ? ` ${exit}` : ""}${hasImage ? " +image" : ""}`;
+                    let body = `${summary}${suffix}`;
+                    if (toolName === "question" && texts.length > 0) {
+                        body = `${summary}\n→ ${cap(texts.join(" ").replace(/^User has answered your questions:\s*/, ""), 500)}`;
+                    }
+                    rows.push({ seq, role: "assistant", kind: "tool", body: cap(body, 1000), createdAt });
                 }
             }
             return;
