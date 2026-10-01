@@ -23,6 +23,7 @@ export interface ThreadRow {
     role: string;
     kind: string;
     body: string;
+    createdAt: string | null;
 }
 
 async function onDecide(
@@ -73,6 +74,12 @@ export default function SessionDetailClient({
     const [draft, setDraft] = useState("");
     const rows = useMemo(() => approvals, [approvals]);
     const thread = useMemo(() => messages, [messages]);
+    const stampOf = useCallback((iso: string | null) => {
+        if (!iso) {
+            return null;
+        }
+        return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    }, []);
     const offlineNote = useMemo(() => {
         if (!info.deviceLastSeenAt) {
             return "Runs when the PC is back online.";
@@ -126,12 +133,18 @@ export default function SessionDetailClient({
             {thread.length === 0 && <p className="mt-2 text-dim">No synced messages yet.</p>}
             <ul className="mt-2 space-y-2">
                 {thread.map((m) => {
+                    const stamp = stampOf(m.createdAt);
                     if (m.role === "user") {
                         return (
                             <li key={m.seq} className="flex justify-end">
-                                <p className="max-w-[85%] whitespace-pre-wrap rounded-lg bg-panel px-3 py-2 text-sm">
-                                    {m.body}
-                                </p>
+                                <div className="max-w-[85%]">
+                                    <p className="whitespace-pre-wrap rounded-lg bg-panel px-3 py-2 text-sm">
+                                        {m.body}
+                                    </p>
+                                    {stamp && (
+                                        <p className="mt-1 text-right font-mono text-xs text-dim">{stamp}</p>
+                                    )}
+                                </div>
                             </li>
                         );
                     }
@@ -158,9 +171,14 @@ export default function SessionDetailClient({
                     }
                     return (
                         <li key={m.seq} className="flex justify-start">
-                            <p className="max-w-[85%] whitespace-pre-wrap rounded-lg border border-line bg-panel px-3 py-2 text-sm">
-                                {m.body}
-                            </p>
+                            <div className="max-w-[85%]">
+                                <p className="whitespace-pre-wrap rounded-lg border border-line bg-panel px-3 py-2 text-sm">
+                                    {m.body}
+                                </p>
+                                {stamp && (
+                                    <p className="mt-1 font-mono text-xs text-dim">{stamp}</p>
+                                )}
+                            </div>
                         </li>
                     );
                 })}

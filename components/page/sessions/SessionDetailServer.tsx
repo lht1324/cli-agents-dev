@@ -58,11 +58,11 @@ export default async function SessionDetailServer({ id }: { id: string }) {
         message: r.message ?? null,
     }));
     const thread = await db
-        .select({ seq: cloudMessages.seq, role: cloudMessages.role, kind: cloudMessages.kind, body: cloudMessages.body })
+        .select({ seq: cloudMessages.seq, role: cloudMessages.role, kind: cloudMessages.kind, body: cloudMessages.body, createdAt: cloudMessages.createdAt })
         .from(cloudMessages)
         .innerJoin(cloudTabs, eq(cloudMessages.tabId, cloudTabs.id))
         .where(and(eq(cloudMessages.tabId, id), eq(cloudTabs.userId, session.user.id)))
         .orderBy(cloudMessages.seq);
-    const messages: ThreadRow[] = thread.map((m) => ({ ...m }));
+    const messages: ThreadRow[] = thread.map((m) => ({ ...m, createdAt: m.createdAt?.toISOString() ?? null }));
     return <SessionDetailClient info={info} approvals={approvals} messages={messages} userId={session.user.id} />;
 }

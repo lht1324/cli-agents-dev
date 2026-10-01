@@ -17,35 +17,41 @@ interface PlainRow {
     role: string;
     kind: string;
     body: string;
+    createdAt: number | null;
 }
 
 function cap(text: string, limit: number): string {
     return text.length > limit ? `${text.slice(0, limit)}…[truncated]` : text;
 }
 
+function at(m: ServerMessage): number | null {
+    return typeof m.time?.created === "number" ? m.time.created : null;
+}
+
 // 텍스트 항상, tool은 메타만, payload·첨부 제외.
 function flatten(messages: ServerMessage[]): PlainRow[] {
     const rows: PlainRow[] = [];
     messages.forEach((m, seq) => {
+        const createdAt = at(m);
         if (m.type === "user") {
             const text = m.text ?? m.payload?.text ?? "";
             if (text.length > 0) {
-                rows.push({ seq, role: "user", kind: "text", body: cap(text, 8000) });
+                rows.push({ seq, role: "user", kind: "text", body: cap(text, 8000), createdAt });
             }
             const files = (m as { files?: { name?: string; mime?: string; data?: string }[] }).files ?? [];
             for (const f of files) {
                 const kb = f.data ? Math.round(f.data.length / 1024) : 0;
-                rows.push({ seq, role: "user", kind: "file", body: `${f.name ?? "file"} (${f.mime ?? "?"}, ${kb}KB, on-demand)` });
+                rows.push({ seq, role: "user", kind: "file", body: `${f.name ?? "file"} (${f.mime ?? "?"}, ${kb}KB, on-demand)`, createdAt });
             }
             return;
         }
         if (m.type === "assistant") {
             for (const part of m.content ?? []) {
                 if (part.type === "text" && part.text && part.text.length > 0) {
-                    rows.push({ seq, role: "assistant", kind: "text", body: cap(part.text, 8000) });
+                    rows.push({ seq, role: "assistant", kind: "text", body: cap(part.text, 8000), createdAt });
                 } else if (part.type === "tool") {
                     const input = part.state?.input ? JSON.stringify(part.state.input).slice(0, 200) : "";
-                    rows.push({ seq, role: "assistant", kind: "tool", body: `${part.name ?? "tool"} ${input}`.trim() });
+                    rows.push({ seq, role: "assistant", kind: "tool", body: `${part.name ?? "tool"} ${input}`.trim(), createdAt });
                 }
             }
             return;
@@ -53,7 +59,7 @@ function flatten(messages: ServerMessage[]): PlainRow[] {
         if (m.type === "compaction") {
             const summary = (m as { summary?: string }).summary ?? "";
             if (summary.length > 0) {
-                rows.push({ seq, role: "system", kind: "summary", body: cap(summary, 8000) });
+                rows.push({ seq, role: "system", kind: "summary", body: cap(summary, 8000), createdAt });
             }
         }
     });
@@ -82,11 +88,19 @@ export async function syncMessages(server: DiscoveredServer, sessionID: string):
         ON CONFLICT (id) DO NOTHING
     `;
     for (const r of rows) {
-        await sql`
-            INSERT INTO cloud_messages (tab_id, seq, role, kind, body)
-            VALUES (${sessionID}, ${r.seq}, ${r.role}, ${r.kind}, ${r.body})
-            ON CONFLICT (tab_id, seq) DO NOTHING
-        `;
+        if (r.createdAt !== null) {
+            await sql`
+                INSERT INTO cloud_messages (tab_id, seq, role, kind, body, created_at)
+                VALUES (${sessionID}, ${r.seq}, ${r.role}, ${r.kind}, ${r.body}, to_timestamp(${r.createdAt / 1000.0}))
+                ON CONFLICT (tab_id, seq) DO NOTHING
+            `;
+        } else {
+            await sql`
+                INSERT INTO cloud_messages (tab_id, seq, role, kind, body)
+                VALUES (${sessionID}, ${r.seq}, ${r.role}, ${r.kind}, ${r.body})
+                ON CONFLICT (tab_id, seq) DO NOTHING
+            `;
+        }
     }
     return { rows: rows.length };
 }
