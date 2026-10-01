@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { parseToolCall, toolDetail, toolSummary } from "./toolFormat";
+import MarkdownText from "./MarkdownText";
 
 export interface SessionInfo {
     id: string;
@@ -330,9 +331,9 @@ export default function SessionDetailClient({
                     return (
                         <li key={m.seq} className="flex justify-start">
                             <div className="max-w-[85%]">
-                                <p className="whitespace-pre-wrap rounded-lg border border-line bg-panel px-3 py-2 text-sm">
-                                    {m.body}
-                                </p>
+                                <div className="rounded-lg border border-line bg-panel px-3 py-2">
+                                    <MarkdownText body={m.body} />
+                                </div>
                                 {stamp && (
                                     <p className="mt-1 font-mono text-xs text-dim">{stamp}</p>
                                 )}
