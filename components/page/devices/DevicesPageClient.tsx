@@ -64,7 +64,7 @@ export default function DevicesPageClient({ items }: { items: DeviceRow[] }) {
         [items],
     );
     return (
-        <main className="mx-auto max-w-3xl px-4 py-10">
+        <main className="mx-auto max-w-5xl px-6 py-10">
             <h1 className="font-mono text-xl font-bold">Devices</h1>
             {rows.length === 0 && (
                 <p className="mt-4 text-dim">No devices yet. Run `cliagent register` on your PC.</p>
