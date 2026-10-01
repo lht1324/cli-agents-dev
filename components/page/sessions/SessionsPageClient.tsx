@@ -37,7 +37,7 @@ export default function SessionsPageClient({ items }: { items: SessionRow[] }) {
             <ul>
                 {rows.map((row) => (
                     <li key={row.id}>
-                        <span>{row.title}</span>
+                        <a href={`/sessions/${row.id}`}>{row.title}</a>
                         <span>{row.status}</span>
                         <span>{relativeTime(row.lastSyncAt)}</span>
                     </li>
