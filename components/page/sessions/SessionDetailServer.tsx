@@ -1,8 +1,8 @@
 import { and, desc, eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth/server";
-import { devices, getDb, pendingApprovals, sessionsMeta } from "@/lib/neon";
-import SessionDetailClient, { type ApprovalRow, type SessionInfo } from "./SessionDetailClient";
+import { devices, cloudMessages, cloudTabs, getDb, pendingApprovals, sessionsMeta } from "@/lib/neon";
+import SessionDetailClient, { type ApprovalRow, type SessionInfo, type ThreadRow } from "./SessionDetailClient";
 
 export default async function SessionDetailServer({ id }: { id: string }) {
     const { data: session } = await auth.getSession();
@@ -57,5 +57,12 @@ export default async function SessionDetailServer({ id }: { id: string }) {
         resources: r.resources,
         message: r.message ?? null,
     }));
-    return <SessionDetailClient info={info} approvals={approvals} userId={session.user.id} />;
+    const thread = await db
+        .select({ seq: cloudMessages.seq, role: cloudMessages.role, kind: cloudMessages.kind, body: cloudMessages.body })
+        .from(cloudMessages)
+        .innerJoin(cloudTabs, eq(cloudMessages.tabId, cloudTabs.id))
+        .where(and(eq(cloudMessages.tabId, id), eq(cloudTabs.userId, session.user.id)))
+        .orderBy(cloudMessages.seq);
+    const messages: ThreadRow[] = thread.map((m) => ({ ...m }));
+    return <SessionDetailClient info={info} approvals={approvals} messages={messages} userId={session.user.id} />;
 }

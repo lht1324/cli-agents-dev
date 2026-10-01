@@ -18,6 +18,13 @@ export interface ApprovalRow {
     message: string | null;
 }
 
+export interface ThreadRow {
+    seq: number;
+    role: string;
+    kind: string;
+    body: string;
+}
+
 async function onDecide(
     userId: string,
     deviceId: string,
@@ -53,16 +60,19 @@ async function onDecide(
 export default function SessionDetailClient({
     info,
     approvals,
+    messages,
     userId,
 }: {
     info: SessionInfo;
     approvals: ApprovalRow[];
+    messages: ThreadRow[];
     userId: string;
 }) {
     const [busy, setBusy] = useState<string | null>(null);
     const [done, setDone] = useState<string | null>(null);
     const [draft, setDraft] = useState("");
     const rows = useMemo(() => approvals, [approvals]);
+    const thread = useMemo(() => messages, [messages]);
     const offlineNote = useMemo(() => {
         if (!info.deviceLastSeenAt) {
             return "Runs when the PC is back online.";
@@ -112,6 +122,18 @@ export default function SessionDetailClient({
             <p className="mt-1 font-mono text-xs text-dim">
                 {info.status} · {info.lastSyncAt ? `synced ${info.lastSyncAt}` : "never synced"}
             </p>
+            <h2 className="mt-8 font-mono text-sm font-bold text-dim">Conversation</h2>
+            {thread.length === 0 && <p className="mt-2 text-dim">No synced messages yet.</p>}
+            <ul className="mt-2 space-y-2">
+                {thread.map((m) => (
+                    <li key={m.seq} className="rounded border border-line bg-panel p-3">
+                        <p className="font-mono text-xs text-dim">
+                            {m.role} · {m.kind}
+                        </p>
+                        <p className="mt-1 whitespace-pre-wrap text-sm">{m.body}</p>
+                    </li>
+                ))}
+            </ul>
             <h2 className="mt-8 font-mono text-sm font-bold text-dim">Pending approvals</h2>
             {rows.length === 0 && <p className="mt-2 text-dim">No pending requests.</p>}
             <ul className="mt-2 space-y-2">
