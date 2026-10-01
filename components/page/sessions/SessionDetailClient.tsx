@@ -125,14 +125,45 @@ export default function SessionDetailClient({
             <h2 className="mt-8 font-mono text-sm font-bold text-dim">Conversation</h2>
             {thread.length === 0 && <p className="mt-2 text-dim">No synced messages yet.</p>}
             <ul className="mt-2 space-y-2">
-                {thread.map((m) => (
-                    <li key={m.seq} className="rounded border border-line bg-panel p-3">
-                        <p className="font-mono text-xs text-dim">
-                            {m.role} · {m.kind}
-                        </p>
-                        <p className="mt-1 whitespace-pre-wrap text-sm">{m.body}</p>
-                    </li>
-                ))}
+                {thread.map((m) => {
+                    if (m.role === "user") {
+                        return (
+                            <li key={m.seq} className="flex justify-end">
+                                <p className="max-w-[85%] whitespace-pre-wrap rounded-lg bg-panel px-3 py-2 text-sm">
+                                    {m.body}
+                                </p>
+                            </li>
+                        );
+                    }
+                    if (m.kind === "tool") {
+                        return (
+                            <li key={m.seq}>
+                                <details className="rounded border border-line bg-ink px-3 py-2">
+                                    <summary className="cursor-pointer font-mono text-xs text-dim">
+                                        $ {m.body.slice(0, 100)}
+                                    </summary>
+                                    <p className="mt-1 whitespace-pre-wrap font-mono text-xs text-dim">
+                                        {m.body}
+                                    </p>
+                                </details>
+                            </li>
+                        );
+                    }
+                    if (m.kind === "summary") {
+                        return (
+                            <li key={m.seq} className="border-l-2 border-warn pl-3">
+                                <p className="whitespace-pre-wrap text-sm text-dim">{m.body}</p>
+                            </li>
+                        );
+                    }
+                    return (
+                        <li key={m.seq} className="flex justify-start">
+                            <p className="max-w-[85%] whitespace-pre-wrap rounded-lg border border-line bg-panel px-3 py-2 text-sm">
+                                {m.body}
+                            </p>
+                        </li>
+                    );
+                })}
             </ul>
             <h2 className="mt-8 font-mono text-sm font-bold text-dim">Pending approvals</h2>
             {rows.length === 0 && <p className="mt-2 text-dim">No pending requests.</p>}
