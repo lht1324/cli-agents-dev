@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { parseToolCall, toolDetail, toolSummary } from "./toolFormat";
 
 export interface SessionInfo {
     id: string;
@@ -149,15 +150,34 @@ export default function SessionDetailClient({
                         );
                     }
                     if (m.kind === "tool") {
+                        const call = parseToolCall(m.body);
+                        if (!call) {
+                            return (
+                                <li key={m.seq}>
+                                    <p className="whitespace-pre-wrap font-mono text-xs text-dim">{m.body}</p>
+                                    {stamp && (
+                                        <p className="mt-1 font-mono text-xs text-dim">{stamp}</p>
+                                    )}
+                                </li>
+                            );
+                        }
+                        const detail = toolDetail(call);
                         return (
                             <li key={m.seq}>
                                 <details className="rounded border border-line bg-ink px-3 py-2">
                                     <summary className="cursor-pointer font-mono text-xs text-dim">
-                                        $ {m.body.slice(0, 100)}
+                                        ▸ {toolSummary(call)}
                                     </summary>
-                                    <p className="mt-1 whitespace-pre-wrap font-mono text-xs text-dim">
-                                        {m.body}
-                                    </p>
+                                    <div className="mt-1 space-y-1">
+                                        {detail.map((line, i) => (
+                                            <p key={i} className="whitespace-pre-wrap font-mono text-xs text-dim">
+                                                {line}
+                                            </p>
+                                        ))}
+                                        {stamp && (
+                                            <p className="font-mono text-xs text-dim">{stamp}</p>
+                                        )}
+                                    </div>
                                 </details>
                             </li>
                         );

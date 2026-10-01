@@ -1,5 +1,5 @@
 import { apiGet, type DiscoveredServer } from "./server";
-import { formatToolCall, formatToolExit } from "./tools";
+import { formatToolExit } from "./tools";
 import { db } from "./db";
 import { readState } from "./device";
 
@@ -61,13 +61,33 @@ function flatten(messages: ServerMessage[]): PlainRow[] {
                     const texts = outputs.filter((o) => o.type === "text").map((o) => o.text ?? "");
                     const exit = formatToolExit(toolName, texts.join("\n"));
                     const hasImage = outputs.some((o) => o.type === "file");
-                    const summary = formatToolCall(toolName, part.state?.input);
-                    const suffix = `${exit ? ` ${exit}` : ""}${hasImage ? " +image" : ""}`;
-                    let body = `${summary}${suffix}`;
-                    if (toolName === "question" && texts.length > 0) {
-                        body = `${summary}\n→ ${cap(texts.join(" ").replace(/^User has answered your questions:\s*/, ""), 500)}`;
+                    const raw = ((part.state?.input ?? {}) as Record<string, unknown>);
+                    const kept: Record<string, unknown> = {};
+                    const stripped: string[] = [];
+                    for (const [key, value] of Object.entries(raw)) {
+                        if ((key === "content" || key === "data") && typeof value === "string" && value.length > 500) {
+                            stripped.push(`${key}:${Math.round(value.length / 1024)}KB`);
+                            continue;
+                        }
+                        kept[key] = value;
                     }
-                    rows.push({ seq, role: "assistant", kind: "tool", body: cap(body, 1000), createdAt });
+                    const envelope: Record<string, unknown> = { tool: toolName, input: kept };
+                    if (stripped.length > 0) {
+                        envelope.stripped = stripped;
+                    }
+                    if (exit) {
+                        envelope.exit = exit;
+                    }
+                    if (hasImage) {
+                        envelope.hasImage = true;
+                    }
+                    if (toolName === "question" && texts.length > 0) {
+                        envelope.answer = cap(
+                            texts.join(" ").replace(/^User has answered your questions:\s*/, ""),
+                            500,
+                        );
+                    }
+                    rows.push({ seq, role: "assistant", kind: "tool", body: cap(JSON.stringify(envelope), 4000), createdAt });
                 }
             }
             return;
