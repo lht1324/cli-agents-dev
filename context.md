@@ -103,9 +103,9 @@
 - [x] 명령 outbox 테이블 (commands + cloud_tabs/messages/folds, Neon dev 적용済み)
 - [x] heartbeat 방식 결정 (`devices.lastSeenAt` 갱신으로 확정)
 - [x] 웹 원격 inbox UI (보기·승인) + 기기 목록 (웹→PC 종단済み: sync→Allow→poll→실행)
-- [ ] `cliagent fork` 등 데몬 CLI 생성 명령
-- [ ] 새 지시 종단 (웹 전송 → poll → 에이전트 응답)
-- [ ] 상세 307 블로커 해소
+- [x] `cliagent fork` 명령 (fork + 대장 등록, 실측済み)
+- [x] 새 지시 종단 (웹 전송 → poll → 에이전트 응답 확인済み)
+- [x] 상세 307 해소 (원인: 손 복사 id 오기. 목록 링크화로 재발 방지)
 - [ ] 예약 실행 ("PC 켜지면 실행" 경고 + 부팅 catch-up)
 
 ## 실행 계획 (2026-09-30)
@@ -124,8 +124,9 @@
 
 ## P3 진행 (2026-10-01, 진행 중)
 - fork: `daemon/src/fork.ts` + `fork` 명령 + `sessions_meta` 대장 등록. 실측 6세션(`CLIAgentsDev (fork #1)`) 확인済み.
-- 새 지시: outbox `message` 타입 + 상세 입력창. 코드 완료, 종단 미검증.
-- 현재 블로커: 상세 화면 307 리다이렉트. db 행 존재·id 일치·user 일치·서버 재시작後도 지속. 다음 의심 순서: (1) 시크릿 창 캐시 배제 (2) 앱 `.env` 브랜치 대조.
+- 새 지시: outbox `message` 타입 + 상세 입력창. 종단 검증済み (웹 전송 → poll `message done` → 에이전트 응답 확인).
+- 상세 307 해소済み. 원인은 손 복사 id 오기 (db 행 `...8ph...I41` vs 입력 `...Bph...I4i`). 목록 제목 링크화로 재발 방지. 코드 정상이었음.
+- 남은 것: 예약 실행 ("PC 켜지면 실행" 경고 + 부팅 catch-up).
 
 ## 데몬 종단 검증 (2026-09-29, 이 PC)
 - 명령: `daemon/`에서 build 후 자체 serve(번들 CLI 2.0.18, 4096, 비번) → `status`·`sessions` 성공. 세션 5개 제목 출력 확인.
