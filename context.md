@@ -1,4 +1,4 @@
-2026-10-01 15:59
+2026-10-02 01:10
 
 # context.md - cli-agents-dev
 
@@ -91,6 +91,24 @@
 - 전역 스킬 60여 개 유지. Paddle은 전역·로컬 어디에도 미설치.
 - `tailored-ad`는 손대지 않음 (SKILLS.md 99줄 동일 사본 존재, Paddle 포함).
 
+## 에이전트·모델 원격 전환 (2026-10-02, 코드 완료·종단 미검증)
+- API 실측: `GET /api/model` 1방에 provider+variants. `GET /api/agent`는 위치 귀속. 전환은 세션별 POST 2개 (`/agent {agent}`, `/model {id,providerID,variant?}`).
+- 에이전트 필터: `mode=primary + hidden≠true` = Build·Plan만. 목록 기본값 = 현재값 (`sessions_meta.agent/model` 컬럼 추가, 데몬 `sync-sessions`으로 채움).
+- 모델 선택: 공급자별 optgroup + variant 분리 선택. 값 있으면 placeholder 숨김.
+- 거울: `model_catalog` 테이블 (device PK). 데몬 `sync-models`. serve 기동 직후 빈 목록 주의 (웜업 후 재실행).
+
+## tool 호출 가공 (2026-10-02)
+- 전수 5,058행: 출력은 text·file(이미지 74건)·빈값 3종. 입력 키 2세대 공존 (`filePath|path`, skill `name|id`).
+- 저장: `{tool, input(본문·base64 제외), exit, hasImage, answer}` envelope. UI에서 종류별 가공. `tools.ts`는 exit 판정만残存.
+- shell 2번째 줄 = 종료 상태 (`Command exited with code N`, SIGTERM, 백그라운드 알림). ✓/✗ 표시.
+- question 출력 = `Q=A` 텍스트. 답변 500자 포함 저장.
+
+## UI 개편 (2026-10-02)
+- 스킬: `design-taste-frontend`. 다크 터미널풍 (ink·panel·line·go·warn 토큰). shadcn 미사용.
+- 랜딩 개편 + 헤더 내비(Sessions·Devices). 본문 `max-w-5xl`. 대화 말풍선 (user 우·assistant 좌·tool 접힘·summary 구분선).
+- assistant text 마크다운 렌더 (`react-markdown@10.1.0` + `remark-gfm@4.0.1`). 진입 시 최하단 + `↓` 플로팅 버튼.
+- 메시지 원본 시각: `cloud_messages.createdAt`에 원본 기록. 말풍선 아래 `3:24 PM` 표시. 걸린 시간은 다음(컬럼 필요).
+
 ## 다음 할 일
 - [x] 세션 정의 확정 (탭>세션, 현재 epoch 전문 + 이전 접기)
 - [x] MVP 플로우 3개 고정 (전문+초과 폴백 / 허용·거부 2버튼 / 주기+수동 버튼)
@@ -106,7 +124,11 @@
 - [x] `cliagent fork` 명령 (fork + 대장 등록, 실측済み)
 - [x] 새 지시 종단 (웹 전송 → poll → 에이전트 응답 확인済み)
 - [x] 상세 307 해소 (원인: 손 복사 id 오기. 목록 링크화로 재발 방지)
-- [ ] 예약 실행 ("PC 켜지면 실행" 경고 + 부팅 catch-up)
+- [x] 에이전트·모델 전환 코드 (종단 미검증: variant 변경 → poll → PC 확인)
+- [x] 대화 동기화·시각·tool 가공·UI 개편 (말풍선·마크다운·폭·점프 버튼)
+- [ ] 예약 실행 catch-up (경고 표시済み. 부팅 pull은 상주 루프와 묶음, 2단계)
+- [ ] 플러그인 통지 (폴링 대체. 스풀 디렉터리 방식 결정済み)
+- [ ] P4 (도메인 연결·배포·과금. MoR: Fungies 심사 대기)
 
 ## 실행 계획 (2026-09-30)
 - P1: outbox·heartbeat 스키마 + 데몬 승인 중계. 돈값 코어의 로컬 절반.
