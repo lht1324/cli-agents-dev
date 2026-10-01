@@ -93,6 +93,15 @@ export const pendingApprovals = pgTable("pending_approvals", {
     resolvedAt: timestamp("resolved_at", { withTimezone: true }),
 });
 
+// 모델·에이전트 카탈로그 거울. 서버 조회 결과를 웹 드롭다운용으로 보관.
+export const modelCatalog = pgTable("model_catalog", {
+    deviceId: text("device_id")
+        .primaryKey()
+        .references(() => devices.id),
+    payload: text("payload").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // 이전 epoch 접기. 압축 발동 시 이전 구간 요약 1줄만 보관한다.
 export const cloudFolds = pgTable(
     "cloud_folds",

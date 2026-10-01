@@ -1,7 +1,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth/server";
-import { devices, cloudMessages, cloudTabs, getDb, pendingApprovals, sessionsMeta } from "@/lib/neon";
+import { devices, cloudMessages, cloudTabs, getDb, modelCatalog, pendingApprovals, sessionsMeta } from "@/lib/neon";
 import SessionDetailClient, { type ApprovalRow, type SessionInfo, type ThreadRow } from "./SessionDetailClient";
 
 export default async function SessionDetailServer({ id }: { id: string }) {
@@ -64,5 +64,17 @@ export default async function SessionDetailServer({ id }: { id: string }) {
         .where(and(eq(cloudMessages.tabId, id), eq(cloudTabs.userId, session.user.id)))
         .orderBy(cloudMessages.seq);
     const messages: ThreadRow[] = thread.map((m) => ({ ...m, createdAt: m.createdAt?.toISOString() ?? null }));
-    return <SessionDetailClient info={info} approvals={approvals} messages={messages} userId={session.user.id} />;
+    const catalog = await db
+        .select({ payload: modelCatalog.payload })
+        .from(modelCatalog)
+        .where(eq(modelCatalog.deviceId, deviceId));
+    return (
+        <SessionDetailClient
+            info={info}
+            approvals={approvals}
+            messages={messages}
+            userId={session.user.id}
+            catalogJson={catalog[0]?.payload ?? null}
+        />
+    );
 }

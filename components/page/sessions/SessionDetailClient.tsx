@@ -27,6 +27,30 @@ export interface ThreadRow {
     createdAt: string | null;
 }
 
+export interface CatalogModel {
+    id: string;
+    providerID: string;
+    name?: string;
+    variants?: { id: string }[];
+}
+
+function parseCatalog(json: string | null): { models: CatalogModel[]; agents: { id?: string; name?: string }[] } {
+    if (!json) {
+        return { models: [], agents: [] };
+    }
+    try {
+        const parsed = JSON.parse(json) as {
+            models?: { data?: CatalogModel[] } | CatalogModel[];
+            agents?: { data?: { id?: string; name?: string }[] } | { id?: string; name?: string }[];
+        };
+        const models = Array.isArray(parsed.models) ? parsed.models : (parsed.models?.data ?? []);
+        const agents = Array.isArray(parsed.agents) ? parsed.agents : (parsed.agents?.data ?? []);
+        return { models, agents };
+    } catch {
+        return { models: [], agents: [] };
+    }
+}
+
 async function onDecide(
     userId: string,
     deviceId: string,
@@ -64,17 +88,89 @@ export default function SessionDetailClient({
     approvals,
     messages,
     userId,
+    catalogJson,
 }: {
     info: SessionInfo;
     approvals: ApprovalRow[];
     messages: ThreadRow[];
     userId: string;
+    catalogJson: string | null;
 }) {
     const [busy, setBusy] = useState<string | null>(null);
     const [done, setDone] = useState<string | null>(null);
     const [draft, setDraft] = useState("");
     const rows = useMemo(() => approvals, [approvals]);
     const thread = useMemo(() => messages, [messages]);
+    const catalog = useMemo(() => parseCatalog(catalogJson), [catalogJson]);
+    const [agent, setAgent] = useState("");
+    const [modelKey, setModelKey] = useState("");
+    const modelOptions = useMemo(
+        () =>
+            catalog.models.flatMap((m) =>
+                (m.variants && m.variants.length > 0 ? m.variants : [{ id: "" }]).map((v) => ({
+                    key: `${m.providerID}/${m.id}${v.id ? `#${v.id}` : ""}`,
+                    label: `${m.name ?? m.id}${v.id ? ` (${v.id})` : ""} · ${m.providerID}`,
+                    providerID: m.providerID,
+                    id: m.id,
+                    variant: v.id || undefined,
+                })),
+            ),
+        [catalog],
+    );
+    const onChangeAgent = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+        setAgent(e.target.value);
+    }, []);
+    const onChangeModel = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+        setModelKey(e.target.value);
+    }, []);
+    const onClickApplyAgent = useCallback(async () => {
+        if (agent.length === 0) {
+            return;
+        }
+        setBusy("agent");
+        setDone(null);
+        try {
+            const res = await fetch("/api/commands", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    userId,
+                    deviceId: info.deviceId,
+                    type: "set-agent",
+                    payload: JSON.stringify({ sessionID: info.id, agent }),
+                }),
+            });
+            setDone(res.ok ? `agent -> ${agent} queued.` : "failed to queue");
+        } finally {
+            setBusy(null);
+        }
+    }, [agent, info, userId]);
+    const onClickApplyModel = useCallback(async () => {
+        const found = modelOptions.find((o) => o.key === modelKey);
+        if (!found) {
+            return;
+        }
+        setBusy("model");
+        setDone(null);
+        try {
+            const res = await fetch("/api/commands", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    userId,
+                    deviceId: info.deviceId,
+                    type: "set-model",
+                    payload: JSON.stringify({
+                        sessionID: info.id,
+                        model: { id: found.id, providerID: found.providerID, variant: found.variant },
+                    }),
+                }),
+            });
+            setDone(res.ok ? `model -> ${found.key} queued.` : "failed to queue");
+        } finally {
+            setBusy(null);
+        }
+    }, [modelKey, modelOptions, info, userId]);
     const stampOf = useCallback((iso: string | null) => {
         if (!iso) {
             return null;
@@ -203,6 +299,55 @@ export default function SessionDetailClient({
                     );
                 })}
             </ul>
+            <h2 className="mt-8 font-mono text-sm font-bold text-dim">Agent & model</h2>
+            {catalog.models.length === 0 && catalog.agents.length === 0 ? (
+                <p className="mt-2 text-dim">No catalog yet. Run `cliagent sync-models` on the PC.</p>
+            ) : (
+                <div className="mt-2 space-y-2">
+                    <div className="flex gap-2">
+                        <select
+                            value={agent}
+                            onChange={onChangeAgent}
+                            className="flex-1 rounded border border-line bg-panel p-2 font-mono text-sm"
+                        >
+                            <option value="">Agent…</option>
+                            {catalog.agents.map((a, i) => (
+                                <option key={a.id ?? i} value={a.id ?? ""}>
+                                    {a.name ?? a.id}
+                                </option>
+                            ))}
+                        </select>
+                        <button
+                            onClick={onClickApplyAgent}
+                            disabled={busy !== null || agent.length === 0}
+                            className="rounded bg-go px-3 py-1 font-mono text-xs font-bold text-ink disabled:opacity-50"
+                        >
+                            Apply
+                        </button>
+                    </div>
+                    <div className="flex gap-2">
+                        <select
+                            value={modelKey}
+                            onChange={onChangeModel}
+                            className="flex-1 rounded border border-line bg-panel p-2 font-mono text-sm"
+                        >
+                            <option value="">Model…</option>
+                            {modelOptions.map((o) => (
+                                <option key={o.key} value={o.key}>
+                                    {o.label}
+                                </option>
+                            ))}
+                        </select>
+                        <button
+                            onClick={onClickApplyModel}
+                            disabled={busy !== null || modelKey.length === 0}
+                            className="rounded bg-go px-3 py-1 font-mono text-xs font-bold text-ink disabled:opacity-50"
+                        >
+                            Apply
+                        </button>
+                    </div>
+                </div>
+            )}
             <h2 className="mt-8 font-mono text-sm font-bold text-dim">Pending approvals</h2>
             {rows.length === 0 && <p className="mt-2 text-dim">No pending requests.</p>}
             <ul className="mt-2 space-y-2">

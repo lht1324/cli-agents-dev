@@ -1,6 +1,7 @@
 import { apiGet, apiPost, discoverServer, type DiscoveredServer } from "./server";
 import { hostInfo, newDeviceId, readState, writeState } from "./device";
 import { forkAndRegister } from "./fork";
+import { setSessionAgent, setSessionModel, syncCatalog, type ModelRef } from "./catalog";
 import { syncMessages } from "./messages";
 import { listPending, reply, pushPending, type ReplyDecision } from "./permissions";
 import { db } from "./db";
@@ -105,6 +106,12 @@ async function onSync(): Promise<void> {
     console.log(`pushed: ${result.open} open`);
 }
 
+async function onSyncModels(): Promise<void> {
+    const server = await requireServer();
+    const result = await syncCatalog(server);
+    console.log(`catalog: ${result.models} models, ${result.agents} agents`);
+}
+
 async function onHeartbeat(): Promise<void> {
     const state = readState();
     if (!state) {
@@ -142,12 +149,14 @@ async function main(): Promise<void> {
         await onFork(process.argv[3]);
     } else if (cmd === "sync-messages") {
         await onSyncMessages(process.argv[3]);
+    } else if (cmd === "sync-models") {
+        await onSyncModels();
     } else if (cmd === "poll") {
         await pollCommands();
     } else if (cmd === "approve") {
         await onApprove(process.argv[3], process.argv[4]);
     } else {
-        console.log("usage: cliagent <login|register|status|sessions|poll|heartbeat|approve|sync|fork|sync-messages>");
+        console.log("usage: cliagent <login|register|status|sessions|poll|heartbeat|approve|sync|fork|sync-messages|sync-models>");
         process.exitCode = 1;
     }
 }

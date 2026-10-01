@@ -2,6 +2,7 @@ import { db } from "./db";
 import { readState } from "./device";
 import { apiPost, discoverServer } from "./server";
 import { reply } from "./permissions";
+import { setSessionAgent, setSessionModel, type ModelRef } from "./catalog";
 
 interface CommandRow {
     id: string;
@@ -36,6 +37,29 @@ interface ApprovePayload {
 async function execute(type: string, payload: string): Promise<ExecResult> {
     if (type === "ping") {
         return { ok: true, data: "pong" };
+    }
+    if (type === "set-agent" || type === "set-model") {
+        const body = JSON.parse(payload) as { sessionID?: unknown; agent?: unknown; model?: unknown };
+        if (typeof body.sessionID !== "string") {
+            return { ok: false, error: `${type} payload needs sessionID` };
+        }
+        const server = await discoverServer();
+        if (!server) {
+            return { ok: false, error: "no running opencode server" };
+        }
+        if (type === "set-agent") {
+            if (typeof body.agent !== "string" || body.agent.length === 0) {
+                return { ok: false, error: "set-agent payload needs agent" };
+            }
+            await setSessionAgent(server, body.sessionID, body.agent);
+            return { ok: true, data: `agent -> ${body.agent}` };
+        }
+        const model = body.model as ModelRef | undefined;
+        if (!model || typeof model.id !== "string" || typeof model.providerID !== "string") {
+            return { ok: false, error: "set-model payload needs model.id and model.providerID" };
+        }
+        await setSessionModel(server, body.sessionID, model);
+        return { ok: true, data: `model -> ${model.providerID}/${model.id}` };
     }
     if (type === "message") {
         const body = JSON.parse(payload) as { sessionID?: unknown; text?: unknown };
