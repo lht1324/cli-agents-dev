@@ -20,6 +20,8 @@ export const sessionsMeta = pgTable("sessions_meta", {
     provider: text("provider").notNull(),
     title: text("title").notNull(),
     status: text("status").notNull(),
+    agent: text("agent"),
+    model: text("model"),
     lastSyncAt: timestamp("last_sync_at", { withTimezone: true }),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

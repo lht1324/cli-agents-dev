@@ -8,6 +8,8 @@ export interface SessionInfo {
     title: string;
     status: string;
     deviceId: string;
+    agent: string | null;
+    model: string | null;
     lastSyncAt: string | null;
     deviceLastSeenAt: string | null;
 }
@@ -34,20 +36,48 @@ export interface CatalogModel {
     variants?: { id: string }[];
 }
 
-function parseCatalog(json: string | null): { models: CatalogModel[]; agents: { id?: string; name?: string }[] } {
+function parseCatalog(json: string | null): { models: CatalogModel[]; agents: CatalogAgent[] } {
     if (!json) {
         return { models: [], agents: [] };
     }
     try {
         const parsed = JSON.parse(json) as {
             models?: { data?: CatalogModel[] } | CatalogModel[];
-            agents?: { data?: { id?: string; name?: string }[] } | { id?: string; name?: string }[];
+            agents?: { data?: CatalogAgent[] } | CatalogAgent[];
         };
         const models = Array.isArray(parsed.models) ? parsed.models : (parsed.models?.data ?? []);
-        const agents = Array.isArray(parsed.agents) ? parsed.agents : (parsed.agents?.data ?? []);
+        const agents = (Array.isArray(parsed.agents) ? parsed.agents : (parsed.agents?.data ?? [])).filter(
+            (a) => a.mode === "primary" && a.hidden !== true,
+        );
         return { models, agents };
     } catch {
         return { models: [], agents: [] };
+    }
+}
+
+interface CatalogAgent {
+    id?: string;
+    name?: string;
+    mode?: string;
+    hidden?: boolean;
+}
+
+function parseCurrentModel(json: string | null): { id: string; providerID: string; variant?: string } | null {
+    if (!json) {
+        return null;
+    }
+    try {
+        const parsed = JSON.parse(json) as { id?: unknown; providerID?: unknown; variant?: unknown };
+        if (typeof parsed.id !== "string" || typeof parsed.providerID !== "string") {
+            return null;
+        }
+        return {
+            id: parsed.id,
+            providerID: parsed.providerID,
+            variant: typeof parsed.variant === "string" ? parsed.variant : undefined,
+        };
+    } catch {
+        return null;
     }
 }
 
@@ -102,26 +132,38 @@ export default function SessionDetailClient({
     const rows = useMemo(() => approvals, [approvals]);
     const thread = useMemo(() => messages, [messages]);
     const catalog = useMemo(() => parseCatalog(catalogJson), [catalogJson]);
-    const [agent, setAgent] = useState("");
-    const [modelKey, setModelKey] = useState("");
-    const modelOptions = useMemo(
-        () =>
-            catalog.models.flatMap((m) =>
-                (m.variants && m.variants.length > 0 ? m.variants : [{ id: "" }]).map((v) => ({
-                    key: `${m.providerID}/${m.id}${v.id ? `#${v.id}` : ""}`,
-                    label: `${m.name ?? m.id}${v.id ? ` (${v.id})` : ""} · ${m.providerID}`,
-                    providerID: m.providerID,
-                    id: m.id,
-                    variant: v.id || undefined,
-                })),
-            ),
-        [catalog],
+    const currentModel = useMemo(() => parseCurrentModel(info.model), [info.model]);
+    const [agent, setAgent] = useState(info.agent ?? "");
+    const [modelId, setModelId] = useState(
+        currentModel ? `${currentModel.providerID}/${currentModel.id}` : "",
     );
+    const [variant, setVariant] = useState(currentModel?.variant ?? "");
+    const providers = useMemo(() => {
+        const groups = new Map<string, CatalogModel[]>();
+        const sorted = [...catalog.models].sort(
+            (a, b) => a.providerID.localeCompare(b.providerID) || (a.name ?? a.id).localeCompare(b.name ?? b.id),
+        );
+        for (const m of sorted) {
+            const list = groups.get(m.providerID) ?? [];
+            list.push(m);
+            groups.set(m.providerID, list);
+        }
+        return [...groups.entries()];
+    }, [catalog]);
+    const variants = useMemo(() => {
+        const [providerID, id] = modelId.split("/");
+        const found = catalog.models.find((m) => m.providerID === providerID && m.id === id);
+        return found?.variants ?? [];
+    }, [catalog, modelId]);
     const onChangeAgent = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
         setAgent(e.target.value);
     }, []);
     const onChangeModel = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-        setModelKey(e.target.value);
+        setModelId(e.target.value);
+        setVariant("");
+    }, []);
+    const onChangeVariant = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+        setVariant(e.target.value);
     }, []);
     const onClickApplyAgent = useCallback(async () => {
         if (agent.length === 0) {
@@ -146,8 +188,8 @@ export default function SessionDetailClient({
         }
     }, [agent, info, userId]);
     const onClickApplyModel = useCallback(async () => {
-        const found = modelOptions.find((o) => o.key === modelKey);
-        if (!found) {
+        const [providerID, id] = modelId.split("/");
+        if (!providerID || !id) {
             return;
         }
         setBusy("model");
@@ -162,15 +204,15 @@ export default function SessionDetailClient({
                     type: "set-model",
                     payload: JSON.stringify({
                         sessionID: info.id,
-                        model: { id: found.id, providerID: found.providerID, variant: found.variant },
+                        model: { id, providerID, variant: variant || undefined },
                     }),
                 }),
             });
-            setDone(res.ok ? `model -> ${found.key} queued.` : "failed to queue");
+            setDone(res.ok ? `model -> ${modelId}${variant ? `#${variant}` : ""} queued.` : "failed to queue");
         } finally {
             setBusy(null);
         }
-    }, [modelKey, modelOptions, info, userId]);
+    }, [modelId, variant, info, userId]);
     const stampOf = useCallback((iso: string | null) => {
         if (!iso) {
             return null;
@@ -300,6 +342,15 @@ export default function SessionDetailClient({
                 })}
             </ul>
             <h2 className="mt-8 font-mono text-sm font-bold text-dim">Agent & model</h2>
+            <p className="mt-1 font-mono text-xs text-dim">
+                current: {info.agent ?? "?"} ·{" "}
+                {(() => {
+                    const current = parseCurrentModel(info.model);
+                    return current
+                        ? `${current.providerID}/${current.id}${current.variant ? `#${current.variant}` : ""}`
+                        : "?";
+                })()}
+            </p>
             {catalog.models.length === 0 && catalog.agents.length === 0 ? (
                 <p className="mt-2 text-dim">No catalog yet. Run `cliagent sync-models` on the PC.</p>
             ) : (
@@ -327,20 +378,37 @@ export default function SessionDetailClient({
                     </div>
                     <div className="flex gap-2">
                         <select
-                            value={modelKey}
+                            value={modelId}
                             onChange={onChangeModel}
                             className="flex-1 rounded border border-line bg-panel p-2 font-mono text-sm"
                         >
                             <option value="">Model…</option>
-                            {modelOptions.map((o) => (
-                                <option key={o.key} value={o.key}>
-                                    {o.label}
+                            {providers.map(([providerID, models]) => (
+                                <optgroup key={providerID} label={providerID}>
+                                    {models.map((m) => (
+                                        <option key={`${m.providerID}/${m.id}`} value={`${m.providerID}/${m.id}`}>
+                                            {m.name ?? m.id}
+                                        </option>
+                                    ))}
+                                </optgroup>
+                            ))}
+                        </select>
+                        <select
+                            value={variant}
+                            onChange={onChangeVariant}
+                            disabled={variants.length === 0}
+                            className="rounded border border-line bg-panel p-2 font-mono text-sm disabled:opacity-50"
+                        >
+                            <option value="">Variant…</option>
+                            {variants.map((v) => (
+                                <option key={v.id} value={v.id}>
+                                    {v.id}
                                 </option>
                             ))}
                         </select>
                         <button
                             onClick={onClickApplyModel}
-                            disabled={busy !== null || modelKey.length === 0}
+                            disabled={busy !== null || modelId.length === 0}
                             className="rounded bg-go px-3 py-1 font-mono text-xs font-bold text-ink disabled:opacity-50"
                         >
                             Apply

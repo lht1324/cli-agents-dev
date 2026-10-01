@@ -33,6 +33,8 @@ export default async function SessionDetailServer({ id }: { id: string }) {
             title: sessionsMeta.title,
             status: sessionsMeta.status,
             deviceId: sessionsMeta.deviceId,
+            agent: sessionsMeta.agent,
+            model: sessionsMeta.model,
             lastSyncAt: sessionsMeta.lastSyncAt,
             deviceLastSeenAt: devices.lastSeenAt,
         })
@@ -48,6 +50,8 @@ export default async function SessionDetailServer({ id }: { id: string }) {
         title: meta[0]?.title ?? id,
         status: meta[0]?.status ?? "unknown",
         deviceId,
+        agent: meta[0]?.agent ?? null,
+        model: meta[0]?.model ?? null,
         lastSyncAt: meta[0]?.lastSyncAt?.toISOString() ?? null,
         deviceLastSeenAt: meta[0]?.deviceLastSeenAt?.toISOString() ?? null,
     };
