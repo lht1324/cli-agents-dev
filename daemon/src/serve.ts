@@ -5,7 +5,8 @@ import { homedir, platform } from "node:os";
 import { join } from "node:path";
 import { discoverServer, type DiscoveredServer } from "./server";
 
-const PORT = 4096;
+const BASE_PORT = 4096;
+const MAX_PORT_TRIES = 10;
 
 interface ServerState {
     password: string;
@@ -80,6 +81,31 @@ export interface ManagedServer extends DiscoveredServer {
     child: ChildProcess | null;
 }
 
+async function probeCandidate(url: string, auth: { username: string; password: string }): Promise<{ version?: string; prefix: string } | null> {
+    for (const prefix of ["/api", ""]) {
+        try {
+            const res = await fetch(`${url}${prefix}/session`, {
+                headers: {
+                    Accept: "application/json",
+                    Authorization: `Basic ${Buffer.from(`${auth.username}:${auth.password}`).toString("base64")}`,
+                },
+                signal: AbortSignal.timeout(2000),
+            });
+            if (!res.ok) {
+                continue;
+            }
+            const text = await res.text();
+            if (!text.trimStart().startsWith("{") && !text.trimStart().startsWith("[")) {
+                continue;
+            }
+            return { prefix };
+        } catch {
+            continue;
+        }
+    }
+    return null;
+}
+
 // 기존 서버 있으면 붙고, 없으면 직접 띄운다. 비번은 자체 생성·보관.
 export async function ensureServer(): Promise<ManagedServer> {
     const found = await discoverServer();
@@ -92,22 +118,35 @@ export async function ensureServer(): Promise<ManagedServer> {
         writeServerState(state);
     }
     process.env.OPENCODE_SERVER_PASSWORD = state.password;
-    const child = spawn(locateBinary(), ["serve", "--port", String(PORT)], {
-        env: { ...process.env, OPENCODE_SERVER_PASSWORD: state.password },
-        stdio: "ignore",
-    });
-    const url = `http://127.0.0.1:${PORT}`;
-    const auth = { username: "opencode", password: state.password };
-    for (let i = 0; i < 30; i++) {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        if (child.exitCode !== null) {
-            throw new Error("opencode serve exited during startup");
+    const binary = locateBinary();
+    let child: ChildProcess | null = null;
+    let url = "";
+    for (let port = BASE_PORT; port < BASE_PORT + MAX_PORT_TRIES; port++) {
+        const candidate = spawn(binary, ["serve", "--port", String(port)], {
+            env: { ...process.env, OPENCODE_SERVER_PASSWORD: state.password },
+            stdio: "ignore",
+        });
+        url = `http://127.0.0.1:${port}`;
+        const auth = { username: "opencode", password: state.password };
+        let ready = false;
+        let ready: { version?: string; prefix: string } | null = null;
+        for (let i = 0; i < 15; i++) {
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+            if (candidate.exitCode !== null) {
+                break;
+            }
+            ready = await probeCandidate(url, auth);
+            if (ready) {
+                break;
+            }
         }
-        const again = await discoverServer();
-        if (again) {
-            return { url, auth, version: again.version, prefix: again.prefix, child };
+        if (ready) {
+            return { url, auth, version: ready.version, prefix: ready.prefix, child: candidate };
+        }
+        candidate.kill();
+        if (candidate.exitCode === null) {
+            await new Promise((resolve) => setTimeout(resolve, 500));
         }
     }
-    child.kill();
     throw new Error("opencode serve did not come up in time");
 }
