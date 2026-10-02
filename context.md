@@ -150,6 +150,10 @@
 - 상세 307 해소済み. 원인은 손 복사 id 오기 (db 행 `...8ph...I41` vs 입력 `...Bph...I4i`). 목록 제목 링크화로 재발 방지. 코드 정상이었음.
 - 남은 것: 예약 실행 ("PC 켜지면 실행" 경고 + 부팅 catch-up).
 
+## OS 등록 (2026-10-03 완료, Arch)
+- `~/.local/bin/cliagent` 래퍼 + `~/.config/cliagent/env` (DATABASE_URL 1개, 600) + systemd user unit.
+- `enable --now`済み. `active (running)` 확인. 재부팅 테스트 미실시.
+
 ## 데몬 종단 검증 (2026-09-29, 이 PC)
 - 명령: `daemon/`에서 build 후 자체 serve(번들 CLI 2.0.18, 4096, 비번) → `status`·`sessions` 성공. 세션 5개 제목 출력 확인.
 - 교훈 3개: (1) 데스크톱 v2 API는 `/api/*` 아래 + 인증 필수. HTML 폴백에 속지 말 것. (2) health 엔드포인트 없음. 탐색 기준은 `/api/session` 목록 조회로 변경. 목록 형태 `{data:[...]}` 래퍼 주의. (3) 시스템 CLI 1.18과 데스크톱 번들 2.0.18 버전 꼬임. serve는 번들 CLI로 띄울 것.
