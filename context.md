@@ -1,4 +1,4 @@
-2026-10-03 01:31
+2026-10-03 01:41
 
 # context.md - cli-agents-dev
 
@@ -126,9 +126,11 @@
 - [x] 상세 307 해소 (원인: 손 복사 id 오기. 목록 링크화로 재발 방지)
 - [x] 에이전트·모델 전환 코드 + 종단 (variant medium 변경 → poll → PC GUI 확인済み 2026-10-02)
 - [x] 대화 동기화·시각·tool 가공·UI 개편 (말풍선·마크다운·폭·점프 버튼)
-- [ ] 예약 실행 catch-up (경고 표시済み. 부팅 pull은 상주 루프와 묶음, 2단계)
+- [x] OS 등록 Arch (`active (running)` 확인, 재부팅 미확인)
+- [ ] 토큰 API 4개 (데몬 `DATABASE_URL` 제거용)
+- [ ] loopback 로그인 구현
 - [ ] 플러그인 통지 (폴링 대체. 스풀 디렉터리 방식 결정済み)
-- [ ] P4 (도메인 연결·배포·과금. MoR: Fungies 심사 대기)
+- [ ] P4 (Dodo 가입 계속·도메인 연결·배포·과금. MoR: Fungies 심사 대기)
 
 ## 실행 계획 (2026-09-30)
 - P1: outbox·heartbeat 스키마 + 데몬 승인 중계. 돈값 코어의 로컬 절반.
@@ -149,6 +151,23 @@
 - 새 지시: outbox `message` 타입 + 상세 입력창. 종단 검증済み (웹 전송 → poll `message done` → 에이전트 응답 확인).
 - 상세 307 해소済み. 원인은 손 복사 id 오기 (db 행 `...8ph...I41` vs 입력 `...Bph...I4i`). 목록 제목 링크화로 재발 방지. 코드 정상이었음.
 - 남은 것: 예약 실행 ("PC 켜지면 실행" 경고 + 부팅 catch-up).
+
+## 1줄 설치 설계 (2026-10-03 확정, 미구현)
+- 목표: `npx cliagent login` 1줄에 설치·OAuth·등록·서버기동·주기실행까지. 붙여넣기 0건.
+- 데몬이 서버 직접 기동済み (`daemon/src/serve.ts`: 기존 탐색 → 없으면 자식으로 기동, 비번 랜덤 32B 상태 보관, 포트 4096~4105 폴백, 종료 시 kill).
+- 비번은 상태 파일 일원화. 명시 명령도 env 없이 됨. OS unit은 `EnvironmentFile` 1개 (`DATABASE_URL`만).
+- 남은 것: 토큰 API 4개 (데몬 `DATABASE_URL` 제거용) + loopback 로그인 구현 + OS 등록 실행は済み(Arch, 재부팅 미확인).
+
+## 브랜드 확정 (2026-10-03)
+- 상호 `LocalAgentsLink`, 도메인 구입済み. `cliagents.dev`는 리다이렉트용 유지.
+- 개명 검토 기록: `CLI`는 CLI·GUI 병행 현실과 어긋남 (OpenCode·Claude 데스크톱 존재). `overlord` 전멸. `agentsync` 계열 사용 금지 (AGENTSYNC 미국 등록상표 6836288호, 권리자 소송 전적. `agenticsync`·`localagentsync` 포함).
+- `remote*`는 부속을 본체로 오해시킴. `.tech` 갱신 함정 (`remoteagent.tech` $9.99→$49.20) 주의.
+
+## Dodo 가입 (2026-10-03 진행 중)
+- 후보 1순위 등극. 4%+40¢(美내)+1.5% 해외+0.5% 구독. 한국 merchant·KRW·카카오/네이버/페이코 가능. SaaS·AI 환영 명시.
+- 출금은 Local (국내망). 국민은행 코드 004. 이름 여권 영문, 예금주 은행 기록 그대로, 주소 영문 로마자, 우편 5자리.
+- 개인 자격 가능. 계좌개설확인서 영문 권장 (없으면 한글 + 영문명 로마자 표기).
+- 주소 영문 예시: `302-ho, A-dong, 41, Seongan-ro 3-gil, Gangdong-gu, Seoul`, City `Seoul`.
 
 ## OS 등록 (2026-10-03 완료, Arch)
 - `~/.local/bin/cliagent` 래퍼 + `~/.config/cliagent/env` (DATABASE_URL 1개, 600) + systemd user unit.
