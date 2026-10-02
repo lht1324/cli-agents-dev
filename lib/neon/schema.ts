@@ -104,6 +104,14 @@ export const modelCatalog = pgTable("model_catalog", {
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// 구독(플랜 배정). plan_id가 진실, 해석된 값은 함께 저장한다.
+export const subscriptions = pgTable("subscriptions", {
+    userId: text("user_id").primaryKey(),
+    planId: text("plan_id").notNull().default("plan-1"),
+    syncIntervalSec: integer("sync_interval_sec").notNull().default(1800),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // 이전 epoch 접기. 압축 발동 시 이전 구간 요약 1줄만 보관한다.
 export const cloudFolds = pgTable(
     "cloud_folds",

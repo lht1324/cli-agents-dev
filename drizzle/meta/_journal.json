@@ -43,6 +43,13 @@
       "when": 1790867645161,
       "tag": "0005_free_pretty_boy",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790927790448,
+      "tag": "0006_stormy_ricochet",
+      "breakpoints": true
     }
   ]
 }
