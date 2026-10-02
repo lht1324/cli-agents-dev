@@ -119,7 +119,6 @@ export async function ensureServer(): Promise<ManagedServer> {
     }
     process.env.OPENCODE_SERVER_PASSWORD = state.password;
     const binary = locateBinary();
-    let child: ChildProcess | null = null;
     let url = "";
     for (let port = BASE_PORT; port < BASE_PORT + MAX_PORT_TRIES; port++) {
         const candidate = spawn(binary, ["serve", "--port", String(port)], {
@@ -128,7 +127,6 @@ export async function ensureServer(): Promise<ManagedServer> {
         });
         url = `http://127.0.0.1:${port}`;
         const auth = { username: "opencode", password: state.password };
-        let ready = false;
         let ready: { version?: string; prefix: string } | null = null;
         for (let i = 0; i < 15; i++) {
             await new Promise((resolve) => setTimeout(resolve, 1000));
