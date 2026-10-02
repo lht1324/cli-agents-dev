@@ -6,11 +6,9 @@ Wants=network-online.target
 [Service]
 Type=simple
 ExecStart=%h/.local/bin/cliagent run
+EnvironmentFile=%h/.config/cliagent/env
 Restart=on-failure
 RestartSec=30
-Environment=DATABASE_URL=
-Environment=OPENCODE_SERVER_URL=
-Environment=OPENCODE_SERVER_PASSWORD=
 
 [Install]
 WantedBy=default.target

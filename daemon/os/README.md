@@ -1,7 +1,7 @@
 # OS 등록 (부팅 자동시작)
 
-`cliagent run`을 OS에 등록한다. 환경값 3개는 각 OS 방식으로 넣는다.
-(`DATABASE_URL`, `OPENCODE_SERVER_URL`, `OPENCODE_SERVER_PASSWORD`)
+`cliagent run`을 OS에 등록한다. 비밀은 unit이 아니라 `~/.config/cliagent/env` 1줄씩 둔다.
+(`DATABASE_URL` 1개. 서버 URL·비번은 데몬이 상태 파일로 알아서 한다)
 
 ## Arch Linux (systemd user)
 
