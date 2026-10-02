@@ -21,6 +21,10 @@ export interface DeviceState {
     userId: string;
 }
 
+export interface ServerState {
+    password: string;
+}
+
 function stateDir(): string {
     return join(homedir(), ".config", "cliagent");
 }
@@ -48,6 +52,27 @@ export function writeState(state: DeviceState): void {
     mkdirSync(stateDir(), { recursive: true });
     writeFileSync(statePath(), JSON.stringify(state, null, 4), { mode: 0o600 });
     chmodSync(statePath(), 0o600);
+}
+
+function serverStatePath(): string {
+    return join(stateDir(), "server.json");
+}
+
+export function readServerState(): ServerState | null {
+    try {
+        if (!existsSync(serverStatePath())) {
+            return null;
+        }
+        return JSON.parse(readFileSync(serverStatePath(), "utf8")) as ServerState;
+    } catch {
+        return null;
+    }
+}
+
+export function writeServerState(state: ServerState): void {
+    mkdirSync(stateDir(), { recursive: true });
+    writeFileSync(serverStatePath(), JSON.stringify(state), { mode: 0o600 });
+    chmodSync(serverStatePath(), 0o600);
 }
 
 export interface HostInfo {

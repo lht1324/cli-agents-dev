@@ -1,41 +1,13 @@
 import { randomBytes } from "node:crypto";
-import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { execSync, spawn, type ChildProcess } from "node:child_process";
 import { homedir, platform } from "node:os";
 import { join } from "node:path";
 import { discoverServer, type DiscoveredServer } from "./server";
+import { readServerState, writeServerState } from "./device";
 
 const BASE_PORT = 4096;
 const MAX_PORT_TRIES = 10;
-
-interface ServerState {
-    password: string;
-}
-
-function stateDir(): string {
-    return join(homedir(), ".config", "cliagent");
-}
-
-function serverStatePath(): string {
-    return join(stateDir(), "server.json");
-}
-
-function readServerState(): ServerState | null {
-    try {
-        if (!existsSync(serverStatePath())) {
-            return null;
-        }
-        return JSON.parse(readFileSync(serverStatePath(), "utf8")) as ServerState;
-    } catch {
-        return null;
-    }
-}
-
-function writeServerState(state: ServerState): void {
-    mkdirSync(stateDir(), { recursive: true });
-    writeFileSync(serverStatePath(), JSON.stringify(state), { mode: 0o600 });
-    chmodSync(serverStatePath(), 0o600);
-}
 
 function bundledBinary(): string | null {
     const base =

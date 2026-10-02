@@ -1,12 +1,14 @@
 const DEFAULT_PORTS = [4096];
 
+import { readServerState } from "./device";
+
 function baseUrlFromEnv(): string | null {
     const url = process.env.OPENCODE_SERVER_URL;
     return url && url.length > 0 ? url : null;
 }
 
 function authFromEnv(): { username: string; password: string } | null {
-    const password = process.env.OPENCODE_SERVER_PASSWORD;
+    const password = process.env.OPENCODE_SERVER_PASSWORD ?? readServerState()?.password;
     if (!password) {
         return null;
     }
