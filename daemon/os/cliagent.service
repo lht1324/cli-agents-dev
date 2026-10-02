@@ -1,0 +1,16 @@
+[Unit]
+Description=cliagents resident daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/cliagent run
+Restart=on-failure
+RestartSec=30
+Environment=DATABASE_URL=
+Environment=OPENCODE_SERVER_URL=
+Environment=OPENCODE_SERVER_PASSWORD=
+
+[Install]
+WantedBy=default.target

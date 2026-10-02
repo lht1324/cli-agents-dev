@@ -138,6 +138,71 @@ async function onHeartbeat(): Promise<void> {
     console.log(`heartbeat: ${state.deviceId} (${host.label})`);
 }
 
+function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function readIntervalSec(userId: string): Promise<number> {
+    try {
+        const sql = db();
+        const rows = (await sql`
+            SELECT sync_interval_sec FROM subscriptions WHERE user_id = ${userId}
+        `) as { sync_interval_sec: number }[];
+        const value = rows[0]?.sync_interval_sec;
+        return typeof value === "number" && value > 0 ? value : 1800;
+    } catch {
+        return 1800;
+    }
+}
+
+// 상주 루프. heartbeat·sync·poll을 주기마다 순서대로. 1개 실패해도 계속.
+async function onRun(): Promise<void> {
+    const state = readState();
+    if (!state) {
+        throw new Error("not registered. run `cliagent register <user-id>` first");
+    }
+    let stopping = false;
+    const stop = () => {
+        stopping = true;
+    };
+    process.once("SIGINT", stop);
+    process.once("SIGTERM", stop);
+    console.log(`run: device=${state.deviceId}`);
+    while (!stopping) {
+        const started = Date.now();
+        try {
+            await onHeartbeat();
+        } catch (err) {
+            console.error(`heartbeat failed: ${err instanceof Error ? err.message : err}`);
+        }
+        try {
+            const server = await requireServer();
+            await pushPending(server);
+            await syncSessions(server);
+        } catch (err) {
+            console.error(`sync failed: ${err instanceof Error ? err.message : err}`);
+        }
+        try {
+            await pollCommands();
+        } catch (err) {
+            console.error(`poll failed: ${err instanceof Error ? err.message : err}`);
+        }
+        const intervalSec = await readIntervalSec(state.userId);
+        const waitMs = Math.max(0, intervalSec * 1000 - (Date.now() - started));
+        console.log(`run: next in ${Math.round(waitMs / 1000)}s`);
+        const deadline = Date.now() + waitMs;
+        while (!stopping && Date.now() < deadline) {
+            await sleep(Math.min(1000, deadline - Date.now()));
+        }
+    }
+    try {
+        await onHeartbeat();
+    } catch {
+        // best-effort flush only
+    }
+    console.log("run: stopped");
+}
+
 async function main(): Promise<void> {
     const cmd = process.argv[2];
     if (cmd === "status") {
@@ -160,12 +225,14 @@ async function main(): Promise<void> {
         await onSyncModels();
     } else if (cmd === "sync-sessions") {
         await onSyncSessions();
+    } else if (cmd === "run") {
+        await onRun();
     } else if (cmd === "poll") {
         await pollCommands();
     } else if (cmd === "approve") {
         await onApprove(process.argv[3], process.argv[4]);
     } else {
-        console.log("usage: cliagent <login|register|status|sessions|poll|heartbeat|approve|sync|fork|sync-messages|sync-models|sync-sessions>");
+        console.log("usage: cliagent <login|register|status|sessions|poll|heartbeat|approve|sync|fork|sync-messages|sync-models|sync-sessions|run>");
         process.exitCode = 1;
     }
 }
