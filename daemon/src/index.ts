@@ -1,6 +1,7 @@
 import { apiGet, apiPost, discoverServer, type DiscoveredServer } from "./server";
 import { hostInfo, newDeviceId, readState, writeState } from "./device";
 import { forkAndRegister } from "./fork";
+import { ensureServer, type ManagedServer } from "./serve";
 import { syncSessions } from "./sessions";
 import { setSessionAgent, setSessionModel, syncCatalog, type ModelRef } from "./catalog";
 import { syncMessages } from "./messages";
@@ -168,6 +169,15 @@ async function onRun(): Promise<void> {
     process.once("SIGINT", stop);
     process.once("SIGTERM", stop);
     console.log(`run: device=${state.deviceId}`);
+    let owned: ManagedServer | null = null;
+    try {
+        owned = await ensureServer();
+        if (owned.child) {
+            console.log(`run: spawned server at ${owned.url}`);
+        }
+    } catch (err) {
+        console.error(`server ensure failed: ${err instanceof Error ? err.message : err}`);
+    }
     while (!stopping) {
         const started = Date.now();
         try {
@@ -200,6 +210,7 @@ async function onRun(): Promise<void> {
     } catch {
         // best-effort flush only
     }
+    owned?.child?.kill();
     console.log("run: stopped");
 }
 
