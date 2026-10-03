@@ -18,7 +18,7 @@ export async function GET(request: Request): Promise<Response> {
         .orderBy(asc(commands.createdAt))
         .limit(1);
     if (oldest.length === 0) {
-        return getNextBaseResponse(204).json({ success: true, status: 204 });
+        return new Response(null, { status: 204 });
     }
     const claimed = await db
         .update(commands)
@@ -26,7 +26,7 @@ export async function GET(request: Request): Promise<Response> {
         .where(and(eq(commands.id, oldest[0].id), eq(commands.status, "pending")))
         .returning({ id: commands.id, type: commands.type, payload: commands.payload });
     if (claimed.length === 0) {
-        return getNextBaseResponse(204).json({ success: true, status: 204 });
+        return new Response(null, { status: 204 });
     }
     return getNextBaseResponse(200).json({ success: true, status: 200, data: claimed[0] });
 }
