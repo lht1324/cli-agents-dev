@@ -1,4 +1,4 @@
-2026-10-04 01:03
+2026-10-04 01:35
 
 # context.md - cli-agents-dev
 
@@ -109,6 +109,13 @@
 - assistant text 마크다운 렌더 (`react-markdown@10.1.0` + `remark-gfm@4.0.1`). 진입 시 최하단 + `↓` 플로팅 버튼.
 - 메시지 원본 시각: `cloud_messages.createdAt`에 원본 기록. 말풍선 아래 `3:24 PM` 표시. 걸린 시간은 다음(컬럼 필요).
 
+## CLI 명령어 목록 (2026-10-04 확정)
+- 유저 표면 5개: `login`(묶기, loopback 미구현) · `logout`(끊기, 상태 파일 삭제, 미구현) · `status`(동기화 상태 3줄로 개편予定, 지금은 서버 접속 정보) · `push`(묶음 명령, 미구현) · `pull`(이식, 2단계).
+- 고급·진단으로 격하: `fork`(직접 동기화로 충분 실측済み, 충돌 시 옵션) · `approve`(테스트용. 실승인은 웹 버튼·로컬 클릭) · heartbeat·sync·sync-messages·sync-models·sync-sessions·poll·register·token·sessions (진단 `doctor` 1개로 묶을 예정).
+- `send` 폐기. 메시지 전송은 웹에서만.
+- `status` 개편: 서버 접속 표시 제거 → 마지막 성공·밀린 명령·서버 도달 3줄.
+- `--help` 미구현. 기본 5개 + 고급 숨김 구조로 만들 것.
+
 ## 다음 할 일
 - [x] 세션 정의 확정 (탭>세션, 현재 epoch 전문 + 이전 접기)
 - [x] MVP 플로우 3개 고정 (전문+초과 폴백 / 허용·거부 2버튼 / 주기+수동 버튼)
@@ -127,8 +134,10 @@
 - [x] 에이전트·모델 전환 코드 + 종단 (variant medium 변경 → poll → PC GUI 확인済み 2026-10-02)
 - [x] 대화 동기화·시각·tool 가공·UI 개편 (말풍선·마크다운·폭·점프 버튼)
 - [x] OS 등록 Arch (`active (running)` 확인, 재부팅 미확인)
-- [ ] 토큰 API 4개 (데몬 `DATABASE_URL` 제거용)
+- [x] 토큰 API (heartbeat·poll·sync·messages 전환済み. `register` 1회만 직접 Neon)
 - [ ] loopback 로그인 구현
+- [ ] `push` 묶음 명령 + `status` 개편 + `logout` + `--help` (기본 5개 표면)
+- [ ] `doctor` 진단 묶음 (고급 명령 숨김)
 - [ ] 플러그인 통지 (폴링 대체. 스풀 디렉터리 방식 결정済み)
 - [ ] P4 (Dodo 가입 계속·도메인 연결·배포·과금. MoR: Fungies 심사 대기)
 
