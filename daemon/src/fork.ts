@@ -1,6 +1,5 @@
 import { apiGet, apiPost, type DiscoveredServer } from "./server";
-import { db } from "./db";
-import { readState } from "./device";
+import { cloudPost } from "./cloud";
 
 interface ForkResult {
     id: string;
@@ -28,17 +27,10 @@ async function sourceTitle(server: DiscoveredServer, sessionID: string): Promise
 
 // fork + 클라우드 대장(sessions_meta) 등록.
 export async function forkAndRegister(server: DiscoveredServer, sessionID: string): Promise<string> {
-    const state = readState();
-    if (!state) {
-        throw new Error("not registered. run `cliagent register <user-id>` first");
-    }
     const forked = await forkSession(server, sessionID);
     const title = (await sourceTitle(server, sessionID)) ?? `fork of ${sessionID.slice(4, 12)}`;
-    const sql = db();
-    await sql`
-        INSERT INTO sessions_meta (id, device_id, provider, title, status)
-        VALUES (${forked.id}, ${state.deviceId}, 'opencode', ${title}, 'active')
-        ON CONFLICT (id) DO NOTHING
-    `;
+    await cloudPost("/api/sync", {
+        sessions: [{ id: forked.id, title, status: "active", provider: "opencode" }],
+    });
     return forked.id;
 }

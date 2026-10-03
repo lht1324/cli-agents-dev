@@ -1,7 +1,6 @@
 import { apiGet, type DiscoveredServer } from "./server";
 import { formatToolExit } from "./tools";
-import { db } from "./db";
-import { readState } from "./device";
+import { cloudPost } from "./cloud";
 
 interface ServerMessage {
     id: string;
@@ -111,32 +110,17 @@ async function fetchMessages(server: DiscoveredServer, sessionID: string): Promi
 }
 
 export async function syncMessages(server: DiscoveredServer, sessionID: string): Promise<{ rows: number }> {
-    const state = readState();
-    if (!state) {
-        throw new Error("not registered. run `cliagent register <user-id>` first");
-    }
     const messages = await fetchMessages(server, sessionID);
     const rows = flatten(messages);
-    const sql = db();
-    await sql`
-        INSERT INTO cloud_tabs (id, user_id, device_id, provider, title, status)
-        VALUES (${sessionID}, ${state.userId}, ${state.deviceId}, 'opencode', ${sessionID}, 'active')
-        ON CONFLICT (id) DO NOTHING
-    `;
-    for (const r of rows) {
-        if (r.createdAt !== null) {
-            await sql`
-                INSERT INTO cloud_messages (tab_id, seq, role, kind, body, created_at)
-                VALUES (${sessionID}, ${r.seq}, ${r.role}, ${r.kind}, ${r.body}, to_timestamp(${r.createdAt / 1000.0}))
-                ON CONFLICT (tab_id, seq) DO NOTHING
-            `;
-        } else {
-            await sql`
-                INSERT INTO cloud_messages (tab_id, seq, role, kind, body)
-                VALUES (${sessionID}, ${r.seq}, ${r.role}, ${r.kind}, ${r.body})
-                ON CONFLICT (tab_id, seq) DO NOTHING
-            `;
-        }
-    }
-    return { rows: rows.length };
+    const result = (await cloudPost("/api/messages", {
+        messages: rows.map((r) => ({
+            sessionID,
+            seq: r.seq,
+            role: r.role,
+            kind: r.kind,
+            body: r.body,
+            createdAt: r.createdAt,
+        })),
+    })) as { data?: { rows?: number } };
+    return { rows: result.data?.rows ?? rows.length };
 }
