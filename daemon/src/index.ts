@@ -1,5 +1,5 @@
 import { apiGet, apiPost, discoverServer, type DiscoveredServer } from "./server";
-import { hostInfo, newDeviceId, readState, writeState } from "./device";
+import { hostInfo, newDeviceId, readState, writeState, baseUrl } from "./device";
 import { forkAndRegister } from "./fork";
 import { ensureServer, type ManagedServer } from "./serve";
 import { syncSessions } from "./sessions";
@@ -120,12 +120,38 @@ async function onSyncSessions(): Promise<void> {
     console.log(`sessions: ${result.sessions}`);
 }
 
+async function onToken(token: string | undefined): Promise<void> {
+    if (!token) {
+        throw new Error("usage: cliagent token <device-token>");
+    }
+    const state = readState();
+    if (!state) {
+        throw new Error("not registered. run `cliagent register <user-id>` first");
+    }
+    writeState({ ...state, token });
+    console.log("token saved");
+}
+
 async function onHeartbeat(): Promise<void> {
     const state = readState();
     if (!state) {
         throw new Error("not registered. run `cliagent register <user-id>` first");
     }
     const host = hostInfo();
+    if (state.token) {
+        const res = await fetch(`${baseUrl()}/api/heartbeat`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${state.token}` },
+            body: JSON.stringify({ platform: host.platform, hostname: host.hostname, label: host.label }),
+            signal: AbortSignal.timeout(10000),
+        });
+        if (!res.ok) {
+            throw new Error(`heartbeat rejected: ${res.status}`);
+        }
+        console.log(`heartbeat: ${state.deviceId} (${host.label}) via api`);
+        return;
+    }
+    // 토큰 없으면 구 경로 (직결). 토큰 발급 후에는 타지 않는다.
     const sql = db();
     await sql`
         UPDATE devices
@@ -226,6 +252,8 @@ async function main(): Promise<void> {
         await onRegister(process.argv[3], process.argv[4]);
     } else if (cmd === "heartbeat") {
         await onHeartbeat();
+    } else if (cmd === "token") {
+        await onToken(process.argv[3]);
     } else if (cmd === "sync") {
         await onSync();
     } else if (cmd === "fork") {
@@ -243,7 +271,7 @@ async function main(): Promise<void> {
     } else if (cmd === "approve") {
         await onApprove(process.argv[3], process.argv[4]);
     } else {
-        console.log("usage: cliagent <login|register|status|sessions|poll|heartbeat|approve|sync|fork|sync-messages|sync-models|sync-sessions|run>");
+        console.log("usage: cliagent <login|register|token|status|sessions|poll|heartbeat|approve|sync|fork|sync-messages|sync-models|sync-sessions|run>");
         process.exitCode = 1;
     }
 }

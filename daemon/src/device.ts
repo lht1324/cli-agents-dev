@@ -19,6 +19,7 @@ export function newDeviceId(): string {
 export interface DeviceState {
     deviceId: string;
     userId: string;
+    token?: string;
 }
 
 export interface ServerState {
@@ -42,10 +43,14 @@ export function readState(): DeviceState | null {
         if (!raw.deviceId || !raw.userId) {
             return null;
         }
-        return { deviceId: raw.deviceId, userId: raw.userId };
+        return { deviceId: raw.deviceId, userId: raw.userId, token: raw.token };
     } catch {
         return null;
     }
+}
+
+export function baseUrl(): string {
+    return process.env.CLIAGENT_BASE_URL ?? "http://localhost:3000";
 }
 
 export function writeState(state: DeviceState): void {

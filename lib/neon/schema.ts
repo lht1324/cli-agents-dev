@@ -112,6 +112,18 @@ export const subscriptions = pgTable("subscriptions", {
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// 디바이스 토큰. 데몬→클라우드 인증. 해시만 저장, revoke 가능.
+export const deviceTokens = pgTable("device_tokens", {
+    id: text("id").primaryKey(),
+    deviceId: text("device_id")
+        .notNull()
+        .references(() => devices.id),
+    tokenHash: text("token_hash").notNull().unique(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // 이전 epoch 접기. 압축 발동 시 이전 구간 요약 1줄만 보관한다.
 export const cloudFolds = pgTable(
     "cloud_folds",
