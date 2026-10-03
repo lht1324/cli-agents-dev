@@ -169,6 +169,11 @@
 - 개인 자격 가능. 계좌개설확인서 영문 권장 (없으면 한글 + 영문명 로마자 표기).
 - 주소 영문 예시: `302-ho, A-dong, 41, Seongan-ro 3-gil, Gangdong-gu, Seoul`, City `Seoul`.
 
+## 토큰 API (2026-10-03, heartbeat 완료)
+- `device_tokens` (해시·만료·revoke) + `lib/auth/device.ts` 검증 + `POST /api/heartbeat`.
+- 데몬 `token` 명령으로 저장, heartbeat API 경유 확인. 웹 online 표시 확인.
+- 남은 것: sync·messages·commands/next 3개 전환.
+
 ## OS 등록 (2026-10-03 완료, Arch)
 - `~/.local/bin/cliagent` 래퍼 + `~/.config/cliagent/env` (DATABASE_URL 1개, 600) + systemd user unit.
 - `enable --now`済み. `active (running)` 확인. 재부팅 테스트 미실시.
