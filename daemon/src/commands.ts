@@ -1,5 +1,4 @@
-import { db } from "./db";
-import { readState } from "./device";
+import { readState, baseUrl } from "./device";
 import { apiPost, discoverServer } from "./server";
 import { reply } from "./permissions";
 import { setSessionAgent, setSessionModel, type ModelRef } from "./catalog";
@@ -10,22 +9,41 @@ interface CommandRow {
     payload: string;
 }
 
+async function fetchNext(token: string): Promise<CommandRow | null> {
+    const res = await fetch(`${baseUrl()}/api/commands/next`, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(10000),
+    });
+    if (res.status === 204) {
+        return null;
+    }
+    if (!res.ok) {
+        throw new Error(`next rejected: ${res.status}`);
+    }
+    const body = (await res.json()) as { data?: CommandRow };
+    return body.data ?? null;
+}
+
+async function reportResult(
+    token: string,
+    id: string,
+    result: ExecResult,
+): Promise<void> {
+    const res = await fetch(`${baseUrl()}/api/commands/${id}/result`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(result),
+        signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) {
+        throw new Error(`result rejected: ${res.status}`);
+    }
+}
+
 interface ExecResult {
     ok: boolean;
     data?: string;
     error?: string;
-}
-
-function deviceId(): string {
-    const fromEnv = process.env.CLIAGENT_DEVICE_ID;
-    if (fromEnv) {
-        return fromEnv;
-    }
-    const state = readState();
-    if (!state) {
-        throw new Error("CLIAGENT_DEVICE_ID is not set and no state file. run `cliagent register <user-id>` first");
-    }
-    return state.deviceId;
 }
 
 interface ApprovePayload {
@@ -91,38 +109,25 @@ async function execute(type: string, payload: string): Promise<ExecResult> {
     return { ok: false, error: `unknown command type: ${type} (payload kept: ${payload.length} chars)` };
 }
 
-function toResultJson(result: ExecResult): string {
-    return JSON.stringify(result);
-}
-
 // pending 10건까지 1회 수행. 상주 루프는 2단계.
 export async function pollCommands(): Promise<void> {
-    const sql = db();
-    const device = deviceId();
-    const rows = (await sql`
-        SELECT id, type, payload FROM commands
-        WHERE device_id = ${device} AND status = 'pending' AND expires_at > now()
-        ORDER BY created_at LIMIT 10
-    `) as CommandRow[];
-    if (rows.length === 0) {
-        console.log("no pending commands");
-        return;
+    const state = readState();
+    if (!state) {
+        throw new Error("not registered. run `cliagent register <user-id>` first");
     }
-    for (const row of rows) {
-        const claimed = (await sql`
-            UPDATE commands SET status = 'delivered', delivered_at = now()
-            WHERE id = ${row.id} AND status = 'pending'
-            RETURNING id
-        `) as { id: string }[];
-        if (claimed.length === 0) {
-            console.log(`${row.id}\tskip (already claimed)`);
-            continue;
+    if (!state.token) {
+        throw new Error("no device token. run `cliagent token <device-token>` first");
+    }
+    for (let i = 0; i < 10; i++) {
+        const row = await fetchNext(state.token);
+        if (!row) {
+            if (i === 0) {
+                console.log("no pending commands");
+            }
+            return;
         }
         const result = await execute(row.type, row.payload);
-        await sql`
-            UPDATE commands SET status = 'done', done_at = now(), result = ${toResultJson(result)}
-            WHERE id = ${row.id}
-        `;
+        await reportResult(state.token, row.id, result);
         console.log(`${row.id}\t${row.type}\t${result.ok ? "done" : "error"}`);
     }
 }
