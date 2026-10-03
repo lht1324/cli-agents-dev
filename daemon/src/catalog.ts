@@ -1,4 +1,5 @@
 import { apiGet, apiPost, type DiscoveredServer } from "./server";
+import { cloudPost } from "./cloud";
 
 export interface ModelRef {
     id: string;
