@@ -172,7 +172,7 @@
 ## 토큰 API (2026-10-03, heartbeat 완료)
 - `device_tokens` (해시·만료·revoke) + `lib/auth/device.ts` 검증 + `POST /api/heartbeat`.
 - 데몬 `token` 명령으로 저장, heartbeat API 경유 확인. 웹 online 표시 확인.
-- 남은 것: sync·messages·commands/next 3개 전환.
+- sync·messages·commands/next 전환済み (2026-10-04 검증: sync 183행·파일 마커·현재값 표시). `register` 1회만 직접 Neon 유지.
 
 ## OS 등록 (2026-10-03 완료, Arch)
 - `~/.local/bin/cliagent` 래퍼 + `~/.config/cliagent/env` (DATABASE_URL 1개, 600) + systemd user unit.
