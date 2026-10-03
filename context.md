@@ -1,4 +1,4 @@
-2026-10-04 01:35
+2026-10-04 03:47
 
 # context.md - cli-agents-dev
 
@@ -115,6 +115,8 @@
 - `send` 폐기. 메시지 전송은 웹에서만.
 - `status` 개편: 서버 접속 표시 제거 → 마지막 성공·밀린 명령·서버 도달 3줄.
 - `--help` 미구현. 기본 5개 + 고급 숨김 구조로 만들 것.
+- 숨김 플래그: `--jaeholee`로 확정. help에 안 보이고 쳐야 돌아감. `doctor`는 읽기·진단만 (파괴 금지).
+- 개명 예정 (미실시): `cliagent` → `localagents` (URL `localagents.link`와 일치. npm空 확인. `lal` 선점·`agentslink`는 agentsync 혼동 우려로 탈락). 범위: bin명·설정 디렉터리·systemd unit·래퍼·문서. P4 전 실시.
 
 ## 다음 할 일
 - [x] 세션 정의 확정 (탭>세션, 현재 epoch 전문 + 이전 접기)
