@@ -1,30 +1,51 @@
 // cliagents sync plugin. 변경 통지를 스풀에 적재한다. 데몬이 읽어간다.
-// generic `event` 키가 아니라 종류별 키로 구독한다 (동작 확인 패턴).
-export const CliagentsSync = async () => {
-    const write = async (type, payload) => {
-        try {
-            const fs = await import("node:fs");
-            const os = await import("node:os");
-            const path = await import("node:path");
-            const sessionID =
-                payload?.sessionID ??
-                payload?.sessionId ??
-                payload?.event?.properties?.sessionID ??
-                payload?.event?.sessionID ??
-                null;
-            const dir = path.join(os.homedir(), ".config", "cliagent", "spool");
-            fs.mkdirSync(dir, { recursive: true });
-            const line = JSON.stringify({ type, sessionID, at: Date.now() });
-            const file = path.join(dir, `${Date.now()}-${Math.floor(Math.random() * 100000)}.json`);
-            fs.writeFileSync(file, `${line}\n`);
-        } catch {
-            // 통지 실패는 무시한다. 폴링이 백업이다.
+// v2 모양: default export { id, server, setup }.
+// server(v1 호환) + setup(ctx.tool.hook + ctx.event.subscribe) 둘 다 둔다.
+
+const spoolWrite = async (type, sessionID) => {
+    try {
+        if (!type) {
+            return;
         }
-    };
+        const fs = await import("node:fs");
+        const os = await import("node:os");
+        const path = await import("node:path");
+        const dir = path.join(os.homedir(), ".config", "cliagent", "spool");
+        fs.mkdirSync(dir, { recursive: true });
+        const line = JSON.stringify({ type, sessionID: sessionID ?? null, at: Date.now() });
+        const file = path.join(dir, `${Date.now()}-${Math.floor(Math.random() * 100000)}.json`);
+        fs.writeFileSync(file, `${line}\n`);
+    } catch {
+        // 통지 실패는 무시한다. 폴링이 백업이다.
+    }
+};
+
+const pickSession = (payload) => {
+    if (!payload || typeof payload !== "object") {
+        return null;
+    }
+    return (
+        payload.sessionID ??
+        payload.sessionId ??
+        payload.event?.properties?.sessionID ??
+        payload.event?.sessionID ??
+        payload.properties?.sessionID ??
+        null
+    );
+};
+
+const server = async () => {
     const on = (type) => async (payload) => {
-        await write(type, payload);
+        await spoolWrite(type, pickSession(payload));
     };
     return {
+        event: async ({ event }) => {
+            const type = event?.type ?? "";
+            if (type === "tool.execute.before" || type === "tool.execute.after") {
+                return;
+            }
+            await spoolWrite(type, pickSession({ event }));
+        },
         "tool.execute.after": on("tool.execute.after"),
         "permission.asked": on("permission.asked"),
         "permission.replied": on("permission.replied"),
@@ -35,3 +56,35 @@ export const CliagentsSync = async () => {
         "session.deleted": on("session.deleted"),
     };
 };
+
+const setup = async (ctx) => {
+    const controller = new AbortController();
+    try {
+        if (ctx?.tool?.hook) {
+            await ctx.tool.hook("execute.after", (event) => {
+                spoolWrite("tool.execute.after", event?.sessionID ?? null);
+            });
+        }
+    } catch {
+        // 무시
+    }
+    (async () => {
+        try {
+            if (!ctx?.event?.subscribe) {
+                return;
+            }
+            for await (const event of ctx.event.subscribe({ signal: controller.signal })) {
+                const type = event?.type ?? "";
+                if (type === "tool.execute.before" || type === "tool.execute.after") {
+                    continue;
+                }
+                await spoolWrite(type, pickSession({ event }));
+            }
+        } catch {
+            // 구독 해제는 조용히
+        }
+    })();
+    return () => controller.abort();
+};
+
+export default { id: "cliagents-sync", server, setup };
