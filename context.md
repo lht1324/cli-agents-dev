@@ -1,4 +1,4 @@
-2026-10-05 00:25
+2026-10-05 02:04
 
 # context.md - cli-agents-dev
 
@@ -140,7 +140,7 @@
 - [x] loopback 로그인 구현 (브라우저 OAuth → Connect → 토큰 → heartbeat 종단済み 2026-10-05)
 - [ ] `push` 묶음 명령 + `status` 개편 + `logout` + `--help` (기본 5개 표면)
 - [ ] `doctor` 진단 묶음 (고급 명령 숨김)
-- [ ] 플러그인 통지 (폴링 대체. 스풀 디렉터리 방식 결정済み)
+- [ ] 플러그인 통지 (폴링 대체. 스풀 디렉터리 방식 결정済み. **진행 중 — 아래 블로커 참고**)
 - [ ] P4 (Dodo 가입 계속·도메인 연결·배포·과금. MoR: Fungies 심사 대기)
 
 ## 실행 계획 (2026-09-30)
@@ -189,6 +189,13 @@
 - 흐름: 데몬 `login` → localhost 대기 + 브라우저 → 웹 로그인 → Connect → 콜백 토큰 → whoami → 상태 파일. `logged in` 확인.
 - 미로그인 복귀: AuthView가 callbackURL 무시 → 쿠키 폴백 (`begin` 저장 → `consume` 소비 → 복귀). 쿠키 읽기·삭제는 route에서만 (서버 컴포넌트 금지).
 - 교훈: dev 서버 구코드 주의 (재시작 후 시험). Neon 수면 시 첫 연결 실패 가능 (재시도).
+
+## 플러그인 통지 (2026-10-05, 진행 중 — 블로커 있음)
+- 구현: `daemon/plugin/cliagents-sync.js` + `daemon/src/spool.ts` (`drainSpool`, `poll`에 연결済み). KEEP allowlist 10종만 적재.
+- 원인 1 (해결): generic `event` 키는 발화 안 함. v2 모양 `export default { id, server, setup }` + 종류별 키 필요. 동작 중인 `gk-hooks.js` 대조로 확정.
+- 원인 2 (미해결): 실행 중인 `opencode-cli serve`가 구 플러그인을 메모리에 들고 있음. 데스크톱 창 재시작해도 서버 프로세스는 안 죽음. KEEP 밖 종류(`shell.exited` 등) 혼입이 증거.
+- 현재: 스풀 30여 파일 적체 (구버전 잡음 포함). drain 미실행.
+- 다음: 서버 프로세스 재시작 (컨펌 필요 — 데스크톱이 다시 띄우거나 다음 동기화 때 데몬이 감지). 그 뒤 테스트 메시지 → KEEP 종류만 쌓이는지 확인 → `poll` 로 drain 검증.
 
 ## OS 등록 (2026-10-03 완료, Arch)
 - `~/.local/bin/cliagent` 래퍼 + `~/.config/cliagent/env` (DATABASE_URL 1개, 600) + systemd user unit.
