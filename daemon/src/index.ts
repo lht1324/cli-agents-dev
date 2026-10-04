@@ -39,7 +39,70 @@ async function onSessions(): Promise<void> {
 }
 
 async function onLogin(): Promise<void> {
-    console.log("pairing is not implemented yet. run `cliagent status` to verify local discovery first.");
+    const { createServer } = await import("node:http");
+    const { exec } = await import("node:child_process");
+    const { platform } = await import("node:os");
+    const { newDeviceId, writeState, hostInfo, baseUrl } = await import("./device");
+    const deviceId = newDeviceId();
+    const host = hostInfo();
+    const state = Math.random().toString(36).slice(2, 10);
+    const received = await new Promise<{ token: string }>((resolve, reject) => {
+        const server = createServer((req, res) => {
+            const url = new URL(req.url ?? "/", "http://127.0.0.1");
+            if (url.pathname !== "/callback") {
+                res.writeHead(404);
+                res.end();
+                return;
+            }
+            const token = url.searchParams.get("token") ?? "";
+            const returned = url.searchParams.get("state") ?? "";
+            res.writeHead(200, { "Content-Type": "text/plain" });
+            res.end("Connected. You can close this tab and return to the terminal.");
+            server.close();
+            if (returned !== state || token.length === 0) {
+                reject(new Error("invalid callback. try again"));
+                return;
+            }
+            resolve({ token });
+        });
+        server.listen(0, "127.0.0.1", () => {
+            const address = server.address();
+            const port = typeof address === "object" && address ? address.port : 0;
+            const params = new URLSearchParams({
+                device: deviceId,
+                port: String(port),
+                state,
+                label: host.label,
+                platform: host.platform,
+                hostname: host.hostname,
+            });
+            const target = `${baseUrl().replace(/\/$/, "")}/device/authorize?${params.toString()}`;
+            const opener =
+                platform() === "darwin" ? "open" : platform() === "win32" ? "start" : "xdg-open";
+            exec(`${opener} "${target}"`);
+            console.log("opened browser. approve this device, then return here.");
+        });
+        setTimeout(() => {
+            server.close();
+            reject(new Error("timed out waiting for browser. try again"));
+        }, 5 * 60 * 1000).unref?.();
+    }).catch((err: unknown) => {
+        throw err;
+    });
+    const who = await fetch(`${baseUrl()}/api/auth/whoami`, {
+        headers: { Authorization: `Bearer ${received.token}` },
+        signal: AbortSignal.timeout(10000),
+    });
+    if (!who.ok) {
+        throw new Error(`whoami rejected: ${who.status}`);
+    }
+    const body = (await who.json()) as { data?: { userId?: string } };
+    const userId = body.data?.userId;
+    if (!userId) {
+        throw new Error("whoami returned no user");
+    }
+    writeState({ deviceId, userId, token: received.token });
+    console.log(`logged in: ${deviceId} (${host.label})`);
 }
 
 async function onRegister(userId: string | undefined, deviceId: string | undefined): Promise<void> {
