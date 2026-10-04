@@ -137,7 +137,7 @@
 - [x] 대화 동기화·시각·tool 가공·UI 개편 (말풍선·마크다운·폭·점프 버튼)
 - [x] OS 등록 Arch (`active (running)` 확인, 재부팅 미확인)
 - [x] 토큰 API (heartbeat·poll·sync·messages 전환済み. `register` 1회만 직접 Neon)
-- [ ] loopback 로그인 구현
+- [x] loopback 로그인 구현 (브라우저 OAuth → Connect → 토큰 → heartbeat 종단済み 2026-10-05)
 - [ ] `push` 묶음 명령 + `status` 개편 + `logout` + `--help` (기본 5개 표면)
 - [ ] `doctor` 진단 묶음 (고급 명령 숨김)
 - [ ] 플러그인 통지 (폴링 대체. 스풀 디렉터리 방식 결정済み)
@@ -184,6 +184,11 @@
 - `device_tokens` (해시·만료·revoke) + `lib/auth/device.ts` 검증 + `POST /api/heartbeat`.
 - 데몬 `token` 명령으로 저장, heartbeat API 경유 확인. 웹 online 표시 확인.
 - sync·messages·commands/next 전환済み (2026-10-04 검증: sync 183행·파일 마커·현재값 표시). `register` 1회만 직접 Neon 유지.
+
+## loopback 로그인 (2026-10-05 완료, 이 PC)
+- 흐름: 데몬 `login` → localhost 대기 + 브라우저 → 웹 로그인 → Connect → 콜백 토큰 → whoami → 상태 파일. `logged in` 확인.
+- 미로그인 복귀: AuthView가 callbackURL 무시 → 쿠키 폴백 (`begin` 저장 → `consume` 소비 → 복귀). 쿠키 읽기·삭제는 route에서만 (서버 컴포넌트 금지).
+- 교훈: dev 서버 구코드 주의 (재시작 후 시험). Neon 수면 시 첫 연결 실패 가능 (재시도).
 
 ## OS 등록 (2026-10-03 완료, Arch)
 - `~/.local/bin/cliagent` 래퍼 + `~/.config/cliagent/env` (DATABASE_URL 1개, 600) + systemd user unit.
