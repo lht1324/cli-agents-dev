@@ -2,7 +2,24 @@
 // v2 모양: default export { id, server, setup }.
 // server(v1 호환) + setup(ctx.tool.hook + ctx.event.subscribe) 둘 다 둔다.
 
+// 스트리밍 잡음 제외. 의미 있는 것만 적재한다.
+const KEEP = new Set([
+    "tool.execute.after",
+    "permission.asked",
+    "permission.replied",
+    "session.created",
+    "session.updated",
+    "session.idle",
+    "session.compacted",
+    "session.deleted",
+    "session.error",
+    "session.status",
+]);
+
 const spoolWrite = async (type, sessionID) => {
+    if (!KEEP.has(type)) {
+        return;
+    }
     try {
         if (!type) {
             return;
