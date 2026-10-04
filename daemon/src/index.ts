@@ -24,12 +24,12 @@ async function requireServer(): Promise<DiscoveredServer> {
 }
 
 async function onStatus(): Promise<void> {
-    const server = await requireServer();
+    const server = await ensureServer();
     console.log(`server: ${server.url}${server.version ? ` (v${server.version})` : ""}`);
 }
 
 async function onSessions(): Promise<void> {
-    const server = await requireServer();
+    const server = await ensureServer();
     const body = (await apiGet(server, "/session")) as { data?: SessionRow[] } | SessionRow[];
     const sessions = Array.isArray(body) ? body : (body.data ?? []);
     for (const s of sessions) {
@@ -53,7 +53,7 @@ async function onRegister(userId: string | undefined, deviceId: string | undefin
 }
 
 async function onApprove(requestID: string | undefined, decision: string | undefined): Promise<void> {
-    const server = await requireServer();
+    const server = await ensureServer();
     if (!requestID) {
         const pending = await listPending(server);
         if (pending.length === 0) {
@@ -81,7 +81,7 @@ async function onFork(sessionID: string | undefined): Promise<void> {
     if (!sessionID) {
         throw new Error("usage: cliagent fork <session-id>");
     }
-    const server = await requireServer();
+    const server = await ensureServer();
     const id = await forkAndRegister(server, sessionID);
     console.log(`forked: ${id}`);
 }
@@ -90,25 +90,25 @@ async function onSyncMessages(sessionID: string | undefined): Promise<void> {
     if (!sessionID) {
         throw new Error("usage: cliagent sync-messages <session-id>");
     }
-    const server = await requireServer();
+    const server = await ensureServer();
     const result = await syncMessages(server, sessionID);
     console.log(`synced: ${result.rows} rows`);
 }
 
 async function onSync(): Promise<void> {
-    const server = await requireServer();
+    const server = await ensureServer();
     const result = await pushPending(server);
     console.log(`pushed: ${result.open} open`);
 }
 
 async function onSyncModels(): Promise<void> {
-    const server = await requireServer();
+    const server = await ensureServer();
     const result = await syncCatalog(server);
     console.log(`catalog: ${result.models} models, ${result.agents} agents`);
 }
 
 async function onSyncSessions(): Promise<void> {
-    const server = await requireServer();
+    const server = await ensureServer();
     const result = await syncSessions(server);
     console.log(`sessions: ${result.sessions}`);
 }
@@ -196,7 +196,7 @@ function sleep(ms: number): Promise<void> {
 
 // 묶음 동기화 1회: heartbeat·승인거울·세션헤더·카탈로그.
 async function onPush(): Promise<void> {
-    const server = await requireServer();
+    const server = await ensureServer();
     const intervalSec = await onHeartbeat();
     const pending = await pushPending(server);
     console.log(`pushed: ${pending.open} open`);
@@ -238,7 +238,7 @@ async function onRun(): Promise<void> {
             console.error(`heartbeat failed: ${err instanceof Error ? err.message : err}`);
         }
         try {
-            const server = await requireServer();
+            const server = await ensureServer();
             await pushPending(server);
             await syncSessions(server);
             await syncCatalog(server);
@@ -291,7 +291,7 @@ async function main(): Promise<void> {
     } else if (cmd === "sync-sessions") {
         await onSyncSessions();
     } else if (cmd === "push") {
-        const server = await requireServer();
+        const server = await ensureServer();
         const intervalSec = await onHeartbeat();
         const pending = await pushPending(server);
         console.log(`pushed: ${pending.open} open`);

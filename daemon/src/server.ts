@@ -21,24 +21,24 @@ function basicAuth(auth: { username: string; password: string }): string {
 
 async function probeHealth(url: string, auth: { username: string; password: string } | null): Promise<{ version?: string; prefix: string } | null> {
     for (const prefix of ["/api", ""]) {
-        const path = `${prefix}/session`;
         const headers: Record<string, string> = { Accept: "application/json" };
         try {
             const authed = auth
                 ? { ...headers, Authorization: basicAuth(auth) }
                 : headers;
-            const tryFetch = async (h: Record<string, string>) => {
+            const tryFetch = async (h: Record<string, string>, path: string) => {
                 const res = await fetch(`${url}${path}`, { headers: h, signal: AbortSignal.timeout(2000) });
                 if (res.status === 401 && auth && !h.Authorization) {
                     return null;
                 }
                 return res;
             };
-            let res = await tryFetch(headers);
+            // 세션 목록이 v2 형태인지 확인한다. 구버전(1.x)은 여기서 탈락.
+            let res = await tryFetch(headers, `${prefix}/session`);
             if (res === null) {
-                res = await tryFetch(authed);
+                res = await tryFetch(authed, `${prefix}/session`);
             }
-            if (res === null || !res.ok) {
+            if (!res || !res.ok) {
                 continue;
             }
             const text = await res.text();
@@ -48,6 +48,21 @@ async function probeHealth(url: string, auth: { username: string; password: stri
             const body = JSON.parse(text) as { data?: unknown } | unknown[];
             const list = Array.isArray(body) ? body : body.data;
             if (!Array.isArray(list)) {
+                continue;
+            }
+            // v2 전용 엔드포인트로 확정. 구버전은 model이 없다.
+            const modelHeaders = auth
+                ? { Accept: "application/json", Authorization: basicAuth(auth) }
+                : { Accept: "application/json" };
+            const modelRes = await fetch(`${url}${prefix}/model`, {
+                headers: modelHeaders,
+                signal: AbortSignal.timeout(2000),
+            }).catch(() => null);
+            if (!modelRes || !modelRes.ok) {
+                continue;
+            }
+            const modelText = await modelRes.text();
+            if (!modelText.includes('"data"')) {
                 continue;
             }
             return { prefix };

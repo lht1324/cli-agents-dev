@@ -32,8 +32,13 @@ function bundledBinary(): string | null {
     return null;
 }
 
-// PATH의 opencode 우선, 없으면 데스크톱 번들 최신 버전.
+// PATH의 opencode가 아니라 데스크톱 번들(2.x 확정)을 우선한다.
+// 시스템 1.18은 구 스키마만 봐서 데몬 대상이 아니다.
 export function locateBinary(): string {
+    const bundled = bundledBinary();
+    if (bundled) {
+        return bundled;
+    }
     try {
         const found = execSync("command -v opencode", { encoding: "utf8" }).trim().split("\n")[0] ?? "";
         if (found.length > 0) {
@@ -41,10 +46,6 @@ export function locateBinary(): string {
         }
     } catch {
         // fall through
-    }
-    const bundled = bundledBinary();
-    if (bundled) {
-        return bundled;
     }
     throw new Error("opencode binary not found. install opencode first");
 }
