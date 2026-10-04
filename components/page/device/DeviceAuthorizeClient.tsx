@@ -47,7 +47,7 @@ export default function DeviceAuthorizeClient({
         <main className="mx-auto max-w-3xl px-4 py-10">
             <h1 className="text-2xl font-bold">Connect this device?</h1>
             <p className="mt-2 text-dim">
-                {label} ({platform}) will sync with your account.
+                {label} will sync with your account.
             </p>
             <button
                 onClick={onClickConnect}
