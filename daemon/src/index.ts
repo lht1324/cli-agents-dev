@@ -81,6 +81,7 @@ async function onLogin(): Promise<void> {
                 platform() === "darwin" ? "open" : platform() === "win32" ? "start" : "xdg-open";
             exec(`${opener} "${target}"`);
             console.log("opened browser. approve this device, then return here.");
+            console.log(`if the browser did not open, visit:\n${target}`);
         });
         setTimeout(() => {
             server.close();
