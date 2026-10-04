@@ -1,8 +1,9 @@
 import { eq } from "drizzle-orm";
 import { verifyDeviceToken } from "@/lib/auth/device";
 import { getDb } from "@/lib/neon/client";
-import { devices } from "@/lib/neon/schema";
+import { devices, subscriptions } from "@/lib/neon/schema";
 import { getNextBaseResponse } from "@/lib/utils/getNextBaseResponse";
+import { DEFAULT_PLAN_ID, planOf } from "@/lib/plans";
 
 interface HeartbeatBody {
     platform?: unknown;
@@ -25,9 +26,27 @@ export async function POST(request: Request): Promise<Response> {
     const platform = typeof body.platform === "string" ? body.platform : null;
     const hostname = typeof body.hostname === "string" ? body.hostname : null;
     const label = typeof body.label === "string" ? body.label : null;
-    await getDb()
-        .update(devices)
-        .set({ lastSeenAt: new Date(), platform, hostname, ...(label ? { label } : {}) })
-        .where(eq(devices.id, authed.deviceId));
-    return getNextBaseResponse(200).json({ success: true, status: 200 });
+    const db = getDb();
+    await db
+        .insert(devices)
+        .values({
+            id: authed.deviceId,
+            userId: authed.userId,
+            label: label ?? authed.deviceId.slice(0, 8),
+            platform,
+            hostname,
+            lastSeenAt: new Date(),
+        })
+        .onConflictDoUpdate({
+            target: devices.id,
+            set: { lastSeenAt: new Date(), platform, hostname, ...(label ? { label } : {}) },
+        });
+    const sub = await db
+        .select({ interval: subscriptions.syncIntervalSec, plan: subscriptions.planId })
+        .from(subscriptions)
+        .where(eq(subscriptions.userId, authed.userId))
+        .limit(1);
+    const intervalSec =
+        sub[0]?.interval ?? planOf(sub[0]?.plan ?? DEFAULT_PLAN_ID).syncIntervalSec;
+    return getNextBaseResponse(200).json({ success: true, status: 200, data: { intervalSec } });
 }

@@ -6,7 +6,6 @@ import { syncSessions } from "./sessions";
 import { setSessionAgent, setSessionModel, syncCatalog, type ModelRef } from "./catalog";
 import { syncMessages } from "./messages";
 import { listPending, reply, pushPending, type ReplyDecision } from "./permissions";
-import { db } from "./db";
 import { pollCommands } from "./commands";
 
 interface SessionRow {
@@ -50,12 +49,6 @@ async function onRegister(userId: string | undefined, deviceId: string | undefin
     const id = deviceId ?? newDeviceId();
     writeState({ deviceId: id, userId });
     const host = hostInfo();
-    const sql = db();
-    await sql`
-        INSERT INTO devices (id, user_id, label, platform, hostname, last_seen_at)
-        VALUES (${id}, ${userId}, ${host.label}, ${host.platform}, ${host.hostname}, NOW())
-        ON CONFLICT (id) DO UPDATE SET user_id = EXCLUDED.user_id, last_seen_at = NOW()
-    `;
     console.log(`registered: ${id} (${host.label})`);
 }
 
@@ -132,54 +125,86 @@ async function onToken(token: string | undefined): Promise<void> {
     console.log("token saved");
 }
 
-async function onHeartbeat(): Promise<void> {
+async function onDoctor(): Promise<void> {
+    const lines: string[] = [];
+    try {
+        const server = await requireServer();
+        lines.push(`server: ok (${server.url}${server.version ? ` v${server.version}` : ""})`);
+        try {
+            const sessions = (await apiGet(server, "/session")) as { data?: unknown[] } | unknown[];
+            const count = Array.isArray(sessions) ? sessions.length : (sessions.data?.length ?? 0);
+            lines.push(`sessions: ok (${count})`);
+        } catch (err) {
+            lines.push(`sessions: FAIL (${err instanceof Error ? err.message : err})`);
+        }
+    } catch (err) {
+        lines.push(`server: FAIL (${err instanceof Error ? err.message : err})`);
+    }
+    try {
+        const state = readState();
+        lines.push(state ? `state: ok (${state.deviceId})` : "state: FAIL (not registered)");
+    } catch (err) {
+        lines.push(`state: FAIL (${err instanceof Error ? err.message : err})`);
+    }
+    try {
+        const state = readState();
+        if (!state?.token) {
+            lines.push("cloud: FAIL (no device token)");
+        } else {
+            const res = await fetch(`${baseUrl()}/api/heartbeat`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${state.token}` },
+                body: JSON.stringify({}),
+                signal: AbortSignal.timeout(10000),
+            });
+            lines.push(res.ok ? "cloud: ok (api)" : `cloud: FAIL (${res.status})`);
+        }
+    } catch (err) {
+        lines.push(`cloud: FAIL (${err instanceof Error ? err.message : err})`);
+    }
+    for (const line of lines) {
+        console.log(line);
+    }
+}
+async function onHeartbeat(): Promise<number> {
     const state = readState();
     if (!state) {
         throw new Error("not registered. run `cliagent register <user-id>` first");
     }
+    if (!state.token) {
+        throw new Error("no device token. run `cliagent token <device-token>` first");
+    }
     const host = hostInfo();
-    if (state.token) {
-        const res = await fetch(`${baseUrl()}/api/heartbeat`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${state.token}` },
-            body: JSON.stringify({ platform: host.platform, hostname: host.hostname, label: host.label }),
-            signal: AbortSignal.timeout(10000),
-        });
-        if (!res.ok) {
-            throw new Error(`heartbeat rejected: ${res.status}`);
-        }
-        console.log(`heartbeat: ${state.deviceId} (${host.label}) via api`);
-        return;
+    const res = await fetch(`${baseUrl()}/api/heartbeat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${state.token}` },
+        body: JSON.stringify({ platform: host.platform, hostname: host.hostname, label: host.label }),
+        signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) {
+        throw new Error(`heartbeat rejected: ${res.status}`);
     }
-    // 토큰 없으면 구 경로 (직결). 토큰 발급 후에는 타지 않는다.
-    const sql = db();
-    await sql`
-        UPDATE devices
-        SET last_seen_at = NOW(), platform = ${host.platform}, hostname = ${host.hostname}
-        WHERE id = ${state.deviceId}
-    `;
-    const found = (await sql`SELECT id FROM devices WHERE id = ${state.deviceId}`) as { id: string }[];
-    if (found.length === 0) {
-        throw new Error("device row missing. run `cliagent register` again");
-    }
-    console.log(`heartbeat: ${state.deviceId} (${host.label})`);
+    const body = (await res.json()) as { data?: { intervalSec?: number } };
+    const intervalSec = body.data?.intervalSec;
+    console.log(`heartbeat: ${state.deviceId} (${host.label}) via api`);
+    return typeof intervalSec === "number" && intervalSec > 0 ? intervalSec : 1800;
 }
 
 function sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function readIntervalSec(userId: string): Promise<number> {
-    try {
-        const sql = db();
-        const rows = (await sql`
-            SELECT sync_interval_sec FROM subscriptions WHERE user_id = ${userId}
-        `) as { sync_interval_sec: number }[];
-        const value = rows[0]?.sync_interval_sec;
-        return typeof value === "number" && value > 0 ? value : 1800;
-    } catch {
-        return 1800;
-    }
+// 묶음 동기화 1회: heartbeat·승인거울·세션헤더·카탈로그.
+async function onPush(): Promise<void> {
+    const server = await requireServer();
+    const intervalSec = await onHeartbeat();
+    const pending = await pushPending(server);
+    console.log(`pushed: ${pending.open} open`);
+    const sessions = await syncSessions(server);
+    console.log(`sessions: ${sessions.sessions}`);
+    const catalog = await syncCatalog(server);
+    console.log(`catalog: ${catalog.models} models, ${catalog.agents} agents`);
+    console.log(`interval: ${intervalSec}s`);
 }
 
 // 상주 루프. heartbeat·sync·poll을 주기마다 순서대로. 1개 실패해도 계속.
@@ -206,8 +231,9 @@ async function onRun(): Promise<void> {
     }
     while (!stopping) {
         const started = Date.now();
+        let intervalSec = 1800;
         try {
-            await onHeartbeat();
+            intervalSec = await onHeartbeat();
         } catch (err) {
             console.error(`heartbeat failed: ${err instanceof Error ? err.message : err}`);
         }
@@ -215,6 +241,7 @@ async function onRun(): Promise<void> {
             const server = await requireServer();
             await pushPending(server);
             await syncSessions(server);
+            await syncCatalog(server);
         } catch (err) {
             console.error(`sync failed: ${err instanceof Error ? err.message : err}`);
         }
@@ -223,7 +250,6 @@ async function onRun(): Promise<void> {
         } catch (err) {
             console.error(`poll failed: ${err instanceof Error ? err.message : err}`);
         }
-        const intervalSec = await readIntervalSec(state.userId);
         const waitMs = Math.max(0, intervalSec * 1000 - (Date.now() - started));
         console.log(`run: next in ${Math.round(waitMs / 1000)}s`);
         const deadline = Date.now() + waitMs;
@@ -264,6 +290,16 @@ async function main(): Promise<void> {
         await onSyncModels();
     } else if (cmd === "sync-sessions") {
         await onSyncSessions();
+    } else if (cmd === "push") {
+        const server = await requireServer();
+        const intervalSec = await onHeartbeat();
+        const pending = await pushPending(server);
+        console.log(`pushed: ${pending.open} open`);
+        const sessions = await syncSessions(server);
+        console.log(`sessions: ${sessions.sessions}`);
+        const catalog = await syncCatalog(server);
+        console.log(`catalog: ${catalog.models} models, ${catalog.agents} agents`);
+        console.log(`interval: ${intervalSec}s`);
     } else if (cmd === "run") {
         await onRun();
     } else if (cmd === "poll") {
@@ -271,7 +307,7 @@ async function main(): Promise<void> {
     } else if (cmd === "approve") {
         await onApprove(process.argv[3], process.argv[4]);
     } else {
-        console.log("usage: cliagent <login|register|token|status|sessions|poll|heartbeat|approve|sync|fork|sync-messages|sync-models|sync-sessions|run>");
+        console.log("usage: cliagent <login|register|token|status|sessions|poll|heartbeat|approve|sync|fork|sync-messages|sync-models|sync-sessions|push|run>");
         process.exitCode = 1;
     }
 }
