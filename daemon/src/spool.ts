@@ -29,7 +29,7 @@ export async function drainSpool(server: DiscoveredServer): Promise<{ drained: n
         try {
             const raw = JSON.parse(readFileSync(join(spoolDir(), file), "utf8")) as SpoolEvent;
             const type = raw.type ?? "";
-            if (type.startsWith("message.") && raw.sessionID) {
+            if ((type.startsWith("message.") || type.startsWith("tool.execute")) && raw.sessionID) {
                 messaged.add(raw.sessionID);
             } else if (type.startsWith("permission.")) {
                 needPending = true;
