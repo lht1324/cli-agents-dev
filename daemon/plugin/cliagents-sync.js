@@ -1,6 +1,16 @@
 // cliagents sync plugin. OpenCode 안에서 변경 통지를 스풀에 적재한다.
 // 데몬이 읽어간다. 네트워크 호출 없음. 실패해도 조용히 넘긴다.
 export const CliagentsSync = async () => {
+    try {
+        const fs = await import("node:fs");
+        const os = await import("node:os");
+        const path = await import("node:path");
+        const dir = path.join(os.homedir(), ".config", "cliagent", "spool");
+        fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(path.join(dir, "plugin-loaded.json"), JSON.stringify({ at: Date.now() }));
+    } catch {
+        // 무시
+    };
     const interesting = (type) => {
         if (!type) {
             return false;
