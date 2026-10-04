@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { auth } from "@/lib/auth/server";
 import DeviceAuthorizeClient from "./DeviceAuthorizeClient";
 
@@ -8,7 +9,9 @@ export default async function DeviceAuthorizeServer({ params }: { params: Record
         Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined) as [string, string][]),
     ).toString()}`;
     if (!session?.user) {
-        redirect(`/auth/sign-in?callbackURL=${encodeURIComponent(back)}`);
+        const jar = await cookies();
+    jar.set("cliagent_connect", back, { maxAge: 600, path: "/", httpOnly: true });
+    redirect(`/auth/sign-in?callbackURL=${encodeURIComponent(back)}`);
     }
     const deviceId = params.device ?? "";
     const port = params.port ?? "";
