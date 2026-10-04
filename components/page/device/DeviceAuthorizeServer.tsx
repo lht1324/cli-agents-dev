@@ -4,8 +4,11 @@ import DeviceAuthorizeClient from "./DeviceAuthorizeClient";
 
 export default async function DeviceAuthorizeServer({ params }: { params: Record<string, string | undefined> }) {
     const { data: session } = await auth.getSession();
+    const back = `/device/authorize?${new URLSearchParams(
+        Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined) as [string, string][]),
+    ).toString()}`;
     if (!session?.user) {
-        redirect("/auth/sign-in");
+        redirect(`/auth/sign-in?callbackURL=${encodeURIComponent(back)}`);
     }
     const deviceId = params.device ?? "";
     const port = params.port ?? "";
