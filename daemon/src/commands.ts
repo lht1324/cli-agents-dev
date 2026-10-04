@@ -2,6 +2,7 @@ import { readState, baseUrl } from "./device";
 import { apiPost, discoverServer } from "./server";
 import { reply } from "./permissions";
 import { setSessionAgent, setSessionModel, type ModelRef } from "./catalog";
+import { drainSpool } from "./spool";
 
 interface CommandRow {
     id: string;
@@ -117,6 +118,17 @@ export async function pollCommands(): Promise<void> {
     }
     if (!state.token) {
         throw new Error("no device token. run `cliagent token <device-token>` first");
+    }
+    try {
+        const server = await discoverServer();
+        if (server) {
+            const drained = await drainSpool(server);
+            if (drained.drained > 0) {
+                console.log(`drained: ${drained.drained} events`);
+            }
+        }
+    } catch {
+        // 스풀 실패는 무시. 폴링 계속.
     }
     for (let i = 0; i < 10; i++) {
         const row = await fetchNext(state.token);
