@@ -51,9 +51,10 @@ async function probeHealth(url: string, auth: { username: string; password: stri
                 continue;
             }
             // v2 전용 엔드포인트로 확정. 구버전은 model이 없다.
-            const modelHeaders = auth
-                ? { Accept: "application/json", Authorization: basicAuth(auth) }
-                : { Accept: "application/json" };
+            const modelHeaders: Record<string, string> = { Accept: "application/json" };
+            if (auth) {
+                modelHeaders.Authorization = basicAuth(auth);
+            }
             const modelRes = await fetch(`${url}${prefix}/model`, {
                 headers: modelHeaders,
                 signal: AbortSignal.timeout(2000),

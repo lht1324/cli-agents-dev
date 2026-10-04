@@ -42,7 +42,7 @@ async function onLogin(): Promise<void> {
     const { createServer } = await import("node:http");
     const { exec } = await import("node:child_process");
     const { platform } = await import("node:os");
-    const { newDeviceId, writeState, hostInfo, baseUrl } = await import("./device");
+    const { newDeviceId, writeState, hostInfo, baseUrl } = await import("./device.js");
     const deviceId = newDeviceId();
     const host = hostInfo();
     const state = Math.random().toString(36).slice(2, 10);
