@@ -232,7 +232,21 @@ export default function SessionDetailClient({
         if (!iso) {
             return null;
         }
-        return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+        const at = new Date(iso);
+        const now = new Date();
+        const time = at.toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit" });
+        const sameDay =
+            at.getFullYear() === now.getFullYear() &&
+            at.getMonth() === now.getMonth() &&
+            at.getDate() === now.getDate();
+        if (sameDay) {
+            return time;
+        }
+        const date = `${at.getMonth() + 1}월 ${at.getDate()}일`;
+        if (at.getFullYear() === now.getFullYear()) {
+            return `${date} ${time}`;
+        }
+        return `${at.getFullYear()}년 ${date} ${time}`;
     }, []);
     const offlineNote = useMemo(() => {
         if (!info.deviceLastSeenAt) {
