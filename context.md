@@ -1,4 +1,4 @@
-2026-10-05 02:04
+2026-10-06 01:54
 
 # context.md - cli-agents-dev
 
@@ -109,14 +109,12 @@
 - assistant text 마크다운 렌더 (`react-markdown@10.1.0` + `remark-gfm@4.0.1`). 진입 시 최하단 + `↓` 플로팅 버튼.
 - 메시지 원본 시각: `cloud_messages.createdAt`에 원본 기록. 말풍선 아래 `3:24 PM` 표시. 걸린 시간은 다음(컬럼 필요).
 
-## CLI 명령어 목록 (2026-10-04 확정)
-- 유저 표면 5개: `login`(묶기, loopback 미구현) · `logout`(끊기, 상태 파일 삭제, 미구현) · `status`(동기화 상태 3줄로 개편予定, 지금은 서버 접속 정보) · `push`(묶음 명령, 미구현) · `pull`(이식, 2단계).
-- 고급·진단으로 격하: `fork`(직접 동기화로 충분 실측済み, 충돌 시 옵션) · `approve`(테스트용. 실승인은 웹 버튼·로컬 클릭) · heartbeat·sync·sync-messages·sync-models·sync-sessions·poll·register·token·sessions (진단 `doctor` 1개로 묶을 예정).
+## CLI 명령어 목록 (2026-10-06 확정)
+- 유저 표면 4개: `login`(OAuth+첫동기화) · `status`(기기·서버도달·마지막성공·밀린명령, 주소 없음) · `whoami`(이메일·플랜) · `push`(묶음 1회).
+- 삭제済み: `register`·`token`(login이 대체) · `approve`(웹 버튼으로) · `pull`(2단계 이식 때 부활).
+- 숨김 진단 (`--jaeholee` 없이 치면 unknown): `sessions`·`heartbeat`·`sync`·`fork`·`sync-messages`·`sync-models`·`sync-sessions`·`poll`. `run`은 unit용이라 예외.
+- 보류: `logout`(출시 직전, revoke+상태삭제 30분) · `--help`(표면 안정 후) · `doctor`(진단 묶음) · `sessions` 표면 잔류 여부.
 - `send` 폐기. 메시지 전송은 웹에서만.
-- `status` 개편: 서버 접속 표시 제거 → 마지막 성공·밀린 명령·서버 도달 3줄.
-- `--help` 미구현. 기본 5개 + 고급 숨김 구조로 만들 것.
-- 숨김 플래그: `--jaeholee`로 확정. help에 안 보이고 쳐야 돌아감. `doctor`는 읽기·진단만 (파괴 금지).
-- 개명 예정 (미실시): `localagents` → `localagents` (URL `localagents.link`와 일치. npm空 확인. `lal` 선점·`agentslink`는 agentsync 혼동 우려로 탈락). 범위: bin명·설정 디렉터리·systemd unit·래퍼·문서. P4 전 실시.
 
 ## 다음 할 일
 - [x] 세션 정의 확정 (탭>세션, 현재 epoch 전문 + 이전 접기)
@@ -136,11 +134,16 @@
 - [x] 에이전트·모델 전환 코드 + 종단 (variant medium 변경 → poll → PC GUI 확인済み 2026-10-02)
 - [x] 대화 동기화·시각·tool 가공·UI 개편 (말풍선·마크다운·폭·점프 버튼)
 - [x] OS 등록 Arch (`active (running)` 확인, 재부팅 미확인)
-- [x] 토큰 API (heartbeat·poll·sync·messages 전환済み. `register` 1회만 직접 Neon)
+- [x] 토큰 API (heartbeat·poll·sync·messages 전환済み)
 - [x] loopback 로그인 구현 (브라우저 OAuth → Connect → 토큰 → heartbeat 종단済み 2026-10-05)
-- [ ] `push` 묶음 명령 + `status` 개편 + `logout` + `--help` (기본 5개 표면)
+- [x] `push` 묶음 명령 + `status` 개편 (주소 제거, 2026-10-06) + `whoami` 추가 (이메일·플랜)
+- [ ] `logout` + `--help` (출시 직전·표면 안정 후로 보류)
 - [ ] `doctor` 진단 묶음 (고급 명령 숨김)
-- [ ] 플러그인 통지 (폴링 대체. 스풀 디렉터리 방식 결정済み. **진행 중 — 아래 블로커 참고**)
+- [x] 개명 `localagents` (2026-10-06, 코드+PC 이관済み. `7a8d301`. 도메인·DB 테이블 유지)
+- [x] 플러그인 통지 (2층 루프 + 즉시 drain. 아래 완료 기록 참고)
+- [x] 메시지 핀포인트 동기화 (PK `(tab_id, message_id)` + 커서 증분 + 조건부 backfill. 아래 기록 참고)
+- [x] 실시간 폴링 (웹 5초 + 터미널식 고정 입력. Ably/Pusher 기각, 아래 기록 참고)
+- [x] 기기 연결 암호 봉투 (아래 기록 참고)
 - [ ] P4 (Dodo 가입 계속·도메인 연결·배포·과금. MoR: Fungies 심사 대기)
 
 ## 실행 계획 (2026-09-30)
@@ -167,7 +170,7 @@
 - 목표: `npx localagents login` 1줄에 설치·OAuth·등록·서버기동·주기실행까지. 붙여넣기 0건.
 - 데몬이 서버 직접 기동済み (`daemon/src/serve.ts`: 기존 탐색 → 없으면 자식으로 기동, 비번 랜덤 32B 상태 보관, 포트 4096~4105 폴백, 종료 시 kill).
 - 비번은 상태 파일 일원화. 명시 명령도 env 없이 됨. OS unit은 `EnvironmentFile` 1개 (`DATABASE_URL`만).
-- 남은 것: 토큰 API 4개 (데몬 `DATABASE_URL` 제거용) + loopback 로그인 구현 + OS 등록 실행は済み(Arch, 재부팅 미확인).
+- 남은 것: 없음 (토큰 API 전환済み, loopback済み, OS 등록済み). 1줄 설치 remaining: 플러그인 자동 설치.
 
 ## 브랜드 확정 (2026-10-03)
 - 상호 `LocalAgentsLink`, 도메인 구입済み. `cliagents.dev`는 리다이렉트용 유지.
@@ -180,25 +183,46 @@
 - 개인 자격 가능. 계좌개설확인서 영문 권장 (없으면 한글 + 영문명 로마자 표기).
 - 주소 영문 예시: `302-ho, A-dong, 41, Seongan-ro 3-gil, Gangdong-gu, Seoul`, City `Seoul`.
 
-## 토큰 API (2026-10-03, heartbeat 완료)
+## 토큰 API (2026-10-03, heartbeat 완료 → 2026-10-06 정리)
 - `device_tokens` (해시·만료·revoke) + `lib/auth/device.ts` 검증 + `POST /api/heartbeat`.
-- 데몬 `token` 명령으로 저장, heartbeat API 경유 확인. 웹 online 표시 확인.
-- sync·messages·commands/next 전환済み (2026-10-04 검증: sync 183행·파일 마커·현재값 표시). `register` 1회만 직접 Neon 유지.
+- heartbeat API 경유 확인. 웹 online 표시 확인.
+- sync·messages·commands/next 전환済み. `register`·`token` 명령은 삭제 (`login`이 대체).
+- `whoami` 확장: 이메일(`neon_auth.user`) + 플랜. `status`에는 안 넣음.
+- `GET /api/commands/pending` (읽기 전용 count. `next`는 delivered 부작용이라 `status`에서 사용 금지).
 
-## loopback 로그인 (2026-10-05 완료, 이 PC)
-- 흐름: 데몬 `login` → localhost 대기 + 브라우저 → 웹 로그인 → Connect → 콜백 토큰 → whoami → 상태 파일. `logged in` 확인.
-- 미로그인 복귀: AuthView가 callbackURL 무시 → 쿠키 폴백 (`begin` 저장 → `consume` 소비 → 복귀). 쿠키 읽기·삭제는 route에서만 (서버 컴포넌트 금지).
+## loopback 로그인 (2026-10-05 완료 → 2026-10-06 봉투화, 이 PC)
+- 흐름: 데몬 `login` → pack 사전 포장 → 브라우저 OAuth → Connect → 콜백 토큰 → whoami → 상태 파일. `logged in` 확인.
+- URL 평문 0: `begin?data=` → sign-in(`callbackURL=/r/<blob>`) → consume → `authorize?data=`. 쿠키 폴백 유지.
 - 교훈: dev 서버 구코드 주의 (재시작 후 시험). Neon 수면 시 첫 연결 실패 가능 (재시도).
 
-## 플러그인 통지 (2026-10-05, 진행 중 — 블로커 있음)
-- 구현: `daemon/plugin/localagents-sync.js` + `daemon/src/spool.ts` (`drainSpool`, `poll`에 연결済み). KEEP allowlist 10종만 적재.
-- 원인 1 (해결): generic `event` 키는 발화 안 함. v2 모양 `export default { id, server, setup }` + 종류별 키 필요. 동작 중인 `gk-hooks.js` 대조로 확정.
-- 원인 2 (미해결): 실행 중인 `opencode-cli serve`가 구 플러그인을 메모리에 들고 있음. 데스크톱 창 재시작해도 서버 프로세스는 안 죽음. KEEP 밖 종류(`shell.exited` 등) 혼입이 증거.
-- 현재: 스풀 30여 파일 적체 (구버전 잡음 포함). drain 미실행.
-- 다음: 서버 프로세스 재시작 (컨펌 필요 — 데스크톱이 다시 띄우거나 다음 동기화 때 데몬이 감지). 그 뒤 테스트 메시지 → KEEP 종류만 쌓이는지 확인 → `poll` 로 drain 검증.
+## 플러그인 통지 (2026-10-06 완료)
+- 구현: `daemon/plugin/localagents-sync.js` + `daemon/src/spool.ts` (`drainSpool`, `poll`에 연결済み).
+- v2 모양 `export default { id, server, setup }` + 종류별 키 (generic `event` 키 미발화, `gk-hooks.js` 대조로 확정).
+- KEEP: tool/permission/session + 텍스트 완성 신호(`text.ended`·`step.ended`). reasoning은 제외 (PC 밖 반출 금지).
+- 2층 루프 (2026-10-06): 10초 빠른 층(스풀+drain+명령) + 플랜 주기 느린 층. 467건 3틱 drain 실측.
+- drain 상한 20 → 200. 커서가 중복을 걸러 해롭지 않음.
 
-## OS 등록 (2026-10-03 완료, Arch)
-- `~/.local/bin/localagents` 래퍼 + `~/.config/localagents/env` (DATABASE_URL 1개, 600) + systemd user unit.
+## 메시지 동기화 B안 (2026-10-05~06 완료)
+- PK `(tab_id, seq)` → `(tab_id, message_id)` (`0008`, dev 적용). upsert 멱등 + `createdAt, seq` 정렬.
+- 커서 증분 (`daemon/src/cursors.ts`, PC 로컬): `(createdAt, messageId)` 쌍 비교. 1회차 213행 → 2회차 0행 실측.
+- 조건부 backfill (`daemon/src/localdb.ts`, `backfillMissing`): 로컬 DB 읽기 전용으로 마지막 compaction까지 거슬러 올라가 현재 세션 전부. 클라우드 탭 목록(`GET /api/sync`) 대조 후 없는 탭만. 실측 316행→382행.
+- API 한계 실측: `limit` 최대 200, `offset` 무시. 현재 세션 310행 사례로 DB 직독 필수 확정.
+- compaction 실측: `session_message` `type='compaction'`, `reason=manual` 9건 (4개 탭), 자동 0건. 키 `status·reason·summary·recent·time`. 주체는 `reason` 1개로만 구분.
+- compaction 전용 UI: `kind=compaction` + 접힌 박스 (`Session compacted. Show summary.`, 영어). 구 `summary`행도 같이 그림.
+
+## 실시간 폴링 (2026-10-06 완료)
+- Ably/Pusher 기각: 종단 latency가 daemon 10초에 묶여 푸시 이득 4초뿐. Neon 읽기 1방은 푼돈.
+- `GET /api/messages?tabId=` + `lib/neon/live.ts` (`useLiveThread`, 5초, 탭 숨김 시 정지).
+- 터미널식 레이아웃: 입력 하단 고정, 대화만 스크롤, 바닥 근처 자동 추적. Agent·승인은 접이식.
+
+## 기기 연결 암호 봉투 (2026-10-06 완료)
+- `lib/auth/packet.ts` (AES-256-GCM, 키 `DEVICE_PACKET_KEY` 64hex, `.env.local`のみ).
+- 이중 봉투: 안쪽 기기 파라미터 → 바깥쪽 복귀 경로 문자열 통째. URL엔 암호문만 (`/r/[blob]` 관문, allowlist).
+- 데몬은 `POST /api/device/pack`으로 사전 포장 후 `begin?data=` 오픈. 첫 주소창부터 평문 없음.
+- `login` 직후 첫 동기화 (heartbeat+세션+조건부 backfill). 1회성 명령 종료 hang 수정 (`killOwned`).
+
+## OS 등록 (2026-10-03 완료 → 2026-10-06 개명, Arch)
+- `~/.local/bin/localagents` 래퍼 + `~/.config/localagents/env` (DATABASE_URL 1개, 600) + systemd user unit `localagents.service`.
 - `enable --now`済み. `active (running)` 확인. 재부팅 테스트 미실시.
 
 ## 데몬 종단 검증 (2026-09-29, 이 PC)
