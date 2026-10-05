@@ -284,6 +284,8 @@ async function onRun(): Promise<void> {
     process.once("SIGINT", stop);
     process.once("SIGTERM", stop);
     console.log(`run: device=${state.deviceId}`);
+    let intervalSec = 1800;
+    let lastSlow = 0;
     let owned: ManagedServer | null = null;
     try {
         owned = await ensureServer();
@@ -294,33 +296,36 @@ async function onRun(): Promise<void> {
         console.error(`server ensure failed: ${err instanceof Error ? err.message : err}`);
     }
     while (!stopping) {
-        const started = Date.now();
-        let intervalSec = 1800;
-        try {
-            intervalSec = await onHeartbeat();
-        } catch (err) {
-            console.error(`heartbeat failed: ${err instanceof Error ? err.message : err}`);
-        }
-        try {
-            const server = await ensureServer();
-            await pushPending(server);
-            await syncSessions(server);
-            await syncCatalog(server);
-            const active = await syncActiveMessages(server);
-            if (active.sessions > 0) {
-                console.log(`active-messages: ${active.sessions} sessions, ${active.rows} rows`);
+        const now = Date.now();
+        // 느린 층: 플랜 주기. heartbeat·거울·카탈로그·안전망. 무겁다.
+        if (now - lastSlow >= intervalSec * 1000) {
+            lastSlow = now;
+            try {
+                intervalSec = await onHeartbeat();
+            } catch (err) {
+                console.error(`heartbeat failed: ${err instanceof Error ? err.message : err}`);
             }
-        } catch (err) {
-            console.error(`sync failed: ${err instanceof Error ? err.message : err}`);
+            try {
+                const server = await ensureServer();
+                await pushPending(server);
+                await syncSessions(server);
+                await syncCatalog(server);
+                const active = await syncActiveMessages(server);
+                if (active.sessions > 0) {
+                    console.log(`active-messages: ${active.sessions} sessions, ${active.rows} rows`);
+                }
+            } catch (err) {
+                console.error(`sync failed: ${err instanceof Error ? err.message : err}`);
+            }
+            console.log(`run: slow done, next in ${intervalSec}s`);
         }
+        // 빠른 층: 10초. 스풀 비우기 + 명령 가져오기. 둘 다 싸다. 플러그인 통지의 즉시 반영이 여기다.
         try {
             await pollCommands();
         } catch (err) {
             console.error(`poll failed: ${err instanceof Error ? err.message : err}`);
         }
-        const waitMs = Math.max(0, intervalSec * 1000 - (Date.now() - started));
-        console.log(`run: next in ${Math.round(waitMs / 1000)}s`);
-        const deadline = Date.now() + waitMs;
+        const deadline = Date.now() + 10000;
         while (!stopping && Date.now() < deadline) {
             await sleep(Math.min(1000, deadline - Date.now()));
         }

@@ -20,7 +20,7 @@ export async function drainSpool(server: DiscoveredServer): Promise<{ drained: n
     mkdirSync(spoolDir(), { recursive: true });
     const files = readdirSync(spoolDir())
         .filter((f) => f.endsWith(".json"))
-        .slice(0, 20);
+        .slice(0, 200);
     let drained = 0;
     const messaged = new Set<string>();
     let needPending = false;
