@@ -3,6 +3,7 @@
 // server(v1 호환) + setup(ctx.tool.hook + ctx.event.subscribe) 둘 다 둔다.
 
 // 스트리밍 잡음 제외. 의미 있는 것만 적재한다.
+// 텍스트 완성 신호(text.ended·step.ended·idle)가 순수 문답 동기화의 방아쇠다.
 const KEEP = new Set([
     "tool.execute.after",
     "permission.asked",
@@ -14,6 +15,10 @@ const KEEP = new Set([
     "session.deleted",
     "session.error",
     "session.status",
+    "session.text.ended",
+    "session.step.ended",
+    "message.completed",
+    "message.updated",
 ]);
 
 const spoolWrite = async (type, sessionID) => {
@@ -41,14 +46,26 @@ const pickSession = (payload) => {
     if (!payload || typeof payload !== "object") {
         return null;
     }
-    return (
-        payload.sessionID ??
-        payload.sessionId ??
-        payload.event?.properties?.sessionID ??
-        payload.event?.sessionID ??
-        payload.properties?.sessionID ??
-        null
-    );
+    const seen = new Set();
+    const queue = [payload];
+    for (let i = 0; i < queue.length && i < 40; i++) {
+        const node = queue[i];
+        if (!node || typeof node !== "object" || seen.has(node)) {
+            continue;
+        }
+        seen.add(node);
+        for (const [k, v] of Object.entries(node)) {
+            if ((k === "sessionID" || k === "sessionId" || k === "session_id") && typeof v === "string" && v.length > 0) {
+                return v;
+            }
+        }
+        for (const v of Object.values(node)) {
+            if (v && typeof v === "object") {
+                queue.push(v);
+            }
+        }
+    }
+    return null;
 };
 
 const server = async () => {

@@ -136,3 +136,25 @@ export async function syncMessages(server: DiscoveredServer, sessionID: string):
     })) as { data?: { rows?: number } };
     return { rows: result.data?.rows ?? rows.length };
 }
+
+// 주기 안전망. 스풀 통지가 없어도 최근 활동 세션 본문을 올린다. 최대 5개, 실패는 건너뜀.
+export async function syncActiveMessages(server: DiscoveredServer, maxAgeMs = 3600000): Promise<{ sessions: number; rows: number }> {
+    const body = (await apiGet(server, "/session")) as
+        | { data?: { id: string; time?: { updated?: number } }[] }
+        | { id: string; time?: { updated?: number } }[];
+    const list = Array.isArray(body) ? body : (body.data ?? []);
+    const cutoff = Date.now() - maxAgeMs;
+    const targets = list
+        .filter((s) => typeof s.id === "string" && (s.time?.updated ?? 0) >= cutoff)
+        .slice(0, 5);
+    let rows = 0;
+    for (const t of targets) {
+        try {
+            const r = await syncMessages(server, t.id);
+            rows += r.rows;
+        } catch {
+            // 다음 주기가 잡는다
+        }
+    }
+    return { sessions: targets.length, rows };
+}

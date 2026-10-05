@@ -35,6 +35,10 @@ export async function drainSpool(server: DiscoveredServer): Promise<{ drained: n
                 needPending = true;
             } else if (type.startsWith("session.")) {
                 needSessions = true;
+                // 순수 문답도 본문이 올라가야 한다. 세션 통지에 id가 있으면 메시지 동기화 대상에 포함.
+                if (raw.sessionID) {
+                    messaged.add(raw.sessionID);
+                }
             }
         } catch {
             // 깨진 줄은 버린다

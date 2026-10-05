@@ -4,7 +4,7 @@ import { forkAndRegister } from "./fork";
 import { ensureServer, type ManagedServer } from "./serve";
 import { syncSessions } from "./sessions";
 import { setSessionAgent, setSessionModel, syncCatalog, type ModelRef } from "./catalog";
-import { syncMessages } from "./messages";
+import { syncActiveMessages, syncMessages } from "./messages";
 import { listPending, reply, pushPending, type ReplyDecision } from "./permissions";
 import { pollCommands } from "./commands";
 
@@ -306,6 +306,10 @@ async function onRun(): Promise<void> {
             await pushPending(server);
             await syncSessions(server);
             await syncCatalog(server);
+            const active = await syncActiveMessages(server);
+            if (active.sessions > 0) {
+                console.log(`active-messages: ${active.sessions} sessions, ${active.rows} rows`);
+            }
         } catch (err) {
             console.error(`sync failed: ${err instanceof Error ? err.message : err}`);
         }
