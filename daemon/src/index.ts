@@ -76,7 +76,7 @@ async function onLogin(): Promise<void> {
                 platform: host.platform,
                 hostname: host.hostname,
             });
-            const target = `${baseUrl().replace(/\/$/, "")}/device/authorize?${params.toString()}`;
+            const target = `${baseUrl().replace(/\/$/, "")}/api/device/begin?${params.toString()}`;
             const opener =
                 platform() === "darwin" ? "open" : platform() === "win32" ? "start" : "xdg-open";
             exec(`${opener} "${target}"`);

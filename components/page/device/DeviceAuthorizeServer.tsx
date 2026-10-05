@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth/server";
+import { unsealConnect } from "@/lib/auth/packet";
 import DeviceAuthorizeClient from "./DeviceAuthorizeClient";
 
 export default async function DeviceAuthorizeServer({ params }: { params: Record<string, string | undefined> }) {
@@ -10,9 +11,12 @@ export default async function DeviceAuthorizeServer({ params }: { params: Record
         ).toString();
         redirect(`/api/device/begin?${query}`);
     }
-    const deviceId = params.device ?? "";
-    const port = params.port ?? "";
-    const state = params.state ?? "";
+    // 봉투 우선. 코드는 복호화 뒤 파싱해서 쓴다. URL에는 암호문만 남는다.
+    const data = params.data;
+    const p = data ? unsealConnect(data) : null;
+    const deviceId = p?.device ?? params.device ?? "";
+    const port = p?.port ?? params.port ?? "";
+    const state = p?.state ?? params.state ?? "";
     if (!deviceId || !port || !state) {
         redirect("/");
     }
@@ -21,9 +25,9 @@ export default async function DeviceAuthorizeServer({ params }: { params: Record
             deviceId={deviceId}
             port={port}
             state={state}
-            label={params.label ?? ""}
-            platform={params.platform ?? ""}
-            hostname={params.hostname ?? ""}
+            label={p?.label ?? params.label ?? ""}
+            platform={p?.platform ?? params.platform ?? ""}
+            hostname={p?.hostname ?? params.hostname ?? ""}
         />
     );
 }

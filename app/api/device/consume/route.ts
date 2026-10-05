@@ -2,7 +2,8 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { unsealConnect } from "@/lib/auth/packet";
 
-// 로그인 후 복귀 1회 소비. 암호 봉투(data) 우선, 쿠키 폴백.
+// 로그인 후 복귀 1회 소비. 봉투(data)는 뜯어보지만 다시 봉해서 authorize로 넘긴다.
+// URL에는 암호문만 보인다. 쿠키 폴백(평문)은 최후 수단.
 export async function GET(request: Request): Promise<Response> {
     const jar = await cookies();
     const data = new URL(request.url).searchParams.get("data") ?? "";
@@ -10,15 +11,7 @@ export async function GET(request: Request): Promise<Response> {
         const p = unsealConnect(data);
         jar.delete("cliagent_connect");
         if (p) {
-            const query = new URLSearchParams({
-                device: p.device,
-                port: p.port,
-                state: p.state,
-                label: p.label ?? "",
-                platform: p.platform ?? "",
-                hostname: p.hostname ?? "",
-            }).toString();
-            redirect(`/device/authorize?${query}`);
+            redirect(`/device/authorize?data=${encodeURIComponent(data)}`);
         }
         redirect("/");
     }
