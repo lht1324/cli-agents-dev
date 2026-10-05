@@ -68,6 +68,7 @@ async function onLogin(): Promise<void> {
         server.listen(0, "127.0.0.1", () => {
             const address = server.address();
             const port = typeof address === "object" && address ? address.port : 0;
+            const base = baseUrl().replace(/\/$/, "");
             const params = new URLSearchParams({
                 device: deviceId,
                 port: String(port),
@@ -76,12 +77,38 @@ async function onLogin(): Promise<void> {
                 platform: host.platform,
                 hostname: host.hostname,
             });
-            const target = `${baseUrl().replace(/\/$/, "")}/api/device/begin?${params.toString()}`;
-            const opener =
-                platform() === "darwin" ? "open" : platform() === "win32" ? "start" : "xdg-open";
-            exec(`${opener} "${target}"`);
-            console.log("opened browser. approve this device, then return here.");
-            console.log(`if the browser did not open, visit:\n${target}`);
+            // 사전 포장. 브라우저 주소창에 평문이 일순도 안 뜨게 한다. 실패하면 평문 폴백.
+            fetch(`${base}/api/device/pack`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    device: deviceId,
+                    port: String(port),
+                    state,
+                    label: host.label,
+                    platform: host.platform,
+                    hostname: host.hostname,
+                }),
+                signal: AbortSignal.timeout(10000),
+            })
+                .then(async (res) => {
+                    if (!res.ok) {
+                        return null;
+                    }
+                    const packed = (await res.json()) as { data?: { data?: string } };
+                    return packed.data?.data ?? null;
+                })
+                .catch(() => null)
+                .then((data) => {
+                    const target = data
+                        ? `${base}/api/device/begin?data=${encodeURIComponent(data)}`
+                        : `${base}/api/device/begin?${params.toString()}`;
+                    const opener =
+                        platform() === "darwin" ? "open" : platform() === "win32" ? "start" : "xdg-open";
+                    exec(`${opener} "${target}"`);
+                    console.log("opened browser. approve this device, then return here.");
+                    console.log(`if the browser did not open, visit:\n${target}`);
+                });
         });
         setTimeout(() => {
             server.close();
