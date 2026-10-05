@@ -1,6 +1,7 @@
 import { apiGet, type DiscoveredServer } from "./server";
 import { formatToolExit } from "./tools";
 import { cloudPost } from "./cloud";
+import { isNewer, readCursor, writeCursor } from "./cursors";
 
 interface ServerMessage {
     id: string;
@@ -123,8 +124,14 @@ async function fetchMessages(server: DiscoveredServer, sessionID: string): Promi
 export async function syncMessages(server: DiscoveredServer, sessionID: string): Promise<{ rows: number }> {
     const messages = await fetchMessages(server, sessionID);
     const rows = flatten(messages);
+    // 차집합: 커서보다 새로운 행만 올린다. 첫 실행은 전부(기준선), 이후는 증분.
+    const cursor = readCursor(sessionID);
+    const fresh = rows.filter((r) => isNewer(r.createdAt, r.id, cursor));
+    if (fresh.length === 0) {
+        return { rows: 0 };
+    }
     const result = (await cloudPost("/api/messages", {
-        messages: rows.map((r) => ({
+        messages: fresh.map((r) => ({
             sessionID,
             messageId: r.id,
             seq: r.seq,
@@ -134,7 +141,17 @@ export async function syncMessages(server: DiscoveredServer, sessionID: string):
             createdAt: r.createdAt,
         })),
     })) as { data?: { rows?: number } };
-    return { rows: result.data?.rows ?? rows.length };
+    // 커터는 전송한 것 중 최대값으로 전진. 실패 시 다음 주기가 재시도.
+    let top = fresh[0];
+    for (const r of fresh) {
+        const a = r.createdAt ?? 0;
+        const b = top.createdAt ?? 0;
+        if (a > b || (a === b && r.id > top.id)) {
+            top = r;
+        }
+    }
+    writeCursor(sessionID, top.createdAt, top.id);
+    return { rows: result.data?.rows ?? fresh.length };
 }
 
 // 주기 안전망. 스풀 통지가 없어도 최근 활동 세션 본문을 올린다. 최대 5개, 실패는 건너뜀.
