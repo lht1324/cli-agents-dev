@@ -144,41 +144,6 @@ async function onLogin(): Promise<void> {
     }
 }
 
-async function onRegister(userId: string | undefined, deviceId: string | undefined): Promise<void> {
-    if (!userId) {
-        throw new Error("usage: localagents register <user-id> [device-id]");
-    }
-    const id = deviceId ?? newDeviceId();
-    writeState({ deviceId: id, userId });
-    const host = hostInfo();
-    console.log(`registered: ${id} (${host.label})`);
-}
-
-async function onApprove(requestID: string | undefined, decision: string | undefined): Promise<void> {
-    const server = await ensureServer();
-    if (!requestID) {
-        const pending = await listPending(server);
-        if (pending.length === 0) {
-            console.log("no pending requests");
-            return;
-        }
-        for (const p of pending) {
-            console.log(`${p.id}\tsession=${p.sessionID}\taction=${p.action}\tresources=${p.resources.join(",")}${p.message ? `\t${p.message.slice(0, 120)}` : ""}`);
-        }
-        return;
-    }
-    if (decision !== "once" && decision !== "always" && decision !== "reject") {
-        throw new Error("usage: localagents approve <request-id> <once|always|reject>");
-    }
-    const pending = await listPending(server);
-    const target = pending.find((p) => p.id === requestID);
-    if (!target) {
-        throw new Error(`request not found or already resolved: ${requestID}`);
-    }
-    await reply(server, target.sessionID, requestID, decision as ReplyDecision);
-    console.log(`replied: ${requestID} -> ${decision}`);
-}
-
 async function onFork(sessionID: string | undefined): Promise<void> {
     if (!sessionID) {
         throw new Error("usage: localagents fork <session-id>");
@@ -213,18 +178,6 @@ async function onSyncSessions(): Promise<void> {
     const server = await ensureServer();
     const result = await syncSessions(server);
     console.log(`sessions: ${result.sessions}`);
-}
-
-async function onToken(token: string | undefined): Promise<void> {
-    if (!token) {
-        throw new Error("usage: localagents token <device-token>");
-    }
-    const state = readState();
-    if (!state) {
-        throw new Error("not registered. run `localagents register <user-id>` first");
-    }
-    writeState({ ...state, token });
-    console.log("token saved");
 }
 
 async function onDoctor(): Promise<void> {
@@ -382,16 +335,13 @@ async function main(): Promise<void> {
     const cmd = args[0];
     const advanced = new Set([
         "sessions",
-        "register",
         "heartbeat",
-        "token",
         "sync",
         "fork",
         "sync-messages",
         "sync-models",
         "sync-sessions",
         "poll",
-        "approve",
     ]);
     // 숨김 진단 명령. 플래그 없이 치면 없는 명령으로 보인다. run은 unit이 쓰니 예외.
     if (cmd && advanced.has(cmd) && !process.argv.includes("--jaeholee")) {
@@ -406,12 +356,8 @@ async function main(): Promise<void> {
         await onSessions();
     } else if (cmd === "login") {
         await onLogin();
-    } else if (cmd === "register") {
-        await onRegister(args[1], args[2]);
     } else if (cmd === "heartbeat") {
         await onHeartbeat();
-    } else if (cmd === "token") {
-        await onToken(args[1]);
     } else if (cmd === "sync") {
         await onSync();
     } else if (cmd === "fork") {
@@ -436,9 +382,10 @@ async function main(): Promise<void> {
         await onRun();
     } else if (cmd === "poll") {
         await pollCommands();
-    } else if (cmd === "approve") {
-        await onApprove(args[1], args[2]);
     } else {
+        if (cmd) {
+            console.log(`unknown command: ${cmd}`);
+        }
         console.log("usage: localagents <login|status|push>");
         process.exitCode = 1;
     }
