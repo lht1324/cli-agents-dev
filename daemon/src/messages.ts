@@ -18,6 +18,7 @@ interface ServerMessage {
 }
 
 interface PlainRow {
+    id: string;
     seq: number;
     role: string;
     kind: string;
@@ -37,38 +38,46 @@ function at(m: ServerMessage): number | null {
 function flatten(messages: ServerMessage[]): PlainRow[] {
     const rows: PlainRow[] = [];
     messages.forEach((m, seq) => {
+        if (typeof m.id !== "string" || m.id.length === 0) {
+            return;
+        }
         const createdAt = at(m);
+        let part = 0;
+        const key = () => (part === 0 ? m.id : `${m.id}#${part}`);
         if (m.type === "user") {
             const text = m.text ?? m.payload?.text ?? "";
             if (text.length > 0) {
-                rows.push({ seq, role: "user", kind: "text", body: cap(text, 8000), createdAt });
+                rows.push({ id: key(), seq, role: "user", kind: "text", body: cap(text, 8000), createdAt });
+                part++;
             }
             const files = (m as { files?: { name?: string; mime?: string; data?: string }[] }).files ?? [];
             for (const f of files) {
                 const kb = f.data ? Math.round(f.data.length / 1024) : 0;
-                rows.push({ seq, role: "user", kind: "file", body: `${f.name ?? "file"} (${f.mime ?? "?"}, ${kb}KB, on-demand)`, createdAt });
+                rows.push({ id: key(), seq, role: "user", kind: "file", body: `${f.name ?? "file"} (${f.mime ?? "?"}, ${kb}KB, on-demand)`, createdAt });
+                part++;
             }
             return;
         }
         if (m.type === "assistant") {
-            for (const part of m.content ?? []) {
-                if (part.type === "text" && part.text && part.text.length > 0) {
-                    rows.push({ seq, role: "assistant", kind: "text", body: cap(part.text, 8000), createdAt });
-                } else if (part.type === "tool") {
-                    const toolName = part.name ?? "tool";
-                    const outputs = part.state?.content ?? [];
+            for (const block of m.content ?? []) {
+                if (block.type === "text" && block.text && block.text.length > 0) {
+                    rows.push({ id: key(), seq, role: "assistant", kind: "text", body: cap(block.text, 8000), createdAt });
+                    part++;
+                } else if (block.type === "tool") {
+                    const toolName = block.name ?? "tool";
+                    const outputs = block.state?.content ?? [];
                     const texts = outputs.filter((o) => o.type === "text").map((o) => o.text ?? "");
                     const exit = formatToolExit(toolName, texts.join("\n"));
                     const hasImage = outputs.some((o) => o.type === "file");
-                    const raw = ((part.state?.input ?? {}) as Record<string, unknown>);
+                    const raw = ((block.state?.input ?? {}) as Record<string, unknown>);
                     const kept: Record<string, unknown> = {};
                     const stripped: string[] = [];
-                    for (const [key, value] of Object.entries(raw)) {
-                        if ((key === "content" || key === "data") && typeof value === "string" && value.length > 500) {
-                            stripped.push(`${key}:${Math.round(value.length / 1024)}KB`);
+                    for (const [ik, value] of Object.entries(raw)) {
+                        if ((ik === "content" || ik === "data") && typeof value === "string" && value.length > 500) {
+                            stripped.push(`${ik}:${Math.round(value.length / 1024)}KB`);
                             continue;
                         }
-                        kept[key] = value;
+                        kept[ik] = value;
                     }
                     const envelope: Record<string, unknown> = { tool: toolName, input: kept };
                     if (stripped.length > 0) {
@@ -86,7 +95,8 @@ function flatten(messages: ServerMessage[]): PlainRow[] {
                             500,
                         );
                     }
-                    rows.push({ seq, role: "assistant", kind: "tool", body: cap(JSON.stringify(envelope), 4000), createdAt });
+                    rows.push({ id: key(), seq, role: "assistant", kind: "tool", body: cap(JSON.stringify(envelope), 4000), createdAt });
+                    part++;
                 }
             }
             return;
@@ -94,7 +104,8 @@ function flatten(messages: ServerMessage[]): PlainRow[] {
         if (m.type === "compaction") {
             const summary = (m as { summary?: string }).summary ?? "";
             if (summary.length > 0) {
-                rows.push({ seq, role: "system", kind: "summary", body: cap(summary, 8000), createdAt });
+                rows.push({ id: key(), seq, role: "system", kind: "summary", body: cap(summary, 8000), createdAt });
+                part++;
             }
         }
     });
@@ -115,6 +126,7 @@ export async function syncMessages(server: DiscoveredServer, sessionID: string):
     const result = (await cloudPost("/api/messages", {
         messages: rows.map((r) => ({
             sessionID,
+            messageId: r.id,
             seq: r.seq,
             role: r.role,
             kind: r.kind,

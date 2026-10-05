@@ -6,6 +6,8 @@ import { getNextBaseResponse } from "@/lib/utils/getNextBaseResponse";
 
 interface MessageRow {
     sessionID?: unknown;
+    messageId?: unknown;
+    id?: unknown;
     seq?: unknown;
     role?: unknown;
     kind?: unknown;
@@ -34,7 +36,13 @@ export async function POST(request: Request): Promise<Response> {
     const tabs = new Set<string>();
     let inserted = 0;
     for (const m of rows) {
-        if (typeof m.sessionID !== "string" || typeof m.seq !== "number") {
+        const messageId =
+            typeof m.messageId === "string" && m.messageId.length > 0
+                ? m.messageId
+                : typeof m.id === "string" && m.id.length > 0
+                  ? m.id
+                  : null;
+        if (typeof m.sessionID !== "string" || typeof m.seq !== "number" || !messageId) {
             continue;
         }
         if (!tabs.has(m.sessionID)) {
@@ -57,6 +65,7 @@ export async function POST(request: Request): Promise<Response> {
             .insert(cloudMessages)
             .values({
                 tabId: m.sessionID,
+                messageId,
                 seq: m.seq,
                 role: typeof m.role === "string" ? m.role : "?",
                 kind: typeof m.kind === "string" ? m.kind : "text",

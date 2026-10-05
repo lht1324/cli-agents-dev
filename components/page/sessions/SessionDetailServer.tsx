@@ -66,7 +66,7 @@ export default async function SessionDetailServer({ id }: { id: string }) {
         .from(cloudMessages)
         .innerJoin(cloudTabs, eq(cloudMessages.tabId, cloudTabs.id))
         .where(and(eq(cloudMessages.tabId, id), eq(cloudTabs.userId, session.user.id)))
-        .orderBy(cloudMessages.seq);
+        .orderBy(cloudMessages.createdAt, cloudMessages.seq);
     const messages: ThreadRow[] = thread.map((m) => ({ ...m, createdAt: m.createdAt?.toISOString() ?? null }));
     const catalog = await db
         .select({ payload: modelCatalog.payload })

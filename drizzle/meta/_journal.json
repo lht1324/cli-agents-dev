@@ -57,6 +57,13 @@
       "when": 1791014689303,
       "tag": "0007_lying_colossus",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791181247560,
+      "tag": "0008_parched_red_skull",
+      "breakpoints": true
     }
   ]
 }

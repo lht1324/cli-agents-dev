@@ -69,13 +69,14 @@ export const cloudMessages = pgTable(
         tabId: text("tab_id")
             .notNull()
             .references(() => cloudTabs.id, { onDelete: "cascade" }),
+        messageId: text("message_id").notNull(),
         seq: integer("seq").notNull(),
         role: text("role").notNull(),
         kind: text("kind").notNull(),
         body: text("body").notNull(),
         createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     },
-    (t) => [primaryKey({ columns: [t.tabId, t.seq] })],
+    (t) => [primaryKey({ columns: [t.tabId, t.messageId] })],
 );
 
 // 대기 승인 거울. 로컬에만 있는 pending을 웹에 보여주기 위해 데몬이 올린다.
