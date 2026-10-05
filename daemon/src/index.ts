@@ -378,7 +378,28 @@ async function onRun(): Promise<void> {
 }
 
 async function main(): Promise<void> {
-    const cmd = process.argv[2];
+    const args = process.argv.slice(2).filter((a) => a !== "--jaeholee");
+    const cmd = args[0];
+    const advanced = new Set([
+        "sessions",
+        "register",
+        "heartbeat",
+        "token",
+        "sync",
+        "fork",
+        "sync-messages",
+        "sync-models",
+        "sync-sessions",
+        "poll",
+        "approve",
+    ]);
+    // 숨김 진단 명령. 플래그 없이 치면 없는 명령으로 보인다. run은 unit이 쓰니 예외.
+    if (cmd && advanced.has(cmd) && !process.argv.includes("--jaeholee")) {
+        console.log(`unknown command: ${cmd}`);
+        console.log("usage: localagents <login|status|push>");
+        process.exitCode = 1;
+        return;
+    }
     if (cmd === "status") {
         await onStatus();
     } else if (cmd === "sessions") {
@@ -386,17 +407,17 @@ async function main(): Promise<void> {
     } else if (cmd === "login") {
         await onLogin();
     } else if (cmd === "register") {
-        await onRegister(process.argv[3], process.argv[4]);
+        await onRegister(args[1], args[2]);
     } else if (cmd === "heartbeat") {
         await onHeartbeat();
     } else if (cmd === "token") {
-        await onToken(process.argv[3]);
+        await onToken(args[1]);
     } else if (cmd === "sync") {
         await onSync();
     } else if (cmd === "fork") {
-        await onFork(process.argv[3]);
+        await onFork(args[1]);
     } else if (cmd === "sync-messages") {
-        await onSyncMessages(process.argv[3]);
+        await onSyncMessages(args[1]);
     } else if (cmd === "sync-models") {
         await onSyncModels();
     } else if (cmd === "sync-sessions") {
@@ -416,9 +437,9 @@ async function main(): Promise<void> {
     } else if (cmd === "poll") {
         await pollCommands();
     } else if (cmd === "approve") {
-        await onApprove(process.argv[3], process.argv[4]);
+        await onApprove(args[1], args[2]);
     } else {
-        console.log("usage: localagents <login|register|token|status|sessions|poll|heartbeat|approve|sync|fork|sync-messages|sync-models|sync-sessions|push|run>");
+        console.log("usage: localagents <login|status|push>");
         process.exitCode = 1;
     }
     // 1회성 명령이 띄운 서버는 함께 내린다. run은 스스로 관리한다.
