@@ -1,6 +1,6 @@
 # lib/neon
 
-Neon 제어DB 개인 라이브러리. 나중에 `@cliagents/db` 패키지로 떼어내는 것을 전제로 작성한다.
+Neon 제어DB 개인 라이브러리. 나중에 `@localagents/db` 패키지로 떼어내는 것을 전제로 작성한다.
 
 ## 구성
 

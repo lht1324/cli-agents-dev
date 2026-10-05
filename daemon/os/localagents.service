@@ -1,12 +1,12 @@
 [Unit]
-Description=cliagents resident daemon
+Description=localagents resident daemon
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=%h/.local/bin/cliagent run
-EnvironmentFile=%h/.config/cliagent/env
+ExecStart=%h/.local/bin/localagents run
+EnvironmentFile=%h/.config/localagents/env
 Restart=on-failure
 RestartSec=30
 

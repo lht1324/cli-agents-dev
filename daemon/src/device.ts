@@ -27,7 +27,7 @@ export interface ServerState {
 }
 
 function stateDir(): string {
-    return join(homedir(), ".config", "cliagent");
+    return join(homedir(), ".config", "localagents");
 }
 
 function statePath(): string {
@@ -50,7 +50,7 @@ export function readState(): DeviceState | null {
 }
 
 export function baseUrl(): string {
-    return process.env.CLIAGENT_BASE_URL ?? "http://localhost:3000";
+    return process.env.LOCALAGENTS_BASE_URL ?? "http://localhost:3000";
 }
 
 export function writeState(state: DeviceState): void {

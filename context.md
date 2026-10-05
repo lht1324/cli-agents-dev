@@ -4,8 +4,8 @@
 
 ## 프로젝트
 - 폴더: `cli-agents-dev` (구 `new_project`)
-- 서비스 가명: cliagents (명령어는 단수 `cliagent`)
-- 도메인 후보: `cliagents.dev` (연 $12.2, 본선) / `cliagent.nexus` (연 $10.2, 리다이렉트용)
+- 서비스 가명: localagents (명령어는 단수 `localagents`)
+- 도메인 후보: `cliagents.dev` (연 $12.2, 본선) / `localagents.nexus` (연 $10.2, 리다이렉트용)
 - 스택: Next.js 15+ / TypeScript / Tailwind CSS (사장 기술 기준)
 
 ## 사업 아이템 (확정 방향)
@@ -19,7 +19,7 @@
 - OpenCode는 `opencode serve` API 활용. Claude는 JSONL 감시 + `-p --resume` + SDK SessionStore.
 - PC 꺼지면 offline 표시. `PC 꺼져도 실시간`은 B안(클라우드 실행)이며 후순위. B안은 Daytona류 외부 샌드박스 임대 전제.
 - MVP 범위: 통합 목록 + 상태 + 원격 승인 1개. 전문 미러링은 2단계.
-- 분배 확정: 플러그인·per-project npm 아님. 상주 데몬 1개 (`npx cliagent login` 1방).
+- 분배 확정: 플러그인·per-project npm 아님. 상주 데몬 1개 (`npx localagents login` 1방).
 - 클라이언트 확정: 웹 뷰어 1개. CLI 클라이언트는 중복, Electron은 과함. 터미널 부착은 2단계 이후.
 - 기능 분리 확정 (2026-09-29): 본체 = PC 간 탭 복원. 부속 = 웹 리모컨(보기·승인·새 지시, 실행은 PC 서버). 웹에 터미널 재현 없음.
 - 웹 범위 확정: 랜딩·설명서·요금제 + 프로필·구독 관리 + 원격 inbox. 계정면 + 마케팅면 + 동반 기능.
@@ -116,7 +116,7 @@
 - `status` 개편: 서버 접속 표시 제거 → 마지막 성공·밀린 명령·서버 도달 3줄.
 - `--help` 미구현. 기본 5개 + 고급 숨김 구조로 만들 것.
 - 숨김 플래그: `--jaeholee`로 확정. help에 안 보이고 쳐야 돌아감. `doctor`는 읽기·진단만 (파괴 금지).
-- 개명 예정 (미실시): `cliagent` → `localagents` (URL `localagents.link`와 일치. npm空 확인. `lal` 선점·`agentslink`는 agentsync 혼동 우려로 탈락). 범위: bin명·설정 디렉터리·systemd unit·래퍼·문서. P4 전 실시.
+- 개명 예정 (미실시): `localagents` → `localagents` (URL `localagents.link`와 일치. npm空 확인. `lal` 선점·`agentslink`는 agentsync 혼동 우려로 탈락). 범위: bin명·설정 디렉터리·systemd unit·래퍼·문서. P4 전 실시.
 
 ## 다음 할 일
 - [x] 세션 정의 확정 (탭>세션, 현재 epoch 전문 + 이전 접기)
@@ -130,7 +130,7 @@
 - [x] 명령 outbox 테이블 (commands + cloud_tabs/messages/folds, Neon dev 적용済み)
 - [x] heartbeat 방식 결정 (`devices.lastSeenAt` 갱신으로 확정)
 - [x] 웹 원격 inbox UI (보기·승인) + 기기 목록 (웹→PC 종단済み: sync→Allow→poll→실행)
-- [x] `cliagent fork` 명령 (fork + 대장 등록, 실측済み)
+- [x] `localagents fork` 명령 (fork + 대장 등록, 실측済み)
 - [x] 새 지시 종단 (웹 전송 → poll → 에이전트 응답 확인済み)
 - [x] 상세 307 해소 (원인: 손 복사 id 오기. 목록 링크화로 재발 방지)
 - [x] 에이전트·모델 전환 코드 + 종단 (variant medium 변경 → poll → PC GUI 확인済み 2026-10-02)
@@ -152,8 +152,8 @@
 ## 기기·로그인 결정 (2026-10-01)
 - `devices`에 `platform`·`hostname` 컬럼 추가, dev 적용済み. 값은 Node `os` 모듈.
 - device_id = UUIDv7 (시간+랜덤). hostname 합성 반대. user_id = Auth id 그대로.
-- 식별은 env 아님. 상태 파일(`~/.config/cliagent/device.json`, 600). env는 배포 설정만.
-- 로그인은 loopback 우선 (`cliagent login` → 브라우저 OAuth → localhost 콜백 → whoami → 상태 파일). 페어링 코드는 headless 폴백.
+- 식별은 env 아님. 상태 파일(`~/.config/localagents/device.json`, 600). env는 배포 설정만.
+- 로그인은 loopback 우선 (`localagents login` → 브라우저 OAuth → localhost 콜백 → whoami → 상태 파일). 페어링 코드는 headless 폴백.
 - OS 표시는 전부 텍스트. Apple·MS 로고는 상표 허가 필요라 제외. Linux 펭귄도 통일상 제외.
 - Fungies KYC 완료. Waffo 거절 메일 발송済み (출금 중국 한정).
 
@@ -164,7 +164,7 @@
 - 남은 것: 예약 실행 ("PC 켜지면 실행" 경고 + 부팅 catch-up).
 
 ## 1줄 설치 설계 (2026-10-03 확정, 미구현)
-- 목표: `npx cliagent login` 1줄에 설치·OAuth·등록·서버기동·주기실행까지. 붙여넣기 0건.
+- 목표: `npx localagents login` 1줄에 설치·OAuth·등록·서버기동·주기실행까지. 붙여넣기 0건.
 - 데몬이 서버 직접 기동済み (`daemon/src/serve.ts`: 기존 탐색 → 없으면 자식으로 기동, 비번 랜덤 32B 상태 보관, 포트 4096~4105 폴백, 종료 시 kill).
 - 비번은 상태 파일 일원화. 명시 명령도 env 없이 됨. OS unit은 `EnvironmentFile` 1개 (`DATABASE_URL`만).
 - 남은 것: 토큰 API 4개 (데몬 `DATABASE_URL` 제거용) + loopback 로그인 구현 + OS 등록 실행は済み(Arch, 재부팅 미확인).
@@ -191,14 +191,14 @@
 - 교훈: dev 서버 구코드 주의 (재시작 후 시험). Neon 수면 시 첫 연결 실패 가능 (재시도).
 
 ## 플러그인 통지 (2026-10-05, 진행 중 — 블로커 있음)
-- 구현: `daemon/plugin/cliagents-sync.js` + `daemon/src/spool.ts` (`drainSpool`, `poll`에 연결済み). KEEP allowlist 10종만 적재.
+- 구현: `daemon/plugin/localagents-sync.js` + `daemon/src/spool.ts` (`drainSpool`, `poll`에 연결済み). KEEP allowlist 10종만 적재.
 - 원인 1 (해결): generic `event` 키는 발화 안 함. v2 모양 `export default { id, server, setup }` + 종류별 키 필요. 동작 중인 `gk-hooks.js` 대조로 확정.
 - 원인 2 (미해결): 실행 중인 `opencode-cli serve`가 구 플러그인을 메모리에 들고 있음. 데스크톱 창 재시작해도 서버 프로세스는 안 죽음. KEEP 밖 종류(`shell.exited` 등) 혼입이 증거.
 - 현재: 스풀 30여 파일 적체 (구버전 잡음 포함). drain 미실행.
 - 다음: 서버 프로세스 재시작 (컨펌 필요 — 데스크톱이 다시 띄우거나 다음 동기화 때 데몬이 감지). 그 뒤 테스트 메시지 → KEEP 종류만 쌓이는지 확인 → `poll` 로 drain 검증.
 
 ## OS 등록 (2026-10-03 완료, Arch)
-- `~/.local/bin/cliagent` 래퍼 + `~/.config/cliagent/env` (DATABASE_URL 1개, 600) + systemd user unit.
+- `~/.local/bin/localagents` 래퍼 + `~/.config/localagents/env` (DATABASE_URL 1개, 600) + systemd user unit.
 - `enable --now`済み. `active (running)` 확인. 재부팅 테스트 미실시.
 
 ## 데몬 종단 검증 (2026-09-29, 이 PC)
@@ -213,7 +213,7 @@
 
 ## outbox 종단 (2026-09-30 완료, 이 PC)
 - 스키마: `commands`(우체통, pending→delivered→done→expired + 멱등키·만료) + 거울 3종(`cloud_tabs` UPDATE 헤더, `cloud_messages` INSERT-only 복합키, `cloud_folds` epoch 요약). `0001_massive_plazm.sql` → Neon dev 적용, 6 테이블 실측 확인.
-- 데몬: `daemon/src/db.ts`(Neon 직결) + `commands.ts` + `poll` 1회 수행. 의존성 `@neondatabase/serverless 1.1.0` 추가. env는 `DATABASE_URL` + `CLIAGENT_DEVICE_ID` (pairing 미구현이라 수동).
+- 데몬: `daemon/src/db.ts`(Neon 직결) + `commands.ts` + `poll` 1회 수행. 의존성 `@neondatabase/serverless 1.1.0` 추가. env는 `DATABASE_URL` + `LOCALAGENTS_DEVICE_ID` (pairing 미구현이라 수동).
 - 웹: `POST /api/commands`(outbox INSERT) + `lib/utils/getNextBaseResponse.ts`. curl 201 → 데몬 `poll`이 같은 행 `done` 회수. 웹→PC 종단 완성.
 - 잡음 정리: `drizzle.config.ts`가 `.env.local`을 안 읽어서 generate 실패 → 2줄 로딩으로 수정. `.env.example` 실값 유출未遂 → 플레이스홀더로 복구 (`.env.local`은 무시됨 확인). `next-env.d.ts` 추적 해제 + gitignore. `AGENTS.md`의 nextjs-agent-rules 블록은 `next dev`가 자동 추가한 것이라 커밋.
 - dev DB 테스트 행: `devices/test-pc-1`, `commands/cmd-ping-1` + 웹 ping 1건. 전부 `done`. 둬도 됨.

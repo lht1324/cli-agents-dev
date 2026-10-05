@@ -1,4 +1,4 @@
-// cliagents sync plugin. 변경 통지를 스풀에 적재한다. 데몬이 읽어간다.
+// localagents sync plugin. 변경 통지를 스풀에 적재한다. 데몬이 읽어간다.
 // v2 모양: default export { id, server, setup }.
 // server(v1 호환) + setup(ctx.tool.hook + ctx.event.subscribe) 둘 다 둔다.
 
@@ -32,7 +32,7 @@ const spoolWrite = async (type, sessionID) => {
         const fs = await import("node:fs");
         const os = await import("node:os");
         const path = await import("node:path");
-        const dir = path.join(os.homedir(), ".config", "cliagent", "spool");
+        const dir = path.join(os.homedir(), ".config", "localagents", "spool");
         fs.mkdirSync(dir, { recursive: true });
         const line = JSON.stringify({ type, sessionID: sessionID ?? null, at: Date.now() });
         const file = path.join(dir, `${Date.now()}-${Math.floor(Math.random() * 100000)}.json`);
@@ -121,4 +121,4 @@ const setup = async (ctx) => {
     return () => controller.abort();
 };
 
-export default { id: "cliagents-sync", server, setup };
+export default { id: "localagents-sync", server, setup };

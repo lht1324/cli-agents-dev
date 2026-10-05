@@ -52,7 +52,7 @@ export async function GET(request: Request): Promise<Response> {
     }
     const back = `/device/authorize?${new URLSearchParams({ device, port, state, label, platform, hostname }).toString()}`;
     const jar = await cookies();
-    jar.set("cliagent_connect", back, { maxAge: 600, path: "/", httpOnly: true });
+    jar.set("localagents_connect", back, { maxAge: 600, path: "/", httpOnly: true });
     // 안쪽 봉투(기기 파라미터) → 복귀 경로 → 바깥 봉투(문자열 통째). URL엔 암호문만 남는다.
     let callbackURL = back;
     if (inner) {

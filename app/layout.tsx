@@ -5,7 +5,7 @@ import { NeonAuthUIProvider, UserButton } from "@neondatabase/auth-ui";
 import "./globals.css";
 
 export const metadata: Metadata = {
-    title: "cliagents",
+    title: "localagents",
     description: "Mission control for your CLI agents",
 };
 
@@ -20,7 +20,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     <header className="flex h-14 items-center justify-between border-b border-line px-4">
                         <nav className="flex items-center gap-5">
                             <Link href="/" className="font-mono font-bold">
-                                cliagents
+                                localagents
                             </Link>
                             <Link href="/sessions" className="text-sm text-dim hover:text-fog">
                                 Sessions

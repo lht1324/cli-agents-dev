@@ -8,7 +8,7 @@ interface Cursor {
 }
 
 function cursorFile(): string {
-    return join(homedir(), ".config", "cliagent", "cursors.json");
+    return join(homedir(), ".config", "localagents", "cursors.json");
 }
 
 function loadAll(): Record<string, Cursor> {
@@ -42,7 +42,7 @@ export function writeCursor(sessionID: string, createdAt: number | null, message
     const all = loadAll();
     all[sessionID] = { createdAt: createdAt ?? 0, messageId };
     try {
-        mkdirSync(join(homedir(), ".config", "cliagent"), { recursive: true });
+        mkdirSync(join(homedir(), ".config", "localagents"), { recursive: true });
         writeFileSync(cursorFile(), JSON.stringify(all));
     } catch {
         // 커서 실패는 무시. 다음 주기가 다시 올린다.

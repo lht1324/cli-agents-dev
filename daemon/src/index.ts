@@ -144,7 +144,7 @@ async function onLogin(): Promise<void> {
 
 async function onRegister(userId: string | undefined, deviceId: string | undefined): Promise<void> {
     if (!userId) {
-        throw new Error("usage: cliagent register <user-id> [device-id]");
+        throw new Error("usage: localagents register <user-id> [device-id]");
     }
     const id = deviceId ?? newDeviceId();
     writeState({ deviceId: id, userId });
@@ -166,7 +166,7 @@ async function onApprove(requestID: string | undefined, decision: string | undef
         return;
     }
     if (decision !== "once" && decision !== "always" && decision !== "reject") {
-        throw new Error("usage: cliagent approve <request-id> <once|always|reject>");
+        throw new Error("usage: localagents approve <request-id> <once|always|reject>");
     }
     const pending = await listPending(server);
     const target = pending.find((p) => p.id === requestID);
@@ -179,7 +179,7 @@ async function onApprove(requestID: string | undefined, decision: string | undef
 
 async function onFork(sessionID: string | undefined): Promise<void> {
     if (!sessionID) {
-        throw new Error("usage: cliagent fork <session-id>");
+        throw new Error("usage: localagents fork <session-id>");
     }
     const server = await ensureServer();
     const id = await forkAndRegister(server, sessionID);
@@ -188,7 +188,7 @@ async function onFork(sessionID: string | undefined): Promise<void> {
 
 async function onSyncMessages(sessionID: string | undefined): Promise<void> {
     if (!sessionID) {
-        throw new Error("usage: cliagent sync-messages <session-id>");
+        throw new Error("usage: localagents sync-messages <session-id>");
     }
     const server = await ensureServer();
     const result = await syncMessages(server, sessionID);
@@ -215,11 +215,11 @@ async function onSyncSessions(): Promise<void> {
 
 async function onToken(token: string | undefined): Promise<void> {
     if (!token) {
-        throw new Error("usage: cliagent token <device-token>");
+        throw new Error("usage: localagents token <device-token>");
     }
     const state = readState();
     if (!state) {
-        throw new Error("not registered. run `cliagent register <user-id>` first");
+        throw new Error("not registered. run `localagents register <user-id>` first");
     }
     writeState({ ...state, token });
     console.log("token saved");
@@ -269,10 +269,10 @@ async function onDoctor(): Promise<void> {
 async function onHeartbeat(): Promise<number> {
     const state = readState();
     if (!state) {
-        throw new Error("not registered. run `cliagent register <user-id>` first");
+        throw new Error("not registered. run `localagents register <user-id>` first");
     }
     if (!state.token) {
-        throw new Error("no device token. run `cliagent token <device-token>` first");
+        throw new Error("no device token. run `localagents token <device-token>` first");
     }
     const host = hostInfo();
     const res = await fetch(`${baseUrl()}/api/heartbeat`, {
@@ -311,7 +311,7 @@ async function onPush(): Promise<void> {
 async function onRun(): Promise<void> {
     const state = readState();
     if (!state) {
-        throw new Error("not registered. run `cliagent register <user-id>` first");
+        throw new Error("not registered. run `localagents register <user-id>` first");
     }
     let stopping = false;
     const stop = () => {
@@ -416,7 +416,7 @@ async function main(): Promise<void> {
     } else if (cmd === "approve") {
         await onApprove(process.argv[3], process.argv[4]);
     } else {
-        console.log("usage: cliagent <login|register|token|status|sessions|poll|heartbeat|approve|sync|fork|sync-messages|sync-models|sync-sessions|push|run>");
+        console.log("usage: localagents <login|register|token|status|sessions|poll|heartbeat|approve|sync|fork|sync-messages|sync-models|sync-sessions|push|run>");
         process.exitCode = 1;
     }
     // 1회성 명령이 띄운 서버는 함께 내린다. run은 스스로 관리한다.

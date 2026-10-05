@@ -407,7 +407,7 @@ export default function SessionDetailClient({
                 })()}
             </p>
             {catalog.models.length === 0 && catalog.agents.length === 0 ? (
-                <p className="mt-2 text-dim">No catalog yet. Run `cliagent sync-models` on the PC.</p>
+                <p className="mt-2 text-dim">No catalog yet. Run `localagents sync-models` on the PC.</p>
             ) : (
                 <div className="mt-2 space-y-2">
                     <div className="flex gap-2">

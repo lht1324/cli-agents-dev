@@ -3,7 +3,7 @@ import { baseUrl, readState } from "./device";
 function token(): string {
     const state = readState();
     if (!state?.token) {
-        throw new Error("no device token. run `cliagent token <device-token>` first");
+        throw new Error("no device token. run `localagents token <device-token>` first");
     }
     return state.token;
 }

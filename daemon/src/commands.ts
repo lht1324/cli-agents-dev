@@ -114,10 +114,10 @@ async function execute(type: string, payload: string): Promise<ExecResult> {
 export async function pollCommands(): Promise<void> {
     const state = readState();
     if (!state) {
-        throw new Error("not registered. run `cliagent register <user-id>` first");
+        throw new Error("not registered. run `localagents register <user-id>` first");
     }
     if (!state.token) {
-        throw new Error("no device token. run `cliagent token <device-token>` first");
+        throw new Error("no device token. run `localagents token <device-token>` first");
     }
     try {
         const server = await discoverServer();
