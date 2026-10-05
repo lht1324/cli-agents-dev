@@ -1,7 +1,7 @@
 import { and, eq, notInArray } from "drizzle-orm";
 import { verifyDeviceToken } from "@/lib/auth/device";
 import { getDb } from "@/lib/neon/client";
-import { modelCatalog, pendingApprovals, sessionsMeta } from "@/lib/neon/schema";
+import { cloudTabs, modelCatalog, pendingApprovals, sessionsMeta } from "@/lib/neon/schema";
 import { getNextBaseResponse } from "@/lib/utils/getNextBaseResponse";
 
 interface SyncSession {
@@ -38,6 +38,20 @@ function asRecord(value: unknown): Record<string, unknown> {
 
 function str(value: unknown): string | null {
     return typeof value === "string" ? value : null;
+}
+
+// 데몬 조건부 backfill용. 이 기기가 올린 탭 id 목록. 기기 토큰 전용.
+export async function GET(request: Request): Promise<Response> {
+    const authed = await verifyDeviceToken(request);
+    if (!authed) {
+        return getNextBaseResponse(401).json({ success: false, status: 401, error: "unauthorized" });
+    }
+    const db = getDb();
+    const tabs = await db
+        .select({ id: cloudTabs.id })
+        .from(cloudTabs)
+        .where(eq(cloudTabs.deviceId, authed.deviceId));
+    return getNextBaseResponse(200).json({ success: true, status: 200, data: { tabIds: tabs.map((t) => t.id) } });
 }
 
 // 데몬 동기화 푸시 수신. 세션 헤더·승인 거울·카탈로그 upsert.

@@ -4,7 +4,7 @@ import { forkAndRegister } from "./fork";
 import { ensureServer, killOwned, type ManagedServer } from "./serve";
 import { syncSessions } from "./sessions";
 import { setSessionAgent, setSessionModel, syncCatalog, type ModelRef } from "./catalog";
-import { syncActiveMessages, syncMessages } from "./messages";
+import { backfillMissing, syncActiveMessages, syncMessages } from "./messages";
 import { listPending, reply, pushPending, type ReplyDecision } from "./permissions";
 import { pollCommands } from "./commands";
 
@@ -136,7 +136,9 @@ async function onLogin(): Promise<void> {
         await onHeartbeat();
         const syncedServer = await ensureServer();
         const sessions = await syncSessions(syncedServer);
-        console.log(`initial sync: ${sessions.sessions} sessions`);
+        // 조건부 backfill. 클라우드에 없는 탭의 현재 세션만 채운다.
+        const filled = await backfillMissing(syncedServer);
+        console.log(`initial sync: ${sessions.sessions} sessions, backfill ${filled.filled}/${filled.checked} tabs, ${filled.rows} rows`);
     } catch (err) {
         console.error(`initial sync failed: ${err instanceof Error ? err.message : err}`);
     }

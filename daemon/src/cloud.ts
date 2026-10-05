@@ -8,7 +8,20 @@ function token(): string {
     return state.token;
 }
 
-// 클라우드 API 호출. Neon 직결 금지.
+// 클라우드 API 읽기. Neon 직결 금지.
+export async function cloudGet(path: string): Promise<unknown> {
+    const res = await fetch(`${baseUrl()}${path}`, {
+        headers: { Authorization: `Bearer ${token()}` },
+        signal: AbortSignal.timeout(30000),
+    });
+    if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`cloud rejected ${path}: ${res.status} ${text.slice(0, 200)}`);
+    }
+    return res.json();
+}
+
+// 클라우드 API 쓰기. Neon 직결 금지.
 export async function cloudPost(path: string, body: unknown): Promise<unknown> {
     const res = await fetch(`${baseUrl()}${path}`, {
         method: "POST",

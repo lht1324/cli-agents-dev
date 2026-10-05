@@ -1,9 +1,10 @@
 import { apiGet, type DiscoveredServer } from "./server";
 import { formatToolExit } from "./tools";
-import { cloudPost } from "./cloud";
+import { cloudGet, cloudPost } from "./cloud";
 import { isNewer, readCursor, writeCursor } from "./cursors";
+import { readEpochRows } from "./localdb";
 
-interface ServerMessage {
+export interface ServerMessage {
     id: string;
     type: string;
     time?: { created?: number };
@@ -36,7 +37,7 @@ function at(m: ServerMessage): number | null {
 }
 
 // 텍스트 항상, tool은 메타만, payload·첨부 제외.
-function flatten(messages: ServerMessage[]): PlainRow[] {
+export function flatten(messages: ServerMessage[]): PlainRow[] {
     const rows: PlainRow[] = [];
     messages.forEach((m, seq) => {
         if (typeof m.id !== "string" || m.id.length === 0) {
@@ -152,6 +153,60 @@ export async function syncMessages(server: DiscoveredServer, sessionID: string):
     }
     writeCursor(sessionID, top.createdAt, top.id);
     return { rows: result.data?.rows ?? fresh.length };
+}
+
+// 첫 로그인 backfill. 로컬 DB에서 현재 세션(epoch) 전부를 올린다. 제한 없음.
+// compaction 경계까지 거슬러 올라간다. 실패하면 호출 쪽이 API 창으로 폴백.
+export async function backfillSession(server: DiscoveredServer, sessionID: string): Promise<{ rows: number }> {
+    const messages = readEpochRows(sessionID);
+    const rows = flatten(messages);
+    if (rows.length === 0) {
+        return { rows: 0 };
+    }
+    const result = (await cloudPost("/api/messages", {
+        messages: rows.map((r, seq) => ({
+            sessionID,
+            messageId: r.id,
+            seq,
+            role: r.role,
+            kind: r.kind,
+            body: r.body,
+            createdAt: r.createdAt,
+        })),
+    })) as { data?: { rows?: number } };
+    let top = rows[0];
+    for (const r of rows) {
+        const a = r.createdAt ?? 0;
+        const b = top.createdAt ?? 0;
+        if (a > b || (a === b && r.id > top.id)) {
+            top = r;
+        }
+    }
+    writeCursor(sessionID, top.createdAt, top.id);
+    return { rows: result.data?.rows ?? rows.length };
+}
+
+// 조건부 backfill. 클라우드에 없는 탭만 채운다. session_id 대조.
+export async function backfillMissing(server: DiscoveredServer): Promise<{ checked: number; filled: number; rows: number }> {
+    const listed = (await cloudGet("/api/sync")) as { data?: { tabIds?: string[] } };
+    const have = new Set(Array.isArray(listed.data?.tabIds) ? listed.data.tabIds : []);
+    const body = (await apiGet(server, "/session")) as { data?: { id: string }[] } | { id: string }[];
+    const list = Array.isArray(body) ? body : (body.data ?? []);
+    let filled = 0;
+    let rows = 0;
+    for (const s of list) {
+        if (typeof s.id !== "string" || have.has(s.id)) {
+            continue;
+        }
+        try {
+            const r = await backfillSession(server, s.id);
+            filled++;
+            rows += r.rows;
+        } catch {
+            // 다음 기회에. 주기 안전망이 메운다.
+        }
+    }
+    return { checked: list.length, filled, rows };
 }
 
 // 주기 안전망. 스풀 통지가 없어도 최근 활동 세션 본문을 올린다. 최대 5개, 실패는 건너뜀.
