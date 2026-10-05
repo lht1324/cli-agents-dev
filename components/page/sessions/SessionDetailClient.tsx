@@ -133,20 +133,40 @@ export default function SessionDetailClient({
     const [done, setDone] = useState<string | null>(null);
     const [draft, setDraft] = useState("");
     const [showJump, setShowJump] = useState(false);
-    const endRef = useRef<HTMLDivElement | null>(null);
-    const scrollToEnd = useCallback(() => {
-        endRef.current?.scrollIntoView({ behavior: "smooth" });
+    const scrollRef = useRef<HTMLDivElement | null>(null);
+    const scrollToEnd = useCallback((smooth = true) => {
+        const el = scrollRef.current;
+        if (!el) {
+            return;
+        }
+        el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" });
     }, []);
     const onScrollPage = useCallback(() => {
-        const distance = document.documentElement.scrollHeight - window.innerHeight - window.scrollY;
-        setShowJump(distance > 400);
+        const el = scrollRef.current;
+        if (!el) {
+            return;
+        }
+        setShowJump(el.scrollHeight - el.scrollTop - el.clientHeight > 400);
     }, []);
     useEffect(() => {
-        endRef.current?.scrollIntoView();
-        window.addEventListener("scroll", onScrollPage, { passive: true });
-        return () => window.removeEventListener("scroll", onScrollPage);
+        const el = scrollRef.current;
+        if (el) {
+            el.scrollTop = el.scrollHeight;
+            el.addEventListener("scroll", onScrollPage, { passive: true });
+        }
+        return () => el?.removeEventListener("scroll", onScrollPage);
     }, [onScrollPage]);
     const thread = useLiveThread(info.id, messages);
+    // 새 메시지 추적. 바닥 근처에 있을 때만 따라간다.
+    useEffect(() => {
+        const el = scrollRef.current;
+        if (!el) {
+            return;
+        }
+        if (el.scrollHeight - el.scrollTop - el.clientHeight < 400) {
+            el.scrollTop = el.scrollHeight;
+        }
+    }, [thread]);
     const rows = useMemo(() => approvals, [approvals]);
     const catalog = useMemo(() => parseCatalog(catalogJson), [catalogJson]);
     const currentModel = useMemo(() => parseCurrentModel(info.model), [info.model]);
@@ -294,14 +314,16 @@ export default function SessionDetailClient({
         setDraft(e.target.value);
     }, []);
     return (
-        <main className="mx-auto max-w-5xl px-6 py-10">
-            <h1 className="text-2xl font-bold">{info.title}</h1>
-            <p className="mt-1 font-mono text-xs text-dim">
-                {info.status} · {info.lastSyncAt ? `synced ${info.lastSyncAt}` : "never synced"}
-            </p>
-            <h2 className="mt-8 font-mono text-sm font-bold text-dim">Conversation</h2>
+        <main className="mx-auto flex h-dvh max-w-5xl flex-col px-6 py-4">
+            <div className="order-1 shrink-0">
+                <h1 className="text-2xl font-bold">{info.title}</h1>
+                <p className="mt-1 font-mono text-xs text-dim">
+                    {info.status} · {info.lastSyncAt ? `synced ${info.lastSyncAt}` : "never synced"}
+                </p>
+            </div>
+            <div ref={scrollRef} className="order-4 mt-2 min-h-0 flex-1 overflow-y-auto">
             {thread.length === 0 && <p className="mt-2 text-dim">No synced messages yet.</p>}
-            <ul className="mt-2 space-y-2">
+            <ul className="mt-2 space-y-2 pb-2">
                 {thread.map((m) => {
                     const stamp = stampOf(m.createdAt);
                     if (m.role === "user") {
@@ -372,7 +394,9 @@ export default function SessionDetailClient({
                     );
                 })}
             </ul>
-            <h2 className="mt-8 font-mono text-sm font-bold text-dim">Agent & model</h2>
+            </div>
+            <details className="order-2 mt-2 shrink-0">
+                <summary className="cursor-pointer font-mono text-sm font-bold text-dim">Agent & model</summary>
             <p className="mt-1 font-mono text-xs text-dim">
                 current: {info.agent ?? "?"} ·{" "}
                 {(() => {
@@ -447,7 +471,11 @@ export default function SessionDetailClient({
                     </div>
                 </div>
             )}
-            <h2 className="mt-8 font-mono text-sm font-bold text-dim">Pending approvals</h2>
+            </details>
+            <details className="order-3 mt-2 max-h-56 shrink-0 overflow-y-auto" open={rows.length > 0}>
+                <summary className="cursor-pointer font-mono text-sm font-bold text-dim">
+                    Pending approvals{rows.length > 0 ? ` (${rows.length})` : ""}
+                </summary>
             {rows.length === 0 && <p className="mt-2 text-dim">No pending requests.</p>}
             <ul className="mt-2 space-y-2">
                 {rows.map((row) => (
@@ -477,9 +505,11 @@ export default function SessionDetailClient({
                     </li>
                 ))}
             </ul>
-            {done && <p className="mt-2 font-mono text-xs text-go">{done}</p>}
-            <h2 className="mt-8 font-mono text-sm font-bold text-dim">Send a message</h2>
-            {offlineNote && <p className="mt-2 font-mono text-xs text-warn">{offlineNote}</p>}
+            </details>
+            <div className="order-5 shrink-0 border-t border-line pt-3">
+            {done && <p className="mt-1 font-mono text-xs text-go">{done}</p>}
+            <h2 className="mt-1 font-mono text-sm font-bold text-dim">Send a message</h2>
+            {offlineNote && <p className="mt-1 font-mono text-xs text-warn">{offlineNote}</p>}
             <textarea
                 value={draft}
                 onChange={onChangeDraft}
@@ -493,12 +523,12 @@ export default function SessionDetailClient({
             >
                 Send
             </button>
-            <div ref={endRef} />
+            </div>
             {showJump && (
                 <button
-                    onClick={scrollToEnd}
+                    onClick={() => scrollToEnd()}
                     aria-label="Scroll to bottom"
-                    className="fixed bottom-6 right-6 rounded-full border border-line bg-panel px-4 py-2 font-mono text-lg text-fog"
+                    className="fixed bottom-44 right-6 rounded-full border border-line bg-panel px-4 py-2 font-mono text-lg text-fog"
                 >
                     ↓
                 </button>
