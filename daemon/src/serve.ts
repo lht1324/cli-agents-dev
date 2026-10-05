@@ -54,6 +54,28 @@ export interface ManagedServer extends DiscoveredServer {
     child: ChildProcess | null;
 }
 
+// 띄운 자식 서버들. 1회성 명령이 끝나면 함께 죽인다 (안 그러면 프로세스가 안 끝난다).
+const owned: ChildProcess[] = [];
+process.on("exit", () => {
+    for (const child of owned) {
+        try {
+            child.kill();
+        } catch {
+            // 무시
+        }
+    }
+});
+
+export function killOwned(): void {
+    while (owned.length > 0) {
+        try {
+            owned.pop()?.kill();
+        } catch {
+            // 무시
+        }
+    }
+}
+
 async function probeCandidate(url: string, auth: { username: string; password: string }): Promise<{ version?: string; prefix: string } | null> {
     for (const prefix of ["/api", ""]) {
         try {
@@ -112,6 +134,7 @@ export async function ensureServer(): Promise<ManagedServer> {
             }
         }
         if (ready) {
+            owned.push(candidate);
             return { url, auth, version: ready.version, prefix: ready.prefix, child: candidate };
         }
         candidate.kill();

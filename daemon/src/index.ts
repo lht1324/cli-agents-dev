@@ -1,7 +1,7 @@
 import { apiGet, apiPost, discoverServer, type DiscoveredServer } from "./server";
 import { hostInfo, newDeviceId, readState, writeState, baseUrl } from "./device";
 import { forkAndRegister } from "./fork";
-import { ensureServer, type ManagedServer } from "./serve";
+import { ensureServer, killOwned, type ManagedServer } from "./serve";
 import { syncSessions } from "./sessions";
 import { setSessionAgent, setSessionModel, syncCatalog, type ModelRef } from "./catalog";
 import { syncActiveMessages, syncMessages } from "./messages";
@@ -131,6 +131,15 @@ async function onLogin(): Promise<void> {
     }
     writeState({ deviceId, userId, token: received.token });
     console.log(`logged in: ${deviceId} (${host.label})`);
+    // 첫 동기화. 웹에 세션이 바로 뜨게 한다. 실패해도 로그인은 유효, 수동 sync로 메움.
+    try {
+        await onHeartbeat();
+        const syncedServer = await ensureServer();
+        const sessions = await syncSessions(syncedServer);
+        console.log(`initial sync: ${sessions.sessions} sessions`);
+    } catch (err) {
+        console.error(`initial sync failed: ${err instanceof Error ? err.message : err}`);
+    }
 }
 
 async function onRegister(userId: string | undefined, deviceId: string | undefined): Promise<void> {
@@ -409,6 +418,10 @@ async function main(): Promise<void> {
     } else {
         console.log("usage: cliagent <login|register|token|status|sessions|poll|heartbeat|approve|sync|fork|sync-messages|sync-models|sync-sessions|push|run>");
         process.exitCode = 1;
+    }
+    // 1회성 명령이 띄운 서버는 함께 내린다. run은 스스로 관리한다.
+    if (cmd !== "run") {
+        killOwned();
     }
 }
 
