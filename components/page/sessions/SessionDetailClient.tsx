@@ -373,10 +373,15 @@ export default function SessionDetailClient({
                             </li>
                         );
                     }
-                    if (m.kind === "summary") {
+                    if (m.kind === "compaction" || m.kind === "summary") {
                         return (
                             <li key={m.id} className="border-l-2 border-warn pl-3">
-                                <p className="whitespace-pre-wrap text-sm text-dim">{m.body}</p>
+                                <details>
+                                    <summary className="cursor-pointer font-mono text-xs text-dim">
+                                        Session compacted. Show summary.
+                                    </summary>
+                                    <p className="mt-1 whitespace-pre-wrap text-sm text-dim">{m.body}</p>
+                                </details>
                             </li>
                         );
                     }

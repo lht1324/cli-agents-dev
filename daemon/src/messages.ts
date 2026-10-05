@@ -105,7 +105,7 @@ function flatten(messages: ServerMessage[]): PlainRow[] {
         if (m.type === "compaction") {
             const summary = (m as { summary?: string }).summary ?? "";
             if (summary.length > 0) {
-                rows.push({ id: key(), seq, role: "system", kind: "summary", body: cap(summary, 8000), createdAt });
+                rows.push({ id: key(), seq, role: "system", kind: "compaction", body: cap(summary, 8000), createdAt });
                 part++;
             }
         }
