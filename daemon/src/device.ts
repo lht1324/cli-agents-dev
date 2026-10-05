@@ -20,6 +20,7 @@ export interface DeviceState {
     deviceId: string;
     userId: string;
     token?: string;
+    lastOkAt?: number;
 }
 
 export interface ServerState {
@@ -43,7 +44,7 @@ export function readState(): DeviceState | null {
         if (!raw.deviceId || !raw.userId) {
             return null;
         }
-        return { deviceId: raw.deviceId, userId: raw.userId, token: raw.token };
+        return { deviceId: raw.deviceId, userId: raw.userId, token: raw.token, lastOkAt: raw.lastOkAt };
     } catch {
         return null;
     }

@@ -23,9 +23,57 @@ async function requireServer(): Promise<DiscoveredServer> {
     return server;
 }
 
+function ago(ms: number): string {
+    const s = Math.floor(ms / 1000);
+    if (s < 60) {
+        return `${s}s ago`;
+    }
+    const m = Math.floor(s / 60);
+    if (m < 60) {
+        return `${m}m ago`;
+    }
+    const h = Math.floor(m / 60);
+    if (h < 24) {
+        return `${h}h ago`;
+    }
+    return `${Math.floor(h / 24)}d ago`;
+}
+
 async function onStatus(): Promise<void> {
-    const server = await ensureServer();
-    console.log(`server: ${server.url}${server.version ? ` (v${server.version})` : ""}`);
+    const state = readState();
+    if (!state) {
+        throw new Error("not logged in. run `localagents login` first");
+    }
+    const host = hostInfo();
+    console.log(`device: ${host.label}`);
+    let server = "unreachable";
+    try {
+        const found = await discoverServer();
+        if (found) {
+            server = "ok";
+        }
+    } catch {
+        // unreachable 유지
+    }
+    console.log(`server: ${server}`);
+    console.log(`last sync: ${state.lastOkAt ? ago(Date.now() - state.lastOkAt) : "never"}`);
+    if (!state.token) {
+        console.log("pending: unknown (no token)");
+        return;
+    }
+    try {
+        const res = await fetch(`${baseUrl()}/api/commands/pending`, {
+            headers: { Authorization: `Bearer ${state.token}` },
+            signal: AbortSignal.timeout(10000),
+        });
+        if (!res.ok) {
+            throw new Error(`pending rejected: ${res.status}`);
+        }
+        const body = (await res.json()) as { data?: { pending?: number } };
+        console.log(`pending: ${body.data?.pending ?? "?"} commands`);
+    } catch {
+        console.log("pending: unknown (cloud unreachable)");
+    }
 }
 
 async function onSessions(): Promise<void> {

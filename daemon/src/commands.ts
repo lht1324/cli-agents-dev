@@ -1,4 +1,4 @@
-import { readState, baseUrl } from "./device";
+import { readState, writeState, baseUrl } from "./device";
 import { apiPost, discoverServer } from "./server";
 import { reply } from "./permissions";
 import { setSessionAgent, setSessionModel, type ModelRef } from "./catalog";
@@ -114,10 +114,10 @@ async function execute(type: string, payload: string): Promise<ExecResult> {
 export async function pollCommands(): Promise<void> {
     const state = readState();
     if (!state) {
-        throw new Error("not registered. run `localagents register <user-id>` first");
+        throw new Error("not logged in. run `localagents login` first");
     }
     if (!state.token) {
-        throw new Error("no device token. run `localagents token <device-token>` first");
+        throw new Error("no device token. run `localagents login` again");
     }
     try {
         const server = await discoverServer();
@@ -136,10 +136,12 @@ export async function pollCommands(): Promise<void> {
             if (i === 0) {
                 console.log("no pending commands");
             }
+            writeState({ ...state, lastOkAt: Date.now() });
             return;
         }
         const result = await execute(row.type, row.payload);
         await reportResult(state.token, row.id, result);
         console.log(`${row.id}\t${row.type}\t${result.ok ? "done" : "error"}`);
     }
+    writeState({ ...state, lastOkAt: Date.now() });
 }
