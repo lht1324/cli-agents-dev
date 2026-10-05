@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLiveThread } from "@/lib/neon/live";
 import { parseToolCall, toolDetail, toolSummary } from "./toolFormat";
 import MarkdownText from "./MarkdownText";
 
@@ -145,7 +146,7 @@ export default function SessionDetailClient({
         window.addEventListener("scroll", onScrollPage, { passive: true });
         return () => window.removeEventListener("scroll", onScrollPage);
     }, [onScrollPage]);
-    const thread = useMemo(() => messages, [messages]);
+    const thread = useLiveThread(info.id, messages);
     const rows = useMemo(() => approvals, [approvals]);
     const catalog = useMemo(() => parseCatalog(catalogJson), [catalogJson]);
     const currentModel = useMemo(() => parseCurrentModel(info.model), [info.model]);

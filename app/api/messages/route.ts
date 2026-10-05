@@ -1,4 +1,5 @@
 import { and, eq } from "drizzle-orm";
+import { auth } from "@/lib/auth/server";
 import { verifyDeviceToken } from "@/lib/auth/device";
 import { getDb } from "@/lib/neon/client";
 import { cloudMessages, cloudTabs } from "@/lib/neon/schema";
@@ -20,8 +21,7 @@ interface MessagesBody {
 }
 
 // 데몬 대화 행 수신. INSERT-only. 탭 거울 행 없으면 함께 만든다.
-export async function POST(request: Request): Promise<Response> {
-    const authed = await verifyDeviceToken(request);
+export async function POST(request: Request): Promise<Response> {    const authed = await verifyDeviceToken(request);
     if (!authed) {
         return getNextBaseResponse(401).json({ success: false, status: 401, error: "unauthorized" });
     }
@@ -76,4 +76,35 @@ export async function POST(request: Request): Promise<Response> {
         inserted++;
     }
     return getNextBaseResponse(200).json({ success: true, status: 200, data: { rows: inserted } });
+}
+
+// 웹 실시간 폴링용 스레드 조회. 본인 탭만. 5초 폴링 1회가 이 쿼리 1방이다.
+export async function GET(request: Request): Promise<Response> {
+    const { data: session } = await auth.getSession();
+    if (!session?.user) {
+        return getNextBaseResponse(401).json({ success: false, status: 401, error: "login required" });
+    }
+    const tabId = new URL(request.url).searchParams.get("tabId");
+    if (!tabId) {
+        return getNextBaseResponse(400).json({ success: false, status: 400, error: "tabId is required" });
+    }
+    const db = getDb();
+    const thread = await db
+        .select({
+            id: cloudMessages.messageId,
+            seq: cloudMessages.seq,
+            role: cloudMessages.role,
+            kind: cloudMessages.kind,
+            body: cloudMessages.body,
+            createdAt: cloudMessages.createdAt,
+        })
+        .from(cloudMessages)
+        .innerJoin(cloudTabs, eq(cloudMessages.tabId, cloudTabs.id))
+        .where(and(eq(cloudMessages.tabId, tabId), eq(cloudTabs.userId, session.user.id)))
+        .orderBy(cloudMessages.createdAt, cloudMessages.seq);
+    return getNextBaseResponse(200).json({
+        success: true,
+        status: 200,
+        data: { messages: thread.map((m) => ({ ...m, createdAt: m.createdAt?.toISOString() ?? null })) },
+    });
 }
