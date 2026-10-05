@@ -39,6 +39,23 @@ function ago(ms: number): string {
     return `${Math.floor(h / 24)}d ago`;
 }
 
+async function onWhoami(): Promise<void> {
+    const state = readState();
+    if (!state?.token) {
+        throw new Error("not logged in. run `localagents login` first");
+    }
+    const res = await fetch(`${baseUrl()}/api/auth/whoami`, {
+        headers: { Authorization: `Bearer ${state.token}` },
+        signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) {
+        throw new Error(`whoami rejected: ${res.status}`);
+    }
+    const body = (await res.json()) as { data?: { email?: string | null; planId?: string } };
+    console.log(`email: ${body.data?.email ?? "?"}`);
+    console.log(`plan: ${body.data?.planId ?? "?"}`);
+}
+
 async function onStatus(): Promise<void> {
     const state = readState();
     if (!state) {
@@ -394,12 +411,14 @@ async function main(): Promise<void> {
     // 숨김 진단 명령. 플래그 없이 치면 없는 명령으로 보인다. run은 unit이 쓰니 예외.
     if (cmd && advanced.has(cmd) && !process.argv.includes("--jaeholee")) {
         console.log(`unknown command: ${cmd}`);
-        console.log("usage: localagents <login|status|push>");
+        console.log("usage: localagents <login|status|whoami|push>");
         process.exitCode = 1;
         return;
     }
     if (cmd === "status") {
         await onStatus();
+    } else if (cmd === "whoami") {
+        await onWhoami();
     } else if (cmd === "sessions") {
         await onSessions();
     } else if (cmd === "login") {
@@ -434,7 +453,7 @@ async function main(): Promise<void> {
         if (cmd) {
             console.log(`unknown command: ${cmd}`);
         }
-        console.log("usage: localagents <login|status|push>");
+        console.log("usage: localagents <login|status|whoami|push>");
         process.exitCode = 1;
     }
     // 1회성 명령이 띄운 서버는 함께 내린다. run은 스스로 관리한다.
