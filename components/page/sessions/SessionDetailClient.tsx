@@ -23,6 +23,7 @@ export interface ApprovalRow {
 }
 
 export interface ThreadRow {
+    id: string;
     seq: number;
     role: string;
     kind: string;
@@ -304,7 +305,7 @@ export default function SessionDetailClient({
                     const stamp = stampOf(m.createdAt);
                     if (m.role === "user") {
                         return (
-                            <li key={m.seq} className="flex justify-end">
+                            <li key={m.id} className="flex justify-end">
                                 <div className="max-w-[85%]">
                                     <p className="whitespace-pre-wrap rounded-lg bg-panel px-3 py-2 text-sm">
                                         {m.body}
@@ -320,7 +321,7 @@ export default function SessionDetailClient({
                         const call = parseToolCall(m.body);
                         if (!call) {
                             return (
-                                <li key={m.seq}>
+                                <li key={m.id}>
                                     <p className="whitespace-pre-wrap font-mono text-xs text-dim">{m.body}</p>
                                     {stamp && (
                                         <p className="mt-1 font-mono text-xs text-dim">{stamp}</p>
@@ -330,7 +331,7 @@ export default function SessionDetailClient({
                         }
                         const detail = toolDetail(call);
                         return (
-                            <li key={m.seq}>
+                            <li key={m.id}>
                                 <details className="rounded border border-line bg-ink px-3 py-2">
                                     <summary className="cursor-pointer font-mono text-xs text-dim">
                                         ▸ {toolSummary(call)}
@@ -351,13 +352,13 @@ export default function SessionDetailClient({
                     }
                     if (m.kind === "summary") {
                         return (
-                            <li key={m.seq} className="border-l-2 border-warn pl-3">
+                            <li key={m.id} className="border-l-2 border-warn pl-3">
                                 <p className="whitespace-pre-wrap text-sm text-dim">{m.body}</p>
                             </li>
                         );
                     }
                     return (
-                        <li key={m.seq} className="flex justify-start">
+                        <li key={m.id} className="flex justify-start">
                             <div className="max-w-[85%]">
                                 <div className="rounded-lg border border-line bg-panel px-3 py-2">
                                     <MarkdownText body={m.body} />
