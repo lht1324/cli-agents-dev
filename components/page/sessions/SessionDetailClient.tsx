@@ -286,7 +286,7 @@ export default function SessionDetailClient({
         }
         return () => el?.removeEventListener("scroll", onScrollPage);
     }, [onScrollPage]);
-    const { thread, deviceLastSeenAt } = useLiveThread(info.id, messages, info.deviceLastSeenAt);
+    const { thread, deviceLastSeenAt, lastSyncAt } = useLiveThread(info.id, messages, info.deviceLastSeenAt, info.lastSyncAt);
     // 새 메시지 추적. 바닥 근처에 있을 때만 따라간다.
     useEffect(() => {
         const el = scrollRef.current;
@@ -329,9 +329,9 @@ export default function SessionDetailClient({
             reasoningTokens: stats.reasoning,
             userMessages: stats.msgUser,
             cost: stats.cost,
-            updatedAt: info.lastSyncAt,
+            updatedAt: lastSyncAt,
         };
-    }, [catalog, currentModel, info, stats]);
+    }, [catalog, currentModel, info, lastSyncAt, stats]);
     const [agent, setAgent] = useState(info.agent ?? "");
     const [modelId, setModelId] = useState(
         currentModel ? `${currentModel.providerID}/${currentModel.id}` : "",
@@ -679,7 +679,7 @@ export default function SessionDetailClient({
                     >
                         ●
                     </span>{" "}
-                    {info.status} · {info.lastSyncAt ? `synced ${formatStamp(info.lastSyncAt) ?? info.lastSyncAt}` : "never synced"}
+                    {info.status} · {lastSyncAt ? `synced ${formatStamp(lastSyncAt) ?? lastSyncAt}` : "never synced"}
                 </p>
             </div>
             <details open>

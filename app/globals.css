@@ -16,3 +16,23 @@ body {
     background-color: var(--color-ink);
     color: var(--color-fog);
 }
+
+/* 얇은 스크롤바. 트랙 없이 핸들만. 대화·사이드바용. */
+.scroll-slim {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-line) transparent;
+}
+.scroll-slim::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+.scroll-slim::-webkit-scrollbar-track {
+    background: transparent;
+}
+.scroll-slim::-webkit-scrollbar-thumb {
+    background: var(--color-line);
+    border-radius: 3px;
+}
+.scroll-slim::-webkit-scrollbar-thumb:hover {
+    background: var(--color-dim);
+}

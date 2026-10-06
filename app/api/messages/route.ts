@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { auth } from "@/lib/auth/server";
 import { verifyDeviceToken } from "@/lib/auth/device";
 import { getDb } from "@/lib/neon/client";
-import { cloudMessages, cloudTabs } from "@/lib/neon/schema";
+import { cloudMessages, cloudTabs, devices, sessionsMeta } from "@/lib/neon/schema";
 import { getNextBaseResponse } from "@/lib/utils/getNextBaseResponse";
 
 interface MessageRow {
@@ -58,6 +58,10 @@ export async function POST(request: Request): Promise<Response> {    const authe
                     status: "active",
                 })
                 .onConflictDoNothing();
+            await db
+                .update(sessionsMeta)
+                .set({ lastSyncAt: new Date() })
+                .where(eq(sessionsMeta.id, m.sessionID));
         }
         const createdAt =
             typeof m.createdAt === "number" ? new Date(m.createdAt) : typeof m.createdAt === "string" ? new Date(m.createdAt) : null;
@@ -102,9 +106,20 @@ export async function GET(request: Request): Promise<Response> {
         .innerJoin(cloudTabs, eq(cloudMessages.tabId, cloudTabs.id))
         .where(and(eq(cloudMessages.tabId, tabId), eq(cloudTabs.userId, session.user.id)))
         .orderBy(cloudMessages.createdAt, cloudMessages.seq);
+    const seen = await db
+        .select({ lastSeenAt: devices.lastSeenAt, lastSyncAt: sessionsMeta.lastSyncAt })
+        .from(devices)
+        .innerJoin(cloudTabs, eq(cloudTabs.deviceId, devices.id))
+        .innerJoin(sessionsMeta, eq(sessionsMeta.id, cloudTabs.id))
+        .where(and(eq(cloudTabs.id, tabId), eq(cloudTabs.userId, session.user.id)))
+        .limit(1);
     return getNextBaseResponse(200).json({
         success: true,
         status: 200,
-        data: { messages: thread.map((m) => ({ ...m, createdAt: m.createdAt?.toISOString() ?? null })) },
+        data: {
+            messages: thread.map((m) => ({ ...m, createdAt: m.createdAt?.toISOString() ?? null })),
+            deviceLastSeenAt: seen[0]?.lastSeenAt?.toISOString() ?? null,
+            lastSyncAt: seen[0]?.lastSyncAt?.toISOString() ?? null,
+        },
     });
 }

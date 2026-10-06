@@ -15,18 +15,71 @@ function pathOf(input: Record<string, unknown>): string {
     return str(input.filePath ?? input.path);
 }
 
+// edit용 최소 diff. 앞뒤 공통부 자르고 바뀐 블록만 -/+ 로. 문맥 3줄, 상한 60줄.
+export interface EditDiff {
+    added: number;
+    removed: number;
+    lines: string[];
+}
+
+export function editCounts(call: ToolCall): { added: number; removed: number } | null {
+    if (call.tool !== "edit") {
+        return null;
+    }
+    if (!str(call.input.oldString) && !str(call.input.newString)) {
+        return null;
+    }
+    const diff = editDiff(str(call.input.oldString), str(call.input.newString));
+    return { added: diff.added, removed: diff.removed };
+}
+
+export function editDiff(oldText: string, newText: string): EditDiff {
+    const a = oldText.split("\n");
+    const b = newText.split("\n");
+    let s = 0;
+    while (s < a.length && s < b.length && a[s] === b[s]) {
+        s++;
+    }
+    let e = 0;
+    while (e < a.length - s && e < b.length - s && a[a.length - 1 - e] === b[b.length - 1 - e]) {
+        e++;
+    }
+    const del = a.slice(s, a.length - e);
+    const add = b.slice(s, b.length - e);
+    const lines: string[] = [];
+    for (let i = Math.max(0, s - 3); i < s; i++) {
+        lines.push(`  ${a[i]}`);
+    }
+    for (const l of del) {
+        lines.push(`- ${l}`);
+    }
+    for (const l of add) {
+        lines.push(`+ ${l}`);
+    }
+    for (let i = 0; i < Math.min(3, e); i++) {
+        lines.push(`  ${a[a.length - e + i]}`);
+    }
+    const capped = lines.slice(0, 60);
+    if (lines.length > capped.length) {
+        capped.push(`… ${lines.length - capped.length} more lines`);
+    }
+    return { added: add.length, removed: del.length, lines: capped };
+}
+
 // 접힘 1줄 요약.
 export function toolSummary(call: ToolCall): string {
     const input = call.input;
     switch (call.tool) {
         case "read":
-        case "edit":
         case "write": {
             const extra =
                 input.offset !== undefined || input.limit !== undefined
                     ? `:${str(input.offset) || "0"}+${str(input.limit) || "∞"}`
                     : "";
             return `${call.tool} ${pathOf(input)}${extra}`;
+        }
+        case "edit": {
+            return `${call.tool} ${pathOf(input)}`;
         }
         case "bash":
         case "shell": {
@@ -68,6 +121,9 @@ export function toolDetail(call: ToolCall): string[] {
     const input = call.input;
     const lines: string[] = [];
     const path = pathOf(input);
+    if (call.tool === "edit" && (str(input.oldString) || str(input.newString))) {
+        lines.push(...editDiff(str(input.oldString), str(input.newString)).lines);
+    }
     if (path.length > 0 && ["read", "edit", "write", "grep", "glob"].includes(call.tool)) {
         lines.push(path);
     }
