@@ -13,11 +13,15 @@ interface SessionDetail {
 }
 
 // 전 세션 헤더를 클라우드 거울에 올린다. agent·model 현재값 포함.
-export async function syncSessions(server: DiscoveredServer): Promise<{ sessions: number }> {
+export async function syncSessions(server: DiscoveredServer, progress = false): Promise<{ sessions: number }> {
     const sessions: { id: string; title?: string; status?: string; agent?: string; model?: unknown; provider?: string }[] = [];
     const body = (await apiGet(server, "/session")) as { data?: SessionListItem[] } | SessionListItem[];
     const list = Array.isArray(body) ? body : (body.data ?? []);
-    for (const s of list) {
+    for (let i = 0; i < list.length; i++) {
+        const s = list[i];
+        if (progress) {
+            process.stdout.write(`\rsessions: ${i + 1}/${list.length}`);
+        }
         let title: string | null = null;
         try {
             const detail = (await apiGet(server, `/session/${s.id}`)) as
@@ -36,6 +40,9 @@ export async function syncSessions(server: DiscoveredServer): Promise<{ sessions
             model: s.model,
             provider: s.model?.providerID,
         });
+    }
+    if (progress) {
+        process.stdout.write("\n");
     }
     const result = (await cloudPost("/api/sync", { sessions })) as { data?: { sessions?: number } };
     return { sessions: result.data?.sessions ?? sessions.length };

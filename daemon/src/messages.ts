@@ -133,24 +133,32 @@ export async function syncMessages(server: DiscoveredServer, sessionID: string):
 }
 
 // 첫 로그인 backfill. 로컬 DB에서 현재 세션(epoch) 전부를 올린다. 제한 없음.
-// compaction 경계까지 거슬러 올라간다. 실패하면 호출 쪽이 API 창으로 폴백.
-export async function backfillSession(server: DiscoveredServer, sessionID: string): Promise<{ rows: number }> {
+// compaction 경계까지 거슬러 올라간다. 200행씩 끊어 올리며 진행률 표시. 실패하면 호출 쪽이 API 창으로 폴백.
+export async function backfillSession(server: DiscoveredServer, sessionID: string, label?: string): Promise<{ rows: number }> {
     const messages = readEpochRows(sessionID);
     const rows = flatten(messages);
+    const name = label ?? sessionID.slice(0, 12);
     if (rows.length === 0) {
+        console.log(`backfill ${name}: empty`);
         return { rows: 0 };
     }
-    const result = (await cloudPost("/api/messages", {
-        messages: rows.map((r, seq) => ({
-            sessionID,
-            messageId: r.id,
-            seq,
-            role: r.role,
-            kind: r.kind,
-            body: r.body,
-            createdAt: r.createdAt,
-        })),
-    })) as { data?: { rows?: number } };
+    for (let i = 0; i < rows.length; i += 200) {
+        const part = rows.slice(i, i + 200);
+        await cloudPost("/api/messages", {
+            messages: part.map((r, k) => ({
+                sessionID,
+                messageId: r.id,
+                seq: i + k,
+                role: r.role,
+                kind: r.kind,
+                body: r.body,
+                createdAt: r.createdAt,
+            })),
+        });
+        const done = Math.min(i + part.length, rows.length);
+        process.stdout.write(`\rbackfill ${name}: ${done}/${rows.length} (${Math.floor((done / rows.length) * 100)}%)`);
+    }
+    process.stdout.write("\n");
     let top = rows[0];
     for (const r of rows) {
         const a = r.createdAt ?? 0;
@@ -160,7 +168,7 @@ export async function backfillSession(server: DiscoveredServer, sessionID: strin
         }
     }
     writeCursor(sessionID, top.createdAt, top.id);
-    return { rows: result.data?.rows ?? rows.length };
+    return { rows: rows.length };
 }
 
 // 조건부 backfill. 클라우드에 없는 탭만 채운다. session_id 대조.
@@ -171,16 +179,24 @@ export async function backfillMissing(server: DiscoveredServer): Promise<{ check
     const list = Array.isArray(body) ? body : (body.data ?? []);
     let filled = 0;
     let rows = 0;
-    for (const s of list) {
-        if (typeof s.id !== "string" || have.has(s.id)) {
-            continue;
-        }
+    const pending = list.filter((s) => typeof s.id === "string" && !have.has(s.id));
+    for (let i = 0; i < pending.length; i++) {
+        const s = pending[i];
+        let title: string | null = null;
         try {
-            const r = await backfillSession(server, s.id);
+            const detail = (await apiGet(server, `/session/${s.id}`)) as { data?: { title?: string } } | { title?: string };
+            const row = (detail as { data?: { title?: string } }).data ?? detail;
+            title = (row as { title?: string }).title ?? null;
+        } catch {
+            // 제목 없이 진행
+        }
+        console.log(`backfill [${i + 1}/${pending.length}] ${title ?? s.id}`);
+        try {
+            const r = await backfillSession(server, s.id, title ?? undefined);
             filled++;
             rows += r.rows;
         } catch {
-            // 다음 기회에. 주기 안전망이 메운다.
+            console.log("  failed, skipped");
         }
     }
     return { checked: list.length, filled, rows };

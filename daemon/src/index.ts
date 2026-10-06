@@ -225,7 +225,7 @@ async function onLogin(): Promise<void> {
     try {
         await onHeartbeat();
         const syncedServer = await ensureServer();
-        const sessions = await syncSessions(syncedServer);
+        const sessions = await syncSessions(syncedServer, true);
         // 조건부 backfill. 클라우드에 없는 탭의 현재 세션만 채운다.
         const filled = await backfillMissing(syncedServer);
         console.log(`initial sync: ${sessions.sessions} sessions, backfill ${filled.filled}/${filled.checked} tabs, ${filled.rows} rows`);
