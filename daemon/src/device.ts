@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir, hostname, platform, release } from "node:os";
 import { join } from "node:path";
 
@@ -58,6 +58,33 @@ export function writeState(state: DeviceState): void {
     mkdirSync(stateDir(), { recursive: true });
     writeFileSync(statePath(), JSON.stringify(state, null, 4), { mode: 0o600 });
     chmodSync(statePath(), 0o600);
+}
+
+// logout용. 등록 상태만 지운다. env·서버 비번은 유지.
+export function clearState(): void {
+    try {
+        unlinkSync(statePath());
+    } catch {
+        // 없어도 정상
+    }
+    try {
+        unlinkSync(join(stateDir(), "cursors.json"));
+    } catch {
+        // 없어도 정상
+    }
+    try {
+        for (const f of readdirSync(join(stateDir(), "spool"))) {
+            if (f.endsWith(".json")) {
+                try {
+                    unlinkSync(join(stateDir(), "spool", f));
+                } catch {
+                    // 무시
+                }
+            }
+        }
+    } catch {
+        // 없어도 정상
+    }
 }
 
 function serverStatePath(): string {

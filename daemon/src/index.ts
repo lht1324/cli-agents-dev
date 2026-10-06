@@ -39,6 +39,25 @@ function ago(ms: number): string {
     return `${Math.floor(h / 24)}d ago`;
 }
 
+async function onLogout(): Promise<void> {
+    const { readState, clearState, baseUrl } = await import("./device.js");
+    const state = readState();
+    if (!state?.token) {
+        throw new Error("not logged in. nothing to do");
+    }
+    // revoke 먼저. 실패하면 상태 유지 (살아있는 토큰 고아 방지).
+    const res = await fetch(`${baseUrl()}/api/device/revoke`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${state.token}` },
+        signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) {
+        throw new Error(`revoke rejected: ${res.status}. state kept, try again online`);
+    }
+    clearState();
+    console.log(`logged out: ${state.deviceId}`);
+}
+
 async function onWhoami(): Promise<void> {
     const state = readState();
     if (!state?.token) {
@@ -411,12 +430,14 @@ async function main(): Promise<void> {
     // 숨김 진단 명령. 플래그 없이 치면 없는 명령으로 보인다. run은 unit이 쓰니 예외.
     if (cmd && advanced.has(cmd) && !process.argv.includes("--jaeholee")) {
         console.log(`unknown command: ${cmd}`);
-        console.log("usage: localagents <login|status|whoami|push>");
+        console.log("usage: localagents <login|logout|status|whoami|push>");
         process.exitCode = 1;
         return;
     }
     if (cmd === "status") {
         await onStatus();
+    } else if (cmd === "logout") {
+        await onLogout();
     } else if (cmd === "whoami") {
         await onWhoami();
     } else if (cmd === "sessions") {
@@ -453,7 +474,7 @@ async function main(): Promise<void> {
         if (cmd) {
             console.log(`unknown command: ${cmd}`);
         }
-        console.log("usage: localagents <login|status|whoami|push>");
+        console.log("usage: localagents <login|logout|status|whoami|push>");
         process.exitCode = 1;
     }
     // 1회성 명령이 띄운 서버는 함께 내린다. run은 스스로 관리한다.

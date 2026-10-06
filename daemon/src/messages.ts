@@ -3,30 +3,7 @@ import { formatToolExit } from "./tools";
 import { cloudGet, cloudPost } from "./cloud";
 import { isNewer, readCursor, writeCursor } from "./cursors";
 import { readEpochRows } from "./localdb";
-
-export interface ServerMessage {
-    id: string;
-    type: string;
-    time?: { created?: number };
-    text?: string;
-    payload?: { text?: string };
-    content?: {
-        type: string;
-        text?: string;
-        name?: string;
-        state?: { input?: unknown; content?: { type?: string; text?: string }[] };
-    }[];
-    summary?: string;
-}
-
-interface PlainRow {
-    id: string;
-    seq: number;
-    role: string;
-    kind: string;
-    body: string;
-    createdAt: number | null;
-}
+import type { PlainRow, ServerMessage } from "./types";
 
 function cap(text: string, limit: number): string {
     return text.length > limit ? `${text.slice(0, limit)}…[truncated]` : text;

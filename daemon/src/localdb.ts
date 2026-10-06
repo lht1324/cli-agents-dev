@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { homedir, platform } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import type { ServerMessage } from "./messages";
+import type { ServerMessage } from "./types";
 
 function dbPath(): string | null {
     const path =
