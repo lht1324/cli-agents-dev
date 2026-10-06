@@ -147,8 +147,9 @@ export async function backfillSession(server: DiscoveredServer, sessionID: strin
         console.log(`  ${name} — nothing to sync.`);
         return { rows: 0 };
     }
-    for (let i = 0; i < rows.length; i += 200) {
-        const part = rows.slice(i, i + 200);
+    process.stdout.write(`\r  ${name} ${bar(0)}`);
+    for (let i = 0; i < rows.length; i += 50) {
+        const part = rows.slice(i, i + 50);
         await cloudPost("/api/messages", {
             messages: part.map((r, k) => ({
                 sessionID,
