@@ -74,7 +74,13 @@ export function flatten(messages: ServerMessage[]): PlainRow[] {
                             500,
                         );
                     }
-                    rows.push({ id: key(), seq, role: "assistant", kind: "tool", body: cap(JSON.stringify(envelope), 4000), createdAt });
+                    // 필드 단위로 자른다. 직렬화 뒤 자르면 JSON이 깨져 파싱 실패 → 날것 표시가 된다.
+                    for (const [k, v] of Object.entries(envelope.input as Record<string, unknown>)) {
+                        if (typeof v === "string" && v.length > 1500) {
+                            (envelope.input as Record<string, unknown>)[k] = cap(v, 1500);
+                        }
+                    }
+                    rows.push({ id: key(), seq, role: "assistant", kind: "tool", body: JSON.stringify(envelope), createdAt });
                     part++;
                 }
             }
