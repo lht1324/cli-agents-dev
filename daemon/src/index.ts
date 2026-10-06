@@ -46,11 +46,17 @@ async function onLogout(): Promise<void> {
         throw new Error("not logged in. nothing to do");
     }
     // revoke 먼저. 실패하면 상태 유지 (살아있는 토큰 고아 방지).
+    // 단 401은 서버에 세션이 없다는 뜻이라 로컬만 비운다.
     const res = await fetch(`${baseUrl()}/api/device/revoke`, {
         method: "POST",
         headers: { Authorization: `Bearer ${state.token}` },
         signal: AbortSignal.timeout(10000),
     });
+    if (res.status === 401) {
+        clearState();
+        console.log(`already logged out (server has no session): ${state.deviceId}`);
+        return;
+    }
     if (!res.ok) {
         throw new Error(`revoke rejected: ${res.status}. state kept, try again online`);
     }
