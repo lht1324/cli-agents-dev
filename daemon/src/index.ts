@@ -1,5 +1,5 @@
 import { apiGet, apiPost, discoverServer, type DiscoveredServer } from "./server";
-import { hostInfo, newDeviceId, readState, writeState, baseUrl } from "./device";
+import { hostInfo, readState, writeState, baseUrl } from "./device";
 import { forkAndRegister } from "./fork";
 import { ensureServer, killOwned, type ManagedServer } from "./serve";
 import { syncSessions } from "./sessions";
@@ -126,8 +126,8 @@ async function onLogin(): Promise<void> {
     const { createServer } = await import("node:http");
     const { exec } = await import("node:child_process");
     const { platform } = await import("node:os");
-    const { newDeviceId, writeState, hostInfo, baseUrl } = await import("./device.js");
-    const deviceId = newDeviceId();
+    const { stableDeviceId, writeState, hostInfo, baseUrl } = await import("./device.js");
+    const deviceId = stableDeviceId();
     const host = hostInfo();
     const state = Math.random().toString(36).slice(2, 10);
     const received = await new Promise<{ token: string }>((resolve, reject) => {

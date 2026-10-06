@@ -1,7 +1,55 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
-import { homedir, hostname, platform, release } from "node:os";
+import { homedir, hostname, platform, release, userInfo } from "node:os";
 import { join } from "node:path";
+
+// 기기 지문. OS 기계 id + OS 유저명으로 결정적 생성. logout해도 바뀌지 않는다.
+// 같은 PC·같은 유저는 항상 같은 기기 id. 서버는 upsert라 재로그인이 덮어쓴다.
+export function stableDeviceId(): string {
+    let machine = "";
+    try {
+        if (platform() === "linux" && existsSync("/etc/machine-id")) {
+            machine = readFileSync("/etc/machine-id", "utf8").trim();
+        }
+    } catch {
+        // fall through
+    }
+    let user = "";
+    try {
+        user = userInfo().username;
+    } catch {
+        // fall through
+    }
+    const seed = machine && user ? `localagents:${machine}:${user}` : "";
+    if (!seed) {
+        return fallbackDeviceId();
+    }
+    const hash = createHash("sha256").update(seed).digest();
+    hash[6] = (hash[6] & 0x0f) | 0x40;
+    hash[8] = (hash[8] & 0x3f) | 0x80;
+    const hex = hash.subarray(0, 16).toString("hex");
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+function fallbackDeviceId(): string {
+    const path = join(homedir(), ".config", "localagents", "machine");
+    try {
+        const saved = readFileSync(path, "utf8").trim();
+        if (/^[0-9a-f-]{36}$/.test(saved)) {
+            return saved;
+        }
+    } catch {
+        // fall through
+    }
+    const id = newDeviceId();
+    try {
+        mkdirSync(join(homedir(), ".config", "localagents"), { recursive: true });
+        writeFileSync(path, id, { mode: 0o600 });
+    } catch {
+        // 무시. 이번 실행만 유효.
+    }
+    return id;
+}
 
 // UUIDv7: 시간 48비트 + 랜덤 74비트. 정렬 유리, 충돌 무시 수준.
 export function newDeviceId(): string {
