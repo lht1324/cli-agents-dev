@@ -228,7 +228,7 @@ async function onLogin(): Promise<void> {
         const sessions = await syncSessions(syncedServer, true);
         // 조건부 backfill. 클라우드에 없는 탭의 현재 세션만 채운다.
         const filled = await backfillMissing(syncedServer);
-        console.log(`Done: ${sessions.sessions} tabs found, ${filled.rows} messages synced.`);
+        console.log(`Done: ${sessions.sessions} sessions found, ${filled.rows} messages synced.`);
     } catch (err) {
         console.error(`initial sync failed: ${err instanceof Error ? err.message : err}`);
     }

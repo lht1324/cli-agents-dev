@@ -186,7 +186,7 @@ export async function backfillMissing(server: DiscoveredServer): Promise<{ check
     let rows = 0;
     const pending = list.filter((s) => typeof s.id === "string" && !have.has(s.id));
     if (pending.length > 0) {
-        console.log(`Syncing ${pending.length} tab${pending.length === 1 ? "" : "s"}...`);
+        console.log(`Syncing ${pending.length} session${pending.length === 1 ? "" : "s"}...`);
     }
     for (let i = 0; i < pending.length; i++) {
         const s = pending[i];
