@@ -311,7 +311,7 @@ async function onDoctor(): Promise<void> {
         console.log(line);
     }
 }
-async function onHeartbeat(): Promise<number> {
+async function onHeartbeat(quiet = false): Promise<number> {
     const state = readState();
     if (!state) {
         throw new Error("not registered. run `localagents login` first");
@@ -331,7 +331,9 @@ async function onHeartbeat(): Promise<number> {
     }
     const body = (await res.json()) as { data?: { intervalSec?: number } };
     const intervalSec = body.data?.intervalSec;
-    console.log(`heartbeat: ${state.deviceId} (${host.label}) via api`);
+    if (!quiet) {
+        console.log(`heartbeat: ${state.deviceId} (${host.label}) via api`);
+    }
     return typeof intervalSec === "number" && intervalSec > 0 ? intervalSec : 1800;
 }
 
@@ -409,7 +411,13 @@ async function onRun(): Promise<void> {
             }
             console.log(`run: slow done, next in ${intervalSec}s`);
         }
-        // 빠른 층: 10초. 스풀 비우기 + 명령 가져오기. 둘 다 싸다. 플러그인 통지의 즉시 반영이 여기다.
+        // 빠른 층: 10초. 하트비트·스풀 비우기 + 명령 가져오기. presence는 플랜 주기와 분리한다.
+        // (동기화 30분마다만 뛰면 2분 기준 온라인 표시가 항상 꺼진다.)
+        try {
+            intervalSec = await onHeartbeat(true);
+        } catch (err) {
+            console.error(`heartbeat failed: ${err instanceof Error ? err.message : err}`);
+        }
         try {
             await pollCommands();
         } catch (err) {
