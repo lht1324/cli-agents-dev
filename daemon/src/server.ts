@@ -1,4 +1,4 @@
-const DEFAULT_PORTS = [4096];
+const DEFAULT_PORTS = [4096, 4097, 4098, 4099, 4100, 4101, 4102, 4103, 4104, 4105];
 
 import { readServerState } from "./device";
 

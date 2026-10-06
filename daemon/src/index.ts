@@ -425,7 +425,7 @@ async function onRun(): Promise<void> {
     } catch {
         // best-effort flush only
     }
-    owned?.child?.kill();
+    // 항시 서버는 죽이지 않는다. 다음 run이 이어쓴다.
     console.log("run: stopped");
 }
 

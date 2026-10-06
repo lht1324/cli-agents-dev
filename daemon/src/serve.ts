@@ -55,16 +55,8 @@ export interface ManagedServer extends DiscoveredServer {
 }
 
 // 띄운 자식 서버들. 1회성 명령이 끝나면 함께 죽인다 (안 그러면 프로세스가 안 끝난다).
+// 상주(run)는 죽이지 않는다. 다음 세대가 이어쓰는 항시 서버다.
 const owned: ChildProcess[] = [];
-process.on("exit", () => {
-    for (const child of owned) {
-        try {
-            child.kill();
-        } catch {
-            // 무시
-        }
-    }
-});
 
 export function killOwned(): void {
     while (owned.length > 0) {

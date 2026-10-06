@@ -7,6 +7,8 @@ Wants=network-online.target
 Type=simple
 ExecStart=%h/.local/bin/localagents run
 EnvironmentFile=%h/.config/localagents/env
+# 항시 서버가 재시작 때 같이 죽지 않게. 메인이 아니면 손대지 않는다.
+KillMode=process
 Restart=on-failure
 RestartSec=30
 
