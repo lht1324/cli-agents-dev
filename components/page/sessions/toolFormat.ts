@@ -5,6 +5,9 @@ export interface ToolCall {
     exit?: string;
     hasImage?: boolean;
     answer?: string;
+    truncated?: boolean;
+    addedLines?: number;
+    removedLines?: number;
 }
 
 function str(value: unknown): string {
@@ -25,6 +28,12 @@ export interface EditDiff {
 export function editCounts(call: ToolCall): { added: number; removed: number } | null {
     if (call.tool !== "edit") {
         return null;
+    }
+    if (call.truncated) {
+        return {
+            added: typeof call.addedLines === "number" ? call.addedLines : 0,
+            removed: typeof call.removedLines === "number" ? call.removedLines : 0,
+        };
     }
     if (!str(call.input.oldString) && !str(call.input.newString)) {
         return null;

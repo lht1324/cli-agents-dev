@@ -74,10 +74,23 @@ export function flatten(messages: ServerMessage[]): PlainRow[] {
                             500,
                         );
                     }
+                    // edit 전문이 너무 길면 diff 생략. JSON 모양 유지 + 줄 수만 저장.
+                    // 기준: old+new 합 16K 초과. 펼침 없음, 경로만 보인다.
+                    if (toolName === "edit") {
+                        const oldText = typeof kept.oldString === "string" ? kept.oldString : "";
+                        const newText = typeof kept.newString === "string" ? kept.newString : "";
+                        if (oldText.length + newText.length > 16384) {
+                            envelope.truncated = true;
+                            envelope.addedLines = newText.split("\n").length;
+                            envelope.removedLines = oldText.split("\n").length;
+                            delete (envelope.input as Record<string, unknown>).oldString;
+                            delete (envelope.input as Record<string, unknown>).newString;
+                        }
+                    }
                     // 필드 단위로 자른다. 직렬화 뒤 자르면 JSON이 깨져 파싱 실패 → 날것 표시가 된다.
                     for (const [k, v] of Object.entries(envelope.input as Record<string, unknown>)) {
-                        if (typeof v === "string" && v.length > 1500) {
-                            (envelope.input as Record<string, unknown>)[k] = cap(v, 1500);
+                        if (typeof v === "string" && v.length > 8000) {
+                            (envelope.input as Record<string, unknown>)[k] = cap(v, 8000);
                         }
                     }
                     rows.push({ id: key(), seq, role: "assistant", kind: "tool", body: JSON.stringify(envelope), createdAt });

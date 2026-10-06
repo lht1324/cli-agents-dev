@@ -522,6 +522,25 @@ export default function SessionDetailClient({
                         }
                         const detail = toolDetail(call);
                         const counts = editCounts(call);
+                        if (call.truncated) {
+                            return (
+                                <li key={m.id} className="max-w-3xl">
+                                    <p className="rounded border border-line bg-ink px-3 py-2 font-mono text-xs text-dim">
+                                        ▸ {toolSummary(call)}
+                                        {counts && (
+                                            <>
+                                                {" "}
+                                                <span className="text-go">+{counts.added}</span>
+                                                /
+                                                <span className="text-stop">-{counts.removed}</span>
+                                                <span className="text-dim"> (diff omitted, too long)</span>
+                                            </>
+                                        )}
+                                    </p>
+                                    {stamp && <p className="mt-1 font-mono text-xs text-dim">{stamp}</p>}
+                                </li>
+                            );
+                        }
                         return (
                             <li key={m.id} className="max-w-3xl">
                                 <details className="rounded border border-line bg-ink px-3 py-2">
