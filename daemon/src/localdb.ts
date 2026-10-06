@@ -44,8 +44,67 @@ function toMessage(row: { id: string; type: string; createdAt: number | null; da
     return null;
 }
 
-// 현재 세션(epoch) 행만. 마지막 compaction 뒤 전부, 제한 없음. 경계 compaction은 포함(접기 표시).
-// idle·system 등은 제외. 읽기 전용. 실패하면 호출 쪽이 API 창으로 폴백.
+export interface SessionUsage {
+    input: number | null;
+    output: number | null;
+    reasoning: number | null;
+    cacheRead: number | null;
+    cacheWrite: number | null;
+    msgUser: number;
+    msgAssistant: number;
+}
+
+// 마지막 assistant 호출 토큰 + 누적 메시지 횟수. 없으면 null/0.
+export function sessionUsage(sessionID: string): SessionUsage {
+    const empty: SessionUsage = {
+        input: null,
+        output: null,
+        reasoning: null,
+        cacheRead: null,
+        cacheWrite: null,
+        msgUser: 0,
+        msgAssistant: 0,
+    };
+    const path = dbPath();
+    if (!path) {
+        return empty;
+    }
+    const db = new DatabaseSync(path, { readOnly: true });
+    try {
+        const counts = db
+            .prepare("SELECT type, COUNT(*) AS n FROM session_message WHERE session_id = ? GROUP BY type")
+            .all(sessionID) as { type: string; n: number }[];
+        for (const c of counts) {
+            if (c.type === "user") {
+                empty.msgUser = c.n;
+            } else if (c.type === "assistant") {
+                empty.msgAssistant = c.n;
+            }
+        }
+        const last = db
+            .prepare(
+                "SELECT data FROM session_message WHERE session_id = ? AND type = 'assistant' AND json_extract(data, '$.tokens') IS NOT NULL ORDER BY seq DESC LIMIT 1",
+            )
+            .all(sessionID) as { data: string }[];
+        if (last.length > 0) {
+            try {
+                const t = (JSON.parse(last[0].data) as { tokens?: Record<string, unknown> }).tokens ?? {};
+                const cache = (t.cache ?? {}) as Record<string, unknown>;
+                const num = (v: unknown) => (typeof v === "number" ? v : null);
+                empty.input = num(t.input);
+                empty.output = num(t.output);
+                empty.reasoning = num(t.reasoning);
+                empty.cacheRead = num(cache.read);
+                empty.cacheWrite = num(cache.write);
+            } catch {
+                // 부분 실패 무시
+            }
+        }
+        return empty;
+    } finally {
+        db.close();
+    }
+}
 export function readEpochRows(sessionID: string): ServerMessage[] {
     const path = dbPath();
     if (!path) {

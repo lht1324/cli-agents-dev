@@ -11,6 +11,15 @@ interface SyncSession {
     agent?: unknown;
     model?: unknown;
     provider?: unknown;
+    cost?: unknown;
+    lastInput?: unknown;
+    lastOutput?: unknown;
+    lastReasoning?: unknown;
+    lastCacheRead?: unknown;
+    lastCacheWrite?: unknown;
+    msgUser?: unknown;
+    msgAssistant?: unknown;
+    sessionCreatedAt?: unknown;
 }
 
 interface SyncApproval {
@@ -38,6 +47,21 @@ function asRecord(value: unknown): Record<string, unknown> {
 
 function str(value: unknown): string | null {
     return typeof value === "string" ? value : null;
+}
+
+function num(value: unknown): number | null {
+    return typeof value === "number" ? value : null;
+}
+
+function stamp(value: unknown): Date | null {
+    if (typeof value === "number") {
+        return new Date(value);
+    }
+    if (typeof value === "string") {
+        const d = new Date(value);
+        return isNaN(d.getTime()) ? null : d;
+    }
+    return null;
 }
 
 // 데몬 조건부 backfill용. 이 기기가 올린 탭 id 목록. 기기 토큰 전용.
@@ -73,6 +97,7 @@ export async function POST(request: Request): Promise<Response> {
             continue;
         }
         const detail = asRecord(s);
+        const createdAt = stamp(s.sessionCreatedAt);
         await db
             .insert(sessionsMeta)
             .values({
@@ -83,6 +108,16 @@ export async function POST(request: Request): Promise<Response> {
                 status: str(detail.status) ?? "active",
                 agent: str(detail.agent),
                 model: detail.model ? JSON.stringify(detail.model) : null,
+                cost: num(s.cost),
+                lastInput: num(s.lastInput),
+                lastOutput: num(s.lastOutput),
+                lastReasoning: num(s.lastReasoning),
+                lastCacheRead: num(s.lastCacheRead),
+                lastCacheWrite: num(s.lastCacheWrite),
+                msgUser: num(s.msgUser),
+                msgAssistant: num(s.msgAssistant),
+                ...(createdAt ? { sessionCreatedAt: createdAt } : {}),
+                lastSyncAt: new Date(),
                 updatedAt: new Date(),
             })
             .onConflictDoUpdate({
@@ -91,6 +126,16 @@ export async function POST(request: Request): Promise<Response> {
                     agent: str(detail.agent),
                     model: detail.model ? JSON.stringify(detail.model) : null,
                     status: str(detail.status) ?? "active",
+                    cost: num(s.cost),
+                    lastInput: num(s.lastInput),
+                    lastOutput: num(s.lastOutput),
+                    lastReasoning: num(s.lastReasoning),
+                    lastCacheRead: num(s.lastCacheRead),
+                    lastCacheWrite: num(s.lastCacheWrite),
+                    msgUser: num(s.msgUser),
+                    msgAssistant: num(s.msgAssistant),
+                    ...(createdAt ? { sessionCreatedAt: createdAt } : {}),
+                    lastSyncAt: new Date(),
                     updatedAt: new Date(),
                 },
             });

@@ -35,6 +35,15 @@ export default async function SessionDetailServer({ id }: { id: string }) {
             deviceId: sessionsMeta.deviceId,
             agent: sessionsMeta.agent,
             model: sessionsMeta.model,
+            cost: sessionsMeta.cost,
+            lastInput: sessionsMeta.lastInput,
+            lastOutput: sessionsMeta.lastOutput,
+            lastReasoning: sessionsMeta.lastReasoning,
+            lastCacheRead: sessionsMeta.lastCacheRead,
+            lastCacheWrite: sessionsMeta.lastCacheWrite,
+            msgUser: sessionsMeta.msgUser,
+            msgAssistant: sessionsMeta.msgAssistant,
+            sessionCreatedAt: sessionsMeta.sessionCreatedAt,
             lastSyncAt: sessionsMeta.lastSyncAt,
             deviceLastSeenAt: devices.lastSeenAt,
         })
@@ -68,6 +77,18 @@ export default async function SessionDetailServer({ id }: { id: string }) {
         .where(and(eq(cloudMessages.tabId, id), eq(cloudTabs.userId, session.user.id)))
         .orderBy(cloudMessages.createdAt, cloudMessages.seq);
     const messages: ThreadRow[] = thread.map((m) => ({ ...m, createdAt: m.createdAt?.toISOString() ?? null }));
+    const m0 = meta[0];
+    const stats = {
+        cost: m0?.cost ?? null,
+        input: m0?.lastInput ?? null,
+        output: m0?.lastOutput ?? null,
+        reasoning: m0?.lastReasoning ?? null,
+        cacheRead: m0?.lastCacheRead ?? null,
+        cacheWrite: m0?.lastCacheWrite ?? null,
+        msgUser: m0?.msgUser ?? null,
+        msgAssistant: m0?.msgAssistant ?? null,
+        createdAt: m0?.sessionCreatedAt?.toISOString() ?? null,
+    };
     const catalog = await db
         .select({ payload: modelCatalog.payload })
         .from(modelCatalog)
@@ -79,6 +100,7 @@ export default async function SessionDetailServer({ id }: { id: string }) {
             messages={messages}
             userId={session.user.id}
             catalogJson={catalog[0]?.payload ?? null}
+            stats={stats}
         />
     );
 }
