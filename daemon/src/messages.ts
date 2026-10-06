@@ -161,7 +161,7 @@ export async function backfillSession(server: DiscoveredServer, sessionID: strin
             })),
         });
         const done = Math.min(i + part.length, rows.length);
-        process.stdout.write(`\r  ${name} ${bar(Math.floor((done / rows.length) * 100))} (${done}/${rows.length})`);
+        process.stdout.write(`\r  ${name} ${bar(Math.floor((done / rows.length) * 100))}`);
     }
     process.stdout.write("\n");
     let top = rows[0];
