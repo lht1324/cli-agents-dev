@@ -54,14 +54,14 @@ async function onLogout(): Promise<void> {
     });
     if (res.status === 401) {
         clearState();
-        console.log(`already logged out (server has no session): ${state.deviceId}`);
+        console.log("already logged out.");
         return;
     }
     if (!res.ok) {
         throw new Error(`revoke rejected: ${res.status}. state kept, try again online`);
     }
     clearState();
-    console.log(`logged out: ${state.deviceId}`);
+    console.log("logged out.");
 }
 
 async function onWhoami(): Promise<void> {
