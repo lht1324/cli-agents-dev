@@ -1,4 +1,4 @@
-2026-10-06 01:54
+2026-10-07 01:12
 
 # context.md - cli-agents-dev
 
@@ -137,14 +137,21 @@
 - [x] 토큰 API (heartbeat·poll·sync·messages 전환済み)
 - [x] loopback 로그인 구현 (브라우저 OAuth → Connect → 토큰 → heartbeat 종단済み 2026-10-05)
 - [x] `push` 묶음 명령 + `status` 개편 (주소 제거, 2026-10-06) + `whoami` 추가 (이메일·플랜)
-- [ ] `logout` + `--help` (출시 직전·표면 안정 후로 보류)
+- [ ] UI 개선 (최우선, 진행 중. 아래 2026-10-07 기록 참고)
+- [x] `logout` 구현 (revoke+상태삭제. 401이면 로컬만 정리. `d5a7433`)
+- [x] 기기 지문 고정 ID (machine-id+유저 해시. `24cb7ad`. 중복행 정리済み)
+- [x] `GET /api/commands/pending` 읽기 전용 (next의 delivered 부작용 회피)
+- [x] `register`·`token`·`approve` 삭제, `--jaeholee` 숨김, `run` 예외
+- [x] 항시 서버 통일 (탐색 4096~4105, exit kill 제거, unit `KillMode=process`)
+- [x] 하트비트 10초 분리 (presence 정확. `lastSyncAt` 기록漏れ 수정)
+- [ ] `--help` (표면 안정 후로 보류)
 - [ ] `doctor` 진단 묶음 (고급 명령 숨김)
 - [x] 개명 `localagents` (2026-10-06, 코드+PC 이관済み. `7a8d301`. 도메인·DB 테이블 유지)
 - [x] 플러그인 통지 (2층 루프 + 즉시 drain. 아래 완료 기록 참고)
 - [x] 메시지 핀포인트 동기화 (PK `(tab_id, message_id)` + 커서 증분 + 조건부 backfill. 아래 기록 참고)
 - [x] 실시간 폴링 (웹 5초 + 터미널식 고정 입력. Ably/Pusher 기각, 아래 기록 참고)
 - [x] 기기 연결 암호 봉투 (아래 기록 참고)
-- [ ] P4 (Dodo 가입 계속·도메인 연결·배포·과금. MoR: Fungies 심사 대기)
+- [ ] P4 (Dodo 브랜드済み·상품/가격 생성 대기·도메인 연결·배포·과금. MoR: Fungies 심사 대기)
 
 ## 실행 계획 (2026-09-30)
 - P1: outbox·heartbeat 스키마 + 데몬 승인 중계. 돈값 코어의 로컬 절반.
@@ -220,6 +227,17 @@
 - 이중 봉투: 안쪽 기기 파라미터 → 바깥쪽 복귀 경로 문자열 통째. URL엔 암호문만 (`/r/[blob]` 관문, allowlist).
 - 데몬은 `POST /api/device/pack`으로 사전 포장 후 `begin?data=` 오픈. 첫 주소창부터 평문 없음.
 - `login` 직후 첫 동기화 (heartbeat+세션+조건부 backfill). 1회성 명령 종료 hang 수정 (`killOwned`).
+
+## UI 개선 (2026-10-07 진행 중, 최우선)
+- 스킬: `design-taste-frontend` (audit-first) + `ui-ux-pro-max` 검색 (대시보드 규칙: 본문 65~75자) + `ui-styling` (토큰 일관). `impeccable`은 문서のみ 미설치.
+- 세션 통계 실데이터 (`0009`, `eeed0cd`): `sessions_meta`에 cost·last 호출 토큰 5종·누적 횟수·생성시각. 마지막 assistant 행 tokens = 패널 수치와 일치 실측. 횟수는 누적이라 패널 live-window와 다름 (명시).
+- 표시명·제한은 카탈로그에서 해결 (모델명·`limit.context`, `/api/provider` 추가 수집). 사용률 = 합계/제한.
+- presence 점 (● 초록/빨강) + 5초 폴링에 포함. 하트비트 10초 분리. `never synced` 수정 (쓰는 코드가 없었음).
+- 레이아웃: 7:3 2열 (대화·우레일), 입력 하단 고정 컴포저 (선택 즉시 적용, Enter 전송), 제목 레일로 이동, 전체 스크롤 제거 (`100dvh-헤더`).
+- tool: edit diff 표시 (+A/-B 초록빨강, 0 흰색) + 펼침 diff 색상. 요약 경로 전체 유지.
+- 스크롤바 slim (핸들만 6px) + 대화창 우패딩. 점프 버튼 가운데.
+- 미커밋 UI batch 별도 (presence·스크롤바·diff·폴링). 눈 확인 후 묶음 예정.
+- 교훈: 데몬 빌드 뒤 반드시 재시작. 구 dist가 30분마다 null로 덮음 실측.
 
 ## OS 등록 (2026-10-03 완료 → 2026-10-06 개명, Arch)
 - `~/.local/bin/localagents` 래퍼 + `~/.config/localagents/env` (DATABASE_URL 1개, 600) + systemd user unit `localagents.service`.
