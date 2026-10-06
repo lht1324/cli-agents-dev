@@ -314,10 +314,10 @@ async function onDoctor(): Promise<void> {
 async function onHeartbeat(): Promise<number> {
     const state = readState();
     if (!state) {
-        throw new Error("not registered. run `localagents register <user-id>` first");
+        throw new Error("not registered. run `localagents login` first");
     }
     if (!state.token) {
-        throw new Error("no device token. run `localagents token <device-token>` first");
+        throw new Error("no device token. run `localagents login` again");
     }
     const host = hostInfo();
     const res = await fetch(`${baseUrl()}/api/heartbeat`, {
@@ -354,16 +354,25 @@ async function onPush(): Promise<void> {
 
 // 상주 루프. heartbeat·sync·poll을 주기마다 순서대로. 1개 실패해도 계속.
 async function onRun(): Promise<void> {
-    const state = readState();
-    if (!state) {
-        throw new Error("not registered. run `localagents register <user-id>` first");
-    }
     let stopping = false;
     const stop = () => {
         stopping = true;
     };
     process.once("SIGINT", stop);
     process.once("SIGTERM", stop);
+    // 미로그인 대기. crash-loop 대신 login을 기다린다.
+    let state = readState();
+    while (!stopping && (!state || !state.token)) {
+        console.log("run: waiting for `localagents login`...");
+        const deadline = Date.now() + 30000;
+        while (!stopping && Date.now() < deadline) {
+            await sleep(Math.min(1000, deadline - Date.now()));
+        }
+        state = readState();
+    }
+    if (stopping || !state?.token) {
+        return;
+    }
     console.log(`run: device=${state.deviceId}`);
     let intervalSec = 1800;
     let lastSlow = 0;
