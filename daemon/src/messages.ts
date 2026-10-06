@@ -132,6 +132,11 @@ export async function syncMessages(server: DiscoveredServer, sessionID: string):
     return { rows: result.data?.rows ?? fresh.length };
 }
 
+function bar(pct: number, width = 20): string {
+    const filled = Math.round((pct / 100) * width);
+    return `[${"#".repeat(filled)}${"-".repeat(width - filled)}] ${pct}%`;
+}
+
 // 첫 로그인 backfill. 로컬 DB에서 현재 세션(epoch) 전부를 올린다. 제한 없음.
 // compaction 경계까지 거슬러 올라간다. 200행씩 끊어 올리며 진행률 표시. 실패하면 호출 쪽이 API 창으로 폴백.
 export async function backfillSession(server: DiscoveredServer, sessionID: string, label?: string): Promise<{ rows: number }> {
@@ -139,7 +144,7 @@ export async function backfillSession(server: DiscoveredServer, sessionID: strin
     const rows = flatten(messages);
     const name = label ?? sessionID.slice(0, 12);
     if (rows.length === 0) {
-        console.log(`backfill ${name}: empty`);
+        console.log(`  ${name} — nothing to sync.`);
         return { rows: 0 };
     }
     for (let i = 0; i < rows.length; i += 200) {
@@ -156,7 +161,7 @@ export async function backfillSession(server: DiscoveredServer, sessionID: strin
             })),
         });
         const done = Math.min(i + part.length, rows.length);
-        process.stdout.write(`\rbackfill ${name}: ${done}/${rows.length} (${Math.floor((done / rows.length) * 100)}%)`);
+        process.stdout.write(`\r  ${name} ${bar(Math.floor((done / rows.length) * 100))} (${done}/${rows.length})`);
     }
     process.stdout.write("\n");
     let top = rows[0];
@@ -180,6 +185,9 @@ export async function backfillMissing(server: DiscoveredServer): Promise<{ check
     let filled = 0;
     let rows = 0;
     const pending = list.filter((s) => typeof s.id === "string" && !have.has(s.id));
+    if (pending.length > 0) {
+        console.log(`Syncing ${pending.length} tab${pending.length === 1 ? "" : "s"}...`);
+    }
     for (let i = 0; i < pending.length; i++) {
         const s = pending[i];
         let title: string | null = null;
@@ -190,13 +198,13 @@ export async function backfillMissing(server: DiscoveredServer): Promise<{ check
         } catch {
             // 제목 없이 진행
         }
-        console.log(`backfill [${i + 1}/${pending.length}] ${title ?? s.id}`);
+        console.log(`(${i + 1}/${pending.length}) ${title ?? s.id}`);
         try {
             const r = await backfillSession(server, s.id, title ?? undefined);
             filled++;
             rows += r.rows;
         } catch {
-            console.log("  failed, skipped");
+            console.log("  Something went wrong, skipped. It will retry later.");
         }
     }
     return { checked: list.length, filled, rows };

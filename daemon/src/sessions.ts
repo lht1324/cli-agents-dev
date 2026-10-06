@@ -20,7 +20,7 @@ export async function syncSessions(server: DiscoveredServer, progress = false): 
     for (let i = 0; i < list.length; i++) {
         const s = list[i];
         if (progress) {
-            process.stdout.write(`\rsessions: ${i + 1}/${list.length}`);
+            process.stdout.write(`\rFinding your tabs... ${i + 1}/${list.length}`);
         }
         let title: string | null = null;
         try {
