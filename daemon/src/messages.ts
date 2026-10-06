@@ -132,7 +132,7 @@ export async function syncMessages(server: DiscoveredServer, sessionID: string):
     return { rows: result.data?.rows ?? fresh.length };
 }
 
-function bar(pct: number, width = 20): string {
+function bar(pct: number, width = 40): string {
     const filled = Math.round((pct / 100) * width);
     return `[${"#".repeat(filled)}${"-".repeat(width - filled)}] ${pct}%`;
 }
@@ -148,8 +148,8 @@ export async function backfillSession(server: DiscoveredServer, sessionID: strin
         return { rows: 0 };
     }
     process.stdout.write(`\r  ${name} ${bar(0)}`);
-    for (let i = 0; i < rows.length; i += 50) {
-        const part = rows.slice(i, i + 50);
+    for (let i = 0; i < rows.length; i += 10) {
+        const part = rows.slice(i, i + 10);
         await cloudPost("/api/messages", {
             messages: part.map((r, k) => ({
                 sessionID,
