@@ -20,7 +20,7 @@ export function stableDeviceId(): string {
     } catch {
         // fall through
     }
-    const seed = machine && user ? `agentgit:${machine}:${user}` : "";
+    const seed = machine && user ? `localagents:${machine}:${user}` : "";
     if (!seed) {
         return fallbackDeviceId();
     }
@@ -32,7 +32,7 @@ export function stableDeviceId(): string {
 }
 
 function fallbackDeviceId(): string {
-    const path = join(homedir(), ".config", "agentgit", "machine");
+    const path = join(homedir(), ".config", "localagents", "machine");
     try {
         const saved = readFileSync(path, "utf8").trim();
         if (/^[0-9a-f-]{36}$/.test(saved)) {
@@ -43,7 +43,7 @@ function fallbackDeviceId(): string {
     }
     const id = newDeviceId();
     try {
-        mkdirSync(join(homedir(), ".config", "agentgit"), { recursive: true });
+        mkdirSync(join(homedir(), ".config", "localagents"), { recursive: true });
         writeFileSync(path, id, { mode: 0o600 });
     } catch {
         // 무시. 이번 실행만 유효.
@@ -76,7 +76,7 @@ export interface ServerState {
 }
 
 function stateDir(): string {
-    return join(homedir(), ".config", "agentgit");
+    return join(homedir(), ".config", "localagents");
 }
 
 function statePath(): string {
@@ -99,7 +99,7 @@ export function readState(): DeviceState | null {
 }
 
 export function baseUrl(): string {
-    return process.env.AGENTGIT_BASE_URL ?? "http://localhost:3000";
+    return process.env.LOCALAGENTS_BASE_URL ?? "http://localhost:3000";
 }
 
 export function writeState(state: DeviceState): void {

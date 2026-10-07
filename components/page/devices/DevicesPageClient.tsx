@@ -67,7 +67,7 @@ export default function DevicesPageClient({ items }: { items: DeviceRow[] }) {
         <main className="mx-auto max-w-5xl px-6 py-10">
             <h1 className="font-mono text-xl font-bold">Devices</h1>
             {rows.length === 0 && (
-                <p className="mt-4 text-dim">No devices yet. Run `agentgit register` on your PC.</p>
+                <p className="mt-4 text-dim">No devices yet. Run `localagents register` on your PC.</p>
             )}
             <ul className="mt-4 space-y-2">
                 {rows.map((row) => (

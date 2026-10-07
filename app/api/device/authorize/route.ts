@@ -37,7 +37,7 @@ export async function POST(request: Request): Promise<Response> {
             target: devices.id,
             set: { userId: session.user.id, label, platform, hostname },
         });
-    const token = `cliag_${randomUUID().replace(/-/g, "")}`;
+    const token = `loa_${randomUUID().replace(/-/g, "")}`;
     const tokenHash = createHash("sha256").update(token).digest("hex");
     await db.insert(deviceTokens).values({
         id: randomUUID(),

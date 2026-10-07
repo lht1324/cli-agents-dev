@@ -1,10 +1,10 @@
 {
-  "name": "agentgit",
+  "name": "localagents",
   "version": "0.1.0",
   "private": true,
-  "description": "Resident daemon for agentgit session sync",
+  "description": "Resident daemon for localagents session sync",
   "bin": {
-    "agentgit": "./dist/index.js"
+    "localagents": "./dist/index.js"
   },
   "scripts": {
     "build": "tsc",

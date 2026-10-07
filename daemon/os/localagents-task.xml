@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
     <RegistrationInfo>
-        <Description>agentgit resident daemon</Description>
+        <Description>localagents resident daemon</Description>
     </RegistrationInfo>
     <Triggers>
         <LogonTrigger>
@@ -10,7 +10,7 @@
     </Triggers>
     <Actions Context="Author">
         <Exec>
-            <Command>agentgit</Command>
+            <Command>localagents</Command>
             <Arguments>run</Arguments>
         </Exec>
     </Actions>

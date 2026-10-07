@@ -4,7 +4,7 @@
 
 ## 프로젝트
 - 폴더: `cli-agents-dev` (구 `new_project`)
-- 서비스 가명: agentgit (명령어는 단수 `agentgit`)
+- 서비스 가명: localagents (명령어는 단수 `localagents`)
 - 도메인 후보: `cliagents.dev` (연 $12.2, 본선) / `localagents.nexus` (연 $10.2, 리다이렉트용)
 - 스택: Next.js 15+ / TypeScript / Tailwind CSS (사장 기술 기준)
 
@@ -19,7 +19,7 @@
 - OpenCode는 `opencode serve` API 활용. Claude는 JSONL 감시 + `-p --resume` + SDK SessionStore.
 - PC 꺼지면 offline 표시. `PC 꺼져도 실시간`은 B안(클라우드 실행)이며 후순위. B안은 Daytona류 외부 샌드박스 임대 전제.
 - MVP 범위: 통합 목록 + 상태 + 원격 승인 1개. 전문 미러링은 2단계.
-- 분배 확정: 플러그인·per-project npm 아님. 상주 데몬 1개 (`npx agentgit login` 1방).
+- 분배 확정: 플러그인·per-project npm 아님. 상주 데몬 1개 (`npx localagents login` 1방).
 - 클라이언트 확정: 웹 뷰어 1개. CLI 클라이언트는 중복, Electron은 과함. 터미널 부착은 2단계 이후.
 - 기능 분리 확정 (2026-09-29): 본체 = PC 간 탭 복원. 부속 = 웹 리모컨(보기·승인·새 지시, 실행은 PC 서버). 웹에 터미널 재현 없음.
 - 웹 범위 확정: 랜딩·설명서·요금제 + 프로필·구독 관리 + 원격 inbox. 계정면 + 마케팅면 + 동반 기능.
@@ -128,7 +128,7 @@
 - [x] 명령 outbox 테이블 (commands + cloud_tabs/messages/folds, Neon dev 적용済み)
 - [x] heartbeat 방식 결정 (`devices.lastSeenAt` 갱신으로 확정)
 - [x] 웹 원격 inbox UI (보기·승인) + 기기 목록 (웹→PC 종단済み: sync→Allow→poll→실행)
-- [x] `agentgit fork` 명령 (fork + 대장 등록, 실측済み)
+- [x] `localagents fork` 명령 (fork + 대장 등록, 실측済み)
 - [x] 새 지시 종단 (웹 전송 → poll → 에이전트 응답 확인済み)
 - [x] 상세 307 해소 (원인: 손 복사 id 오기. 목록 링크화로 재발 방지)
 - [x] 에이전트·모델 전환 코드 + 종단 (variant medium 변경 → poll → PC GUI 확인済み 2026-10-02)
@@ -146,7 +146,7 @@
 - [x] 하트비트 10초 분리 (presence 정확. `lastSyncAt` 기록漏れ 수정)
 - [ ] `--help` (표면 안정 후로 보류)
 - [ ] `doctor` 진단 묶음 (고급 명령 숨김)
-- [x] 개명 `agentgit` (2026-10-06, 코드+PC 이관済み. `7a8d301`. 도메인·DB 테이블 유지)
+- [x] 개명 `localagents` (2026-10-06, 코드+PC 이관済み. `7a8d301`. 도메인·DB 테이블 유지)
 - [x] 플러그인 통지 (2층 루프 + 즉시 drain. 아래 완료 기록 참고)
 - [ ] Storage 인계 구현 (세션 export/import + 만료·수신확인 + 탭당 상한)
 - [ ] 방송·자동동기화 설계 확정 (복수 PC 행 + 주인-PC 원칙 + dirty·디바운스)
@@ -164,8 +164,8 @@
 ## 기기·로그인 결정 (2026-10-01)
 - `devices`에 `platform`·`hostname` 컬럼 추가, dev 적용済み. 값은 Node `os` 모듈.
 - device_id = UUIDv7 (시간+랜덤). hostname 합성 반대. user_id = Auth id 그대로.
-- 식별은 env 아님. 상태 파일(`~/.config/agentgit/device.json`, 600). env는 배포 설정만.
-- 로그인은 loopback 우선 (`agentgit login` → 브라우저 OAuth → localhost 콜백 → whoami → 상태 파일). 페어링 코드는 headless 폴백.
+- 식별은 env 아님. 상태 파일(`~/.config/localagents/device.json`, 600). env는 배포 설정만.
+- 로그인은 loopback 우선 (`localagents login` → 브라우저 OAuth → localhost 콜백 → whoami → 상태 파일). 페어링 코드는 headless 폴백.
 - OS 표시는 전부 텍스트. Apple·MS 로고는 상표 허가 필요라 제외. Linux 펭귄도 통일상 제외.
 - Fungies KYC 완료. Waffo 거절 메일 발송済み (출금 중국 한정).
 
@@ -176,14 +176,14 @@
 - 남은 것: 예약 실행 ("PC 켜지면 실행" 경고 + 부팅 catch-up).
 
 ## 1줄 설치 설계 (2026-10-03 확정, 미구현)
-- 목표: `npx agentgit login` 1줄에 설치·OAuth·등록·서버기동·주기실행까지. 붙여넣기 0건.
+- 목표: `npx localagents login` 1줄에 설치·OAuth·등록·서버기동·주기실행까지. 붙여넣기 0건.
 - 데몬이 서버 직접 기동済み (`daemon/src/serve.ts`: 기존 탐색 → 없으면 자식으로 기동, 비번 랜덤 32B 상태 보관, 포트 4096~4105 폴백, 종료 시 kill).
 - 비번은 상태 파일 일원화. 명시 명령도 env 없이 됨. OS unit은 `EnvironmentFile` 1개 (`DATABASE_URL`만).
 - 남은 것: 없음 (토큰 API 전환済み, loopback済み, OS 등록済み). 1줄 설치 remaining: 플러그인 자동 설치.
 
 ## 브랜드 확정 (2026-10-03)
 - 상호 `LocalAgentsLink`, 도메인 구입済み. `cliagents.dev`는 리다이렉트용 유지.
-- 개명 검토 기록: `CLI`는 CLI·GUI 병행 현실과 어긋남 (OpenCode·Claude 데스크톱 존재). `overlord` 전멸. `agentsync` 계열 사용 금지 (AGENTSYNC 미국 등록상표 6836288호, 권리자 소송 전적. `agenticsync`·`agentgitync` 포함).
+- 개명 검토 기록: `CLI`는 CLI·GUI 병행 현실과 어긋남 (OpenCode·Claude 데스크톱 존재). `overlord` 전멸. `agentsync` 계열 사용 금지 (AGENTSYNC 미국 등록상표 6836288호, 권리자 소송 전적. `agenticsync`·`localagentsync` 포함).
 - `remote*`는 부속을 본체로 오해시킴. `.tech` 갱신 함정 (`remoteagent.tech` $9.99→$49.20) 주의.
 
 ## Dodo 가입 (2026-10-03 진행 중)
@@ -205,7 +205,7 @@
 - 교훈: dev 서버 구코드 주의 (재시작 후 시험). Neon 수면 시 첫 연결 실패 가능 (재시도).
 
 ## 플러그인 통지 (2026-10-06 완료)
-- 구현: `daemon/plugin/agentgit-sync.js` + `daemon/src/spool.ts` (`drainSpool`, `poll`에 연결済み).
+- 구현: `daemon/plugin/localagents-sync.js` + `daemon/src/spool.ts` (`drainSpool`, `poll`에 연결済み).
 - v2 모양 `export default { id, server, setup }` + 종류별 키 (generic `event` 키 미발화, `gk-hooks.js` 대조로 확정).
 - KEEP: tool/permission/session + 텍스트 완성 신호(`text.ended`·`step.ended`). reasoning은 제외 (PC 밖 반출 금지).
 - 2층 루프 (2026-10-06): 10초 빠른 층(스풀+drain+명령) + 플랜 주기 느린 층. 467건 3틱 drain 실측.
@@ -253,7 +253,7 @@
 - DB diff: 행 단위로 이미 하는 중. 삭제·스키마·충돌만 별도 처리.
 
 ## Mac 실태 + 버전 정정 (2026-10-07, 이 PC)
-- 설치 없음: 바이너리·`~/.config/agentgit/`·신 플러그인 없음. 구 `cliagent` 잔재는 유지 (손대지 않음).
+- 설치 없음: 바이너리·`~/.config/localagents/`·신 플러그인 없음. 구 `cliagent` 잔재는 유지 (손대지 않음).
 - serve 1.18뿐 (2.x 번들 없음). v2 플러그인 미발화 실측済み → 즉시 통지 불가, 10초 폴링층으로 동작. 거울/heartbeat/push는 버전 무관.
 - 정정: 이 Mac 데스크톱은 1.18.25 (v2 아님). v1 라인(1.18.x, 09-28에 1.18.33)이 현역, v2(2.0.20)는 별도 라인 공존. CLI 1.18.2 + 데스크톱 1.18.25 = 둘 다 v1.
 - DB 세션 7개 전부 1.18 (1.18.2×3, 1.18.25×4), archived 0, 포크 자식 0. 최신은 이 세션 (10-06 03:30).
@@ -264,7 +264,7 @@
 - 용량: 폴더 995MB, event 441MB + part 371MB + message 6.7MB. 대화 본체는 그대로 가벼움.
 
 ## OS 등록 (2026-10-03 완료 → 2026-10-06 개명, Arch)
-- `~/.local/bin/agentgit` 래퍼 + `~/.config/agentgit/env` (DATABASE_URL 1개, 600) + systemd user unit `agentgit.service`.
+- `~/.local/bin/localagents` 래퍼 + `~/.config/localagents/env` (DATABASE_URL 1개, 600) + systemd user unit `localagents.service`.
 - `enable --now`済み. `active (running)` 확인. 재부팅 테스트 미실시.
 
 ## 데몬 종단 검증 (2026-09-29, 이 PC)
@@ -279,7 +279,7 @@
 
 ## outbox 종단 (2026-09-30 완료, 이 PC)
 - 스키마: `commands`(우체통, pending→delivered→done→expired + 멱등키·만료) + 거울 3종(`cloud_tabs` UPDATE 헤더, `cloud_messages` INSERT-only 복합키, `cloud_folds` epoch 요약). `0001_massive_plazm.sql` → Neon dev 적용, 6 테이블 실측 확인.
-- 데몬: `daemon/src/db.ts`(Neon 직결) + `commands.ts` + `poll` 1회 수행. 의존성 `@neondatabase/serverless 1.1.0` 추가. env는 `DATABASE_URL` + `AGENTGIT_DEVICE_ID` (pairing 미구현이라 수동).
+- 데몬: `daemon/src/db.ts`(Neon 직결) + `commands.ts` + `poll` 1회 수행. 의존성 `@neondatabase/serverless 1.1.0` 추가. env는 `DATABASE_URL` + `LOCALAGENTS_DEVICE_ID` (pairing 미구현이라 수동).
 - 웹: `POST /api/commands`(outbox INSERT) + `lib/utils/getNextBaseResponse.ts`. curl 201 → 데몬 `poll`이 같은 행 `done` 회수. 웹→PC 종단 완성.
 - 잡음 정리: `drizzle.config.ts`가 `.env.local`을 안 읽어서 generate 실패 → 2줄 로딩으로 수정. `.env.example` 실값 유출未遂 → 플레이스홀더로 복구 (`.env.local`은 무시됨 확인). `next-env.d.ts` 추적 해제 + gitignore. `AGENTS.md`의 nextjs-agent-rules 블록은 `next dev`가 자동 추가한 것이라 커밋.
 - dev DB 테스트 행: `devices/test-pc-1`, `commands/cmd-ping-1` + 웹 ping 1건. 전부 `done`. 둬도 됨.

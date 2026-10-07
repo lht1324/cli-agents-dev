@@ -623,7 +623,7 @@ export default function SessionDetailClient({
                 />
                 <div className="mt-1 flex items-center gap-2">
                     {catalog.models.length === 0 && catalog.agents.length === 0 ? (
-                        <p className="font-mono text-xs text-dim">No catalog yet. Run `agentgit sync-models` on the PC.</p>
+                        <p className="font-mono text-xs text-dim">No catalog yet. Run `localagents sync-models` on the PC.</p>
                     ) : (
                         <>
                             <select

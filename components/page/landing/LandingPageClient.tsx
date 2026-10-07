@@ -4,12 +4,12 @@ import Link from "next/link";
 
 const STEPS = [
     {
-        code: "$ npx agentgit login",
+        code: "$ npx localagents login",
         title: "Install the daemon",
         body: "One resident daemon per PC. It finds your OpenCode server and attaches. Nothing to configure.",
     },
     {
-        code: "$ agentgit register",
+        code: "$ localagents register",
         title: "Pair the device",
         body: "Your PC appears in the device list with live presence. Rename it anything you like.",
     },
@@ -23,12 +23,12 @@ const STEPS = [
 export default function LandingPageClient() {
     return (
         <main className="mx-auto max-w-3xl px-4 py-16">
-            <p className="font-mono text-sm text-go">$ agentgit --help</p>
+            <p className="font-mono text-sm text-go">$ localagents --help</p>
             <h1 className="mt-4 text-4xl font-bold tracking-tight">
                 Mission control for your CLI agents.
             </h1>
             <p className="mt-4 text-dim">
-                Tabs live on your PCs. agentgit keeps them in sync, so a session started on your
+                Tabs live on your PCs. localagents keeps them in sync, so a session started on your
                 desktop is waiting on your laptop — and approvable from your phone.
             </p>
             <div className="mt-6 flex gap-3">

@@ -3,7 +3,7 @@ import { baseUrl, readState } from "./device";
 function token(): string {
     const state = readState();
     if (!state?.token) {
-        throw new Error("no device token. run `agentgit login` again");
+        throw new Error("no device token. run `localagents login` again");
     }
     return state.token;
 }

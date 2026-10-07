@@ -9,14 +9,14 @@ export async function GET(request: Request): Promise<Response> {
     const data = new URL(request.url).searchParams.get("data") ?? "";
     if (data) {
         const p = unsealConnect(data);
-        jar.delete("agentgit_connect");
+        jar.delete("localagents_connect");
         if (p) {
             redirect(`/device/authorize?data=${encodeURIComponent(data)}`);
         }
         redirect("/");
     }
-    const back = jar.get("agentgit_connect")?.value;
-    jar.delete("agentgit_connect");
+    const back = jar.get("localagents_connect")?.value;
+    jar.delete("localagents_connect");
     if (back && back.startsWith("/device/authorize?")) {
         redirect(back);
     }
