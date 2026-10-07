@@ -16,6 +16,7 @@ export async function GET(request: Request): Promise<Response> {
         .select({
             id: handoffs.id,
             tabId: handoffs.tabId,
+            title: handoffs.title,
             epoch: handoffs.epoch,
             version: handoffs.version,
             storageKey: handoffs.storageKey,
@@ -35,6 +36,7 @@ export async function GET(request: Request): Promise<Response> {
 
 interface HandoffBody {
     tabId?: unknown;
+    title?: unknown;
     epoch?: unknown;
     version?: unknown;
     storageKey?: unknown;
@@ -76,6 +78,7 @@ export async function POST(request: Request): Promise<Response> {
         userId: authed.userId,
         deviceId: authed.deviceId,
         tabId: body.tabId,
+        title: typeof body.title === "string" ? body.title : null,
         epoch: typeof body.epoch === "number" ? body.epoch : 0,
         version: body.version,
         storageKey: body.storageKey,

@@ -1,15 +1,21 @@
 import { existsSync } from "node:fs";
-import { homedir, platform } from "node:os";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { ServerMessage } from "./types";
 
 function dbPath(): string | null {
-    const path =
-        platform() === "darwin"
-            ? join(homedir(), "Library", "Application Support", "opencode", "opencode.db")
-            : join(homedir(), ".local", "share", "opencode", "opencode.db");
-    return existsSync(path) ? path : null;
+    // 설치 방식마다 다르다. 둘 다 찔러본다 (이 Mac은 XDG 쪽에 있음).
+    const candidates = [
+        join(homedir(), ".local", "share", "opencode", "opencode.db"),
+        join(homedir(), "Library", "Application Support", "opencode", "opencode.db"),
+    ];
+    for (const path of candidates) {
+        if (existsSync(path)) {
+            return path;
+        }
+    }
+    return null;
 }
 
 function toMessage(row: { id: string; type: string; createdAt: number | null; data: string }): ServerMessage | null {

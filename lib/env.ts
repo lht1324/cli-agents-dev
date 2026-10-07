@@ -16,6 +16,9 @@ function appEnv(): "development" | "production" | "test" {
 
 export const env = {
     databaseUrl: () => required("DATABASE_URL"),
+    neonApiKey: () => required("NEON_API_KEY"),
+    neonProjectId: () => required("NEON_PROJECT_ID"),
+    neonBranchId: () => required("NEON_BRANCH_ID"),
     authBaseUrl: () => required("NEON_AUTH_BASE_URL"),
     authCookieSecret: () => required("NEON_AUTH_COOKIE_SECRET"),
     appEnv: () => appEnv(),

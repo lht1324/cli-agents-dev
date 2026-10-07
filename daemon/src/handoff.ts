@@ -10,6 +10,7 @@ import { getBytes, putBytes } from "./storage";
 
 export interface HandoffVersion {
     tabId: string;
+    title?: string | null;
     epoch: number;
     version: string;
     storageKey: string;
@@ -71,6 +72,7 @@ export async function pushTabs(server: DiscoveredServer, sessionIDs: string[]): 
         putProgress(name, 70);
         await cloudPost("/api/handoffs", {
             tabId: sid,
+            title,
             epoch,
             version,
             storageKey: key,
