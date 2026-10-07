@@ -114,10 +114,10 @@ async function execute(type: string, payload: string): Promise<ExecResult> {
 export async function pollCommands(): Promise<void> {
     const state = readState();
     if (!state) {
-        throw new Error("not logged in. run `localagents login` first");
+        throw new Error("not logged in. run `agentgit login` first");
     }
     if (!state.token) {
-        throw new Error("no device token. run `localagents login` again");
+        throw new Error("no device token. run `agentgit login` again");
     }
     try {
         const server = await discoverServer();

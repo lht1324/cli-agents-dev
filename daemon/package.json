@@ -1,16 +1,17 @@
 {
-  "name": "localagents",
+  "name": "agentgit",
   "version": "0.1.0",
   "private": true,
-  "description": "Resident daemon for localagents session sync",
+  "description": "Resident daemon for agentgit session sync",
   "bin": {
-    "localagents": "./dist/index.js"
+    "agentgit": "./dist/index.js"
   },
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.1146.0",
     "@neondatabase/serverless": "1.1.0"
   },
   "devDependencies": {

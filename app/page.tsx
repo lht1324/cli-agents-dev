@@ -4,7 +4,7 @@ import LandingPageServer from "@/components/page/landing/LandingPageServer";
 
 export default async function HomePage() {
     const jar = await cookies();
-    const back = jar.get("localagents_connect")?.value;
+    const back = jar.get("agentgit_connect")?.value;
     if (back && back.startsWith("/device/authorize?")) {
         redirect("/api/device/consume");
     }

@@ -7,7 +7,7 @@ import { pushPending } from "./permissions";
 import { syncSessions } from "./sessions";
 
 export function spoolDir(): string {
-    return join(homedir(), ".config", "localagents", "spool");
+    return join(homedir(), ".config", "agentgit", "spool");
 }
 
 interface SpoolEvent {

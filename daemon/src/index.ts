@@ -67,7 +67,7 @@ async function onLogout(): Promise<void> {
 async function onWhoami(): Promise<void> {
     const state = readState();
     if (!state?.token) {
-        throw new Error("not logged in. run `localagents login` first");
+        throw new Error("not logged in. run `agentgit login` first");
     }
     const res = await fetch(`${baseUrl()}/api/auth/whoami`, {
         headers: { Authorization: `Bearer ${state.token}` },
@@ -84,7 +84,7 @@ async function onWhoami(): Promise<void> {
 async function onStatus(): Promise<void> {
     const state = readState();
     if (!state) {
-        throw new Error("not logged in. run `localagents login` first");
+        throw new Error("not logged in. run `agentgit login` first");
     }
     const host = hostInfo();
     console.log(`device: ${host.label}`);
@@ -236,7 +236,7 @@ async function onLogin(): Promise<void> {
 
 async function onFork(sessionID: string | undefined): Promise<void> {
     if (!sessionID) {
-        throw new Error("usage: localagents fork <session-id>");
+        throw new Error("usage: agentgit fork <session-id>");
     }
     const server = await ensureServer();
     const id = await forkAndRegister(server, sessionID);
@@ -245,7 +245,7 @@ async function onFork(sessionID: string | undefined): Promise<void> {
 
 async function onSyncMessages(sessionID: string | undefined): Promise<void> {
     if (!sessionID) {
-        throw new Error("usage: localagents sync-messages <session-id>");
+        throw new Error("usage: agentgit sync-messages <session-id>");
     }
     const server = await ensureServer();
     const result = await syncMessages(server, sessionID);
@@ -314,10 +314,10 @@ async function onDoctor(): Promise<void> {
 async function onHeartbeat(quiet = false): Promise<number> {
     const state = readState();
     if (!state) {
-        throw new Error("not registered. run `localagents login` first");
+        throw new Error("not registered. run `agentgit login` first");
     }
     if (!state.token) {
-        throw new Error("no device token. run `localagents login` again");
+        throw new Error("no device token. run `agentgit login` again");
     }
     const host = hostInfo();
     const res = await fetch(`${baseUrl()}/api/heartbeat`, {
@@ -365,7 +365,7 @@ async function onRun(): Promise<void> {
     // 미로그인 대기. crash-loop 대신 login을 기다린다.
     let state = readState();
     while (!stopping && (!state || !state.token)) {
-        console.log("run: waiting for `localagents login`...");
+        console.log("run: waiting for `agentgit login`...");
         const deadline = Date.now() + 30000;
         while (!stopping && Date.now() < deadline) {
             await sleep(Math.min(1000, deadline - Date.now()));
@@ -453,7 +453,7 @@ async function main(): Promise<void> {
     // 숨김 진단 명령. 플래그 없이 치면 없는 명령으로 보인다. run은 unit이 쓰니 예외.
     if (cmd && advanced.has(cmd) && !process.argv.includes("--jaeholee")) {
         console.log(`unknown command: ${cmd}`);
-        console.log("usage: localagents <login|logout|status|whoami|push>");
+        console.log("usage: agentgit <login|logout|status|whoami|push>");
         process.exitCode = 1;
         return;
     }
@@ -497,7 +497,7 @@ async function main(): Promise<void> {
         if (cmd) {
             console.log(`unknown command: ${cmd}`);
         }
-        console.log("usage: localagents <login|logout|status|whoami|push>");
+        console.log("usage: agentgit <login|logout|status|whoami|push>");
         process.exitCode = 1;
     }
     // 1회성 명령이 띄운 서버는 함께 내린다. run은 스스로 관리한다.
