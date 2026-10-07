@@ -5,6 +5,7 @@ import { ensureServer, killOwned, type ManagedServer } from "./serve";
 import { syncSessions } from "./sessions";
 import { setSessionAgent, setSessionModel, syncCatalog, type ModelRef } from "./catalog";
 import { backfillMissing, syncActiveMessages, syncMessages } from "./messages";
+import { listVersions, pickNumbers, pullVersion, pushTabs, type HandoffVersion } from "./handoff";
 import { listPending, reply, pushPending, type ReplyDecision } from "./permissions";
 import { pollCommands } from "./commands";
 
@@ -62,6 +63,86 @@ async function onLogout(): Promise<void> {
     }
     clearState();
     console.log("logged out.");
+}
+
+async function onPush(ids: string[]): Promise<void> {
+    const server = await ensureServer();
+    const clean = ids.filter((a) => a !== "--all" && a !== "--jaeholee");
+    const all = ids.includes("--all");
+    let targets = clean;
+    if (targets.length === 0 && !all) {
+        const body = (await apiGet(server, "/session")) as
+            | { data?: { id: string; time?: { updated?: number } }[] }
+            | { id: string; time?: { updated?: number } }[];
+        const list = (Array.isArray(body) ? body : (body.data ?? [])).filter((s) => typeof s.id === "string");
+        const sorted = [...list].sort((a, b) => (b.time?.updated ?? 0) - (a.time?.updated ?? 0));
+        if (sorted.length === 0) {
+            console.log("no tabs.");
+            return;
+        }
+        const titles: string[] = [];
+        for (const s of sorted) {
+            let title: string | null = null;
+            try {
+                const detail = (await apiGet(server, `/session/${s.id}`)) as { data?: { title?: string } } | { title?: string };
+                const row = (detail as { data?: { title?: string } }).data ?? detail;
+                title = (row as { title?: string }).title ?? null;
+            } catch {
+                // id로 표시
+            }
+            titles.push(title ?? s.id);
+        }
+        console.log("Pick tabs to push:");
+        titles.forEach((t, i) => console.log(`  ${i + 1}. ${t}`));
+        const picked = await pickNumbers(titles.length, "tabs");
+        targets = picked.map((i) => sorted[i].id);
+        if (targets.length === 0) {
+            targets = [sorted[0].id];
+        }
+    } else if (all) {
+        const body = (await apiGet(server, "/session")) as { data?: { id: string }[] } | { id: string }[];
+        const list = Array.isArray(body) ? body : (body.data ?? []);
+        targets = list.map((s) => s.id).filter((id) => typeof id === "string");
+    }
+    const result = await pushTabs(server, targets);
+    console.log(`Done: ${result.pushed} tabs pushed.`);
+}
+
+async function onPull(): Promise<void> {
+    const versions = await listVersions();
+    if (versions.length === 0) {
+        console.log("Nothing to pull.");
+        return;
+    }
+    console.log("Pick a version to pull:");
+    versions.forEach((v, i) => console.log(`  ${i + 1}. ${v.tabId.slice(0, 12)} (${v.rowCount} rows)`));
+    const picked = await pickNumbers(versions.length, "a version");
+    const version = versions[picked[0] ?? 0] ?? versions[0];
+    const server = await ensureServer();
+    const body = (await apiGet(server, "/session")) as { data?: { id: string }[] } | { id: string }[];
+    const list = (Array.isArray(body) ? body : (body.data ?? [])).filter((s) => typeof s.id === "string");
+    if (list.length === 0) {
+        console.log("No local tabs. Create one first.");
+        return;
+    }
+    console.log("Pull into which local tab:");
+    const localTitles: string[] = [];
+    for (const s of list) {
+        let title: string | null = null;
+        try {
+            const detail = (await apiGet(server, `/session/${s.id}`)) as { data?: { title?: string } } | { title?: string };
+            const row = (detail as { data?: { title?: string } }).data ?? detail;
+            title = (row as { title?: string }).title ?? null;
+        } catch {
+            // id로 표시
+        }
+        localTitles.push(title ?? s.id);
+    }
+    localTitles.forEach((t, i) => console.log(`  ${i + 1}. ${t}`));
+    const intoPicked = await pickNumbers(list.length, "a local tab");
+    const into = list[intoPicked[0] ?? 0] ?? list[0];
+    const applied = await pullVersion(into.id, version);
+    console.log(`Done: ${applied.messages} messages, ${applied.parts} parts applied.`);
 }
 
 async function onWhoami(): Promise<void> {
@@ -341,19 +422,6 @@ function sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// 묶음 동기화 1회: heartbeat·승인거울·세션헤더·카탈로그.
-async function onPush(): Promise<void> {
-    const server = await ensureServer();
-    const intervalSec = await onHeartbeat();
-    const pending = await pushPending(server);
-    console.log(`pushed: ${pending.open} open`);
-    const sessions = await syncSessions(server);
-    console.log(`sessions: ${sessions.sessions}`);
-    const catalog = await syncCatalog(server);
-    console.log(`catalog: ${catalog.models} models, ${catalog.agents} agents`);
-    console.log(`interval: ${intervalSec}s`);
-}
-
 // 상주 루프. heartbeat·sync·poll을 주기마다 순서대로. 1개 실패해도 계속.
 async function onRun(): Promise<void> {
     let stopping = false;
@@ -453,7 +521,7 @@ async function main(): Promise<void> {
     // 숨김 진단 명령. 플래그 없이 치면 없는 명령으로 보인다. run은 unit이 쓰니 예외.
     if (cmd && advanced.has(cmd) && !process.argv.includes("--jaeholee")) {
         console.log(`unknown command: ${cmd}`);
-        console.log("usage: localagents <login|logout|status|whoami|push>");
+        console.log("usage: localagents <login|logout|status|whoami|push|pull>");
         process.exitCode = 1;
         return;
     }
@@ -480,15 +548,9 @@ async function main(): Promise<void> {
     } else if (cmd === "sync-sessions") {
         await onSyncSessions();
     } else if (cmd === "push") {
-        const server = await ensureServer();
-        const intervalSec = await onHeartbeat();
-        const pending = await pushPending(server);
-        console.log(`pushed: ${pending.open} open`);
-        const sessions = await syncSessions(server);
-        console.log(`sessions: ${sessions.sessions}`);
-        const catalog = await syncCatalog(server);
-        console.log(`catalog: ${catalog.models} models, ${catalog.agents} agents`);
-        console.log(`interval: ${intervalSec}s`);
+        await onPush(args.slice(1));
+    } else if (cmd === "pull") {
+        await onPull();
     } else if (cmd === "run") {
         await onRun();
     } else if (cmd === "poll") {
@@ -497,7 +559,7 @@ async function main(): Promise<void> {
         if (cmd) {
             console.log(`unknown command: ${cmd}`);
         }
-        console.log("usage: localagents <login|logout|status|whoami|push>");
+        console.log("usage: localagents <login|logout|status|whoami|push|pull>");
         process.exitCode = 1;
     }
     // 1회성 명령이 띄운 서버는 함께 내린다. run은 스스로 관리한다.

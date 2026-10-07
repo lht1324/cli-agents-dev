@@ -54,6 +54,122 @@ export interface SessionUsage {
     msgAssistant: number;
 }
 
+export interface TabMessage {
+    id: string;
+    type: string;
+    seq: number;
+    createdAt: number | null;
+    updatedAt: number | null;
+    data: string;
+}
+
+export interface TabPart {
+    id: string;
+    messageId: string;
+    createdAt: number | null;
+    updatedAt: number | null;
+    data: string;
+}
+
+export interface TabPackage {
+    tabId: string;
+    exportedAt: number;
+    messages: TabMessage[];
+    parts: TabPart[];
+}
+
+// 인계용 통째 묶음. 현재 세션(epoch) 범위. id 순 정렬, 해시 검증용.
+export function readTabPackage(sessionID: string): TabPackage {
+    const path = dbPath();
+    if (!path) {
+        throw new Error("opencode db not found");
+    }
+    const db = new DatabaseSync(path, { readOnly: true });
+    try {
+        let cut = -1;
+        const bounds = db
+            .prepare("SELECT seq FROM session_message WHERE session_id = ? AND type = 'compaction' ORDER BY seq DESC LIMIT 1")
+            .all(sessionID) as { seq: number }[];
+        if (bounds.length > 0) {
+            cut = bounds[0].seq;
+        }
+        const messages = db
+            .prepare(
+                "SELECT id, type, seq, time_created AS createdAt, time_updated AS updatedAt, data FROM session_message WHERE session_id = ? AND seq > ? ORDER BY id ASC",
+            )
+            .all(sessionID, cut) as unknown as (TabMessage & { type: string })[];
+        const parts = db
+            .prepare(
+                "SELECT p.id, p.message_id AS messageId, p.time_created AS createdAt, p.time_updated AS updatedAt, p.data FROM part p INNER JOIN session_message m ON m.id = p.message_id WHERE m.session_id = ? AND m.seq > ? ORDER BY p.id ASC",
+            )
+            .all(sessionID, cut) as unknown as TabPart[];
+        return {
+            tabId: sessionID,
+            exportedAt: Date.now(),
+            messages: messages.map((m) => ({ id: m.id, type: m.type, seq: m.seq, createdAt: m.createdAt, updatedAt: m.updatedAt, data: m.data })),
+            parts,
+        };
+    } finally {
+        db.close();
+    }
+}
+
+// 인계 적용. id 기준 upsert, seq는 로컬에 맞춰 새로 매김. 트랜잭션 1방.
+export function applyTabPackage(localTabId: string, pkg: TabPackage): { messages: number; parts: number } {
+    const path = dbPath();
+    if (!path) {
+        throw new Error("opencode db not found");
+    }
+    const db = new DatabaseSync(path);
+    try {
+        const maxRow = db
+            .prepare("SELECT COALESCE(MAX(seq), 0) AS maxSeq FROM session_message WHERE session_id = ?")
+            .get(localTabId) as { maxSeq: number };
+        let seq = maxRow.maxSeq;
+        let messages = 0;
+        let parts = 0;
+        db.exec("BEGIN");
+        try {
+            const putMsg = db.prepare(
+                "INSERT INTO session_message (id, session_id, type, seq, time_created, time_updated, data) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET type = excluded.type, data = excluded.data, time_updated = excluded.time_updated",
+            );
+            for (const m of pkg.messages) {
+                seq += 1;
+                putMsg.run(m.id, localTabId, m.type, seq, m.createdAt ?? Date.now(), m.updatedAt ?? Date.now(), m.data);
+                messages++;
+            }
+            const putPart = db.prepare(
+                "INSERT INTO part (id, message_id, session_id, time_created, time_updated, data) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING",
+            );
+            for (const p of pkg.parts) {
+                putPart.run(p.id, p.messageId, localTabId, p.createdAt ?? Date.now(), p.updatedAt ?? Date.now(), p.data);
+                parts++;
+            }
+            db.exec("COMMIT");
+        } catch (err) {
+            try {
+                db.exec("ROLLBACK");
+            } catch {
+                // 무시
+            }
+            throw err;
+        }
+        return { messages, parts };
+    } finally {
+        db.close();
+    }
+}
+
+export interface SessionUsage {
+    input: number | null;
+    output: number | null;
+    reasoning: number | null;
+    cacheRead: number | null;
+    cacheWrite: number | null;
+    msgUser: number;
+    msgAssistant: number;
+}
+
 // 마지막 assistant 호출 토큰 + 누적 메시지 횟수. 없으면 null/0.
 export function sessionUsage(sessionID: string): SessionUsage {
     const empty: SessionUsage = {

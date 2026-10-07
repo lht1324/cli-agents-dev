@@ -134,6 +134,26 @@ export const deviceTokens = pgTable("device_tokens", {
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// 인계 포인터. Storage 버전 파일 1행 = 1버전. PC 2는 이 행만 보고 받는다.
+export const handoffs = pgTable("handoffs", {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull(),
+    deviceId: text("device_id")
+        .notNull()
+        .references(() => devices.id),
+    tabId: text("tab_id").notNull(),
+    epoch: integer("epoch").notNull().default(0),
+    version: text("version").notNull(),
+    storageKey: text("storage_key").notNull(),
+    baseHash: text("base_hash").notNull(),
+    rowCount: integer("row_count").notNull().default(0),
+    sha256: text("sha256").notNull(),
+    receivedBy: text("received_by"),
+    receivedAt: timestamp("received_at", { withTimezone: true }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // 이전 epoch 접기. 압축 발동 시 이전 구간 요약 1줄만 보관한다.
 export const cloudFolds = pgTable(
     "cloud_folds",
