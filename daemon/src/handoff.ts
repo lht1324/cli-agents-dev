@@ -4,7 +4,7 @@ import { createInterface } from "node:readline";
 import { apiGet, type DiscoveredServer } from "./server";
 import { cloudGet, cloudPost } from "./cloud";
 import { readState } from "./device";
-import { applyTabPackage, latestOf, readTabPackage, type TabPackage } from "./localdb";
+import { applyTabPackage, epochOf, latestOf, readTabPackage, type TabPackage } from "./localdb";
 import { readPushMark, writePushMark } from "./pushstate";
 import { getBytes, putBytes } from "./storage";
 
@@ -63,14 +63,15 @@ export async function pushTabs(server: DiscoveredServer, sessionIDs: string[]): 
         const name = title ?? sid.slice(0, 12);
         console.log(`Pushing (${i + 1}/${sessionIDs.length}) ${name}...`);
         const packed = packTab(sid);
+        const epoch = epochOf(sid);
         const version = `${Date.now()}`;
-        const key = `handoffs/${sid}/0/${version}.bin.gz`;
+        const key = `${state.userId}/${sid}/${epoch}/${version}.bin.gz`;
         putProgress(name, 30);
         await putBytes(key, packed.bytes);
         putProgress(name, 70);
         await cloudPost("/api/handoffs", {
             tabId: sid,
-            epoch: 0,
+            epoch,
             version,
             storageKey: key,
             baseHash: packed.baseHash,

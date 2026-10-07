@@ -44,7 +44,24 @@ function toMessage(row: { id: string; type: string; createdAt: number | null; da
     return null;
 }
 
-// 커서보다 뒤에 쌓인 행 수. push 목록의 미반영 표시용.
+// 탭의 현재 epoch 번호. compaction 횟수 = 지금 세대.
+export function epochOf(sessionID: string): number {
+    const path = dbPath();
+    if (!path) {
+        return 0;
+    }
+    const db = new DatabaseSync(path, { readOnly: true });
+    try {
+        const row = db
+            .prepare("SELECT COUNT(*) AS n FROM session_message WHERE session_id = ? AND type = 'compaction'")
+            .get(sessionID) as { n: number };
+        return row.n;
+    } catch {
+        return 0;
+    } finally {
+        db.close();
+    }
+}
 // 메시지+파트 합산. 파트는 새 메시지에 딸린 것만 셈한다.
 export function countNewer(sessionID: string, createdAt: number | null, messageId: string | null): number {
     const path = dbPath();

@@ -6,7 +6,7 @@ import { syncSessions } from "./sessions";
 import { setSessionAgent, setSessionModel, syncCatalog, type ModelRef } from "./catalog";
 import { backfillMissing, syncActiveMessages, syncMessages } from "./messages";
 import { checkboxPick, listVersions, pickNumbers, pullVersion, pushTabs, type HandoffVersion } from "./handoff";
-import { countAll, countNewer } from "./localdb";
+import { countAll, countNewer, epochOf } from "./localdb";
 import { readPushMark } from "./pushstate";
 import { listPending, reply, pushPending, type ReplyDecision } from "./permissions";
 import { pollCommands } from "./commands";
@@ -155,6 +155,11 @@ async function onPull(): Promise<void> {
     localTitles.forEach((t, i) => console.log(`  ${i + 1}. ${t}`));
     const intoPicked = await pickNumbers(list.length, "a local tab");
     const into = list[intoPicked[0] ?? 0] ?? list[0];
+    const localEpoch = epochOf(into.id);
+    if (version.epoch < localEpoch) {
+        console.log(`Stopped: version is epoch ${version.epoch}, local tab is epoch ${localEpoch}. Pushing the local tab first, or pick a newer version.`);
+        return;
+    }
     const applied = await pullVersion(into.id, version);
     console.log(`Done: ${applied.messages} messages, ${applied.parts} parts applied.`);
 }
