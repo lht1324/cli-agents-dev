@@ -1,4 +1,4 @@
-2026-10-07 01:12
+2026-10-07 12:13
 
 # context.md - cli-agents-dev
 
@@ -148,6 +148,8 @@
 - [ ] `doctor` 진단 묶음 (고급 명령 숨김)
 - [x] 개명 `localagents` (2026-10-06, 코드+PC 이관済み. `7a8d301`. 도메인·DB 테이블 유지)
 - [x] 플러그인 통지 (2층 루프 + 즉시 drain. 아래 완료 기록 참고)
+- [ ] Storage 인계 구현 (세션 export/import + 만료·수신확인 + 탭당 상한)
+- [ ] 방송·자동동기화 설계 확정 (복수 PC 행 + 주인-PC 원칙 + dirty·디바운스)
 - [x] 메시지 핀포인트 동기화 (PK `(tab_id, message_id)` + 커서 증분 + 조건부 backfill. 아래 기록 참고)
 - [x] 실시간 폴링 (웹 5초 + 터미널식 고정 입력. Ably/Pusher 기각, 아래 기록 참고)
 - [x] 기기 연결 암호 봉투 (아래 기록 참고)
@@ -238,6 +240,27 @@
 - 스크롤바 slim (핸들만 6px) + 대화창 우패딩. 점프 버튼 가운데.
 - 미커밋 UI batch 별도 (presence·스크롤바·diff·폴링). 눈 확인 후 묶음 예정.
 - 교훈: 데몬 빌드 뒤 반드시 재시작. 구 dist가 30분마다 null로 덮음 실측.
+
+## 인계 모델 확정 (2026-10-07)
+- 본질: 웹 원격조작 아님 (그럴 거면 SSH). 다른 PC에서 원 PC 세션을 '그대로' 이어받기.
+- 역할 분리: 웹↔클라이언트는 Neon DB (거울+outbox, 열람·명령용). 클라이언트↔클라이언트는 Storage 세션 파일 (운반용).
+- 파일: 탭당 현재 세션만 (message+part+session 3종, events 제외). 덮어쓰기 금지 → push마다 버전 파일 1개 + DB에 최신 포인터 1개. 만료+수신확인 후 삭제 (즉삭 금지).
+- 키: `handoffs/<userId>/<tabId>/<epoch>/<시각>.bin`. 스코프 크리덴셜로 격리. 탭당 용량 상한.
+- pull 적용: 같은 id 있으면 upsert, `project_id`·`directory`는 B 기준 재매핑. 삭제 행은 tombstone 필요.
+- 방송 (안, 미확정): 웹→복수 PC는 기기 수만큼 행 (설계 변경 1개). 실행 주인은 1대 (세션 affinity), 다른 PC 화면은 읽기 거울까지만. 양쪽 실행 주입은 중복 실행·승인 혼선으로 금지.
+- 자동 동기화 (안, 미확정): 기본=수동 push/pull, 유료=dirty+디바운스 자동 (신호 오면 표시만, idle 1~2분·종료 때 1번 업로드). 보는 탭은 배지+확인 후 적용. 주기 차등 아님, 방식 차등.
+- DB diff: 행 단위로 이미 하는 중. 삭제·스키마·충돌만 별도 처리.
+
+## Mac 실태 + 버전 정정 (2026-10-07, 이 PC)
+- 설치 없음: 바이너리·`~/.config/localagents/`·신 플러그인 없음. 구 `cliagent` 잔재는 유지 (손대지 않음).
+- serve 1.18뿐 (2.x 번들 없음). v2 플러그인 미발화 실측済み → 즉시 통지 불가, 10초 폴링층으로 동작. 거울/heartbeat/push는 버전 무관.
+- 정정: 이 Mac 데스크톱은 1.18.25 (v2 아님). v1 라인(1.18.x, 09-28에 1.18.33)이 현역, v2(2.0.20)는 별도 라인 공존. CLI 1.18.2 + 데스크톱 1.18.25 = 둘 다 v1.
+- DB 세션 7개 전부 1.18 (1.18.2×3, 1.18.25×4), archived 0, 포크 자식 0. 최신은 이 세션 (10-06 03:30).
+
+## 세션 정리 2차 (2026-10-07 완료, 이 PC)
+- 삭제 3개 + 연관 전부 (9 테이블 고아 0 확인): API 테스트 2개 + 회귀수선전. 백업 `opencode-backup-20261006.db` 855MB.
+- 개명 4개: jaeholee.xyz / ShortReal AI / TailoredAd / LocalAgentsLink.
+- 용량: 폴더 995MB, event 441MB + part 371MB + message 6.7MB. 대화 본체는 그대로 가벼움.
 
 ## OS 등록 (2026-10-03 완료 → 2026-10-06 개명, Arch)
 - `~/.local/bin/localagents` 래퍼 + `~/.config/localagents/env` (DATABASE_URL 1개, 600) + systemd user unit `localagents.service`.
