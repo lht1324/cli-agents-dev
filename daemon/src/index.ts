@@ -6,7 +6,7 @@ import { syncSessions } from "./sessions";
 import { setSessionAgent, setSessionModel, syncCatalog, type ModelRef } from "./catalog";
 import { backfillMissing, syncActiveMessages, syncMessages } from "./messages";
 import { checkboxPick, listVersions, pickNumbers, pullVersion, pushTabs, type HandoffVersion } from "./handoff";
-import { countAll, countNewer, epochOf } from "./localdb";
+import { countAll, countNewer, epochOf, sessionExists } from "./localdb";
 import { readPushMark } from "./pushstate";
 import { listPending, reply, pushPending, type ReplyDecision } from "./permissions";
 import { pollCommands } from "./commands";
@@ -129,38 +129,16 @@ async function onPull(): Promise<void> {
         return;
     }
     console.log("Pick a version to pull:");
-    versions.forEach((v, i) => console.log(`  ${i + 1}. ${v.tabId.slice(0, 12)} (${v.rowCount} rows)`));
+    versions.forEach((v, i) => console.log(`  ${i + 1}. ${v.title ?? v.tabId.slice(0, 12)} (${v.rowCount} rows)`));
     const picked = await pickNumbers(versions.length, "a version");
     const version = versions[picked[0] ?? 0] ?? versions[0];
-    const server = await ensureServer();
-    const body = (await apiGet(server, "/session")) as { data?: { id: string }[] } | { id: string }[];
-    const list = (Array.isArray(body) ? body : (body.data ?? [])).filter((s) => typeof s.id === "string");
-    if (list.length === 0) {
-        console.log("No local tabs. Create one first.");
-        return;
-    }
-    console.log("Pull into which local tab:");
-    const localTitles: string[] = [];
-    for (const s of list) {
-        let title: string | null = null;
-        try {
-            const detail = (await apiGet(server, `/session/${s.id}`)) as { data?: { title?: string } } | { title?: string };
-            const row = (detail as { data?: { title?: string } }).data ?? detail;
-            title = (row as { title?: string }).title ?? null;
-        } catch {
-            // id로 표시
-        }
-        localTitles.push(title ?? s.id);
-    }
-    localTitles.forEach((t, i) => console.log(`  ${i + 1}. ${t}`));
-    const intoPicked = await pickNumbers(list.length, "a local tab");
-    const into = list[intoPicked[0] ?? 0] ?? list[0];
-    const localEpoch = epochOf(into.id);
+    const localEpoch = sessionExists(version.tabId) ? epochOf(version.tabId) : 0;
     if (version.epoch < localEpoch) {
         console.log(`Stopped: version is epoch ${version.epoch}, local tab is epoch ${localEpoch}. Pushing the local tab first, or pick a newer version.`);
         return;
     }
-    const applied = await pullVersion(into.id, version);
+    const applied = await pullVersion(version);
+    console.log(applied.created ? `Created new tab ${version.tabId}.` : `Updated local tab ${version.tabId}.`);
     console.log(`Done: ${applied.messages} messages, ${applied.parts} parts applied.`);
 }
 

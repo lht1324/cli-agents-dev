@@ -4,7 +4,7 @@ import { createInterface } from "node:readline";
 import { apiGet, type DiscoveredServer } from "./server";
 import { cloudGet, cloudPost } from "./cloud";
 import { readState } from "./device";
-import { applyTabPackage, epochOf, latestOf, readTabPackage, type TabPackage } from "./localdb";
+import { applyTabPackageUpsert, epochOf, latestOf, readTabPackage, type TabPackage } from "./localdb";
 import { readPushMark, writePushMark } from "./pushstate";
 import { getBytes, putBytes } from "./storage";
 
@@ -98,11 +98,11 @@ function putProgress(name: string, pct: number): void {
     process.stdout.write(`\r  ${name} [${"#".repeat(filled)}${"-".repeat(width - filled)}] ${pct}%`);
 }
 
-// pull 본체. 버전 고르기 → 받기 → 붙이기 → 검증. 함수라 자동화도 같은 걸 부른다.
-export async function pullVersion(intoTabId: string, version: HandoffVersion): Promise<{ messages: number; parts: number }> {
+// pull 본체. 버전 고르기 → 받기 → upsert(없으면 생성) → 검증. 함수라 자동화도 같은 걸 부른다.
+export async function pullVersion(version: HandoffVersion): Promise<{ created: boolean; messages: number; parts: number }> {
     const raw = await getBytes(version.storageKey);
     const pkg = unpackTab(raw, version.sha256);
-    const applied = applyTabPackage(intoTabId, pkg);
+    const applied = applyTabPackageUpsert(pkg, version.title);
     await cloudPost("/api/handoffs", { receivedVersion: version.version });
     return applied;
 }
