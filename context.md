@@ -1,4 +1,4 @@
-2026-10-07 12:25
+2026-10-08 04:29
 
 # context.md - cli-agents-dev
 
@@ -148,7 +148,7 @@
 - [ ] `doctor` 진단 묶음 (고급 명령 숨김)
 - [x] 개명 `localagents` (2026-10-06, 코드+PC 이관済み. `7a8d301`. 도메인·DB 테이블 유지)
 - [x] 플러그인 통지 (2층 루프 + 즉시 drain. 아래 완료 기록 참고)
-- [ ] Storage 인계 구현 (세션 export/import + 만료·수신확인 + 탭당 상한)
+- [x] Storage 인계 기반 (서명 URL 왕복 + `AWS_*` 삭제 + pull upsert·v1 대응. `b5ef5f6`. 구버전 title NULL은 재push 시 해결)
 - [ ] 방송·자동동기화 설계 확정 (복수 PC 행 + 주인-PC 원칙 + dirty·디바운스)
 - [x] 메시지 핀포인트 동기화 (PK `(tab_id, message_id)` + 커서 증분 + 조건부 backfill. 아래 기록 참고)
 - [x] 실시간 폴링 (웹 5초 + 터미널식 고정 입력. Ably/Pusher 기각, 아래 기록 참고)
@@ -246,7 +246,7 @@
 - 본질: 웹 원격조작 아님 (그럴 거면 SSH). 다른 PC에서 원 PC 세션을 '그대로' 이어받기.
 - 역할 분리: 웹↔클라이언트는 Neon DB (거울+outbox, 열람·명령용). 클라이언트↔클라이언트는 Storage 세션 파일 (운반용).
 - 파일: 탭당 현재 세션만 (message+part+session 3종, events 제외). 덮어쓰기 금지 → push마다 버전 파일 1개 + DB에 최신 포인터 1개. 만료+수신확인 후 삭제 (즉삭 금지).
-- 키: `handoffs/<userId>/<tabId>/<epoch>/<시각>.bin`. 스코프 크리덴셜로 격리. 탭당 용량 상한.
+- 키: `<userId>/<tabId>/<epoch>/<version>.bin.gz` (버킷 바로 아래, `handoffs/` 접두사 없음 — 구 문서 정정). 스코프 크리덴셜로 격리. 탭당 용량 상한.
 - pull 적용: 같은 id 있으면 upsert, `project_id`·`directory`는 B 기준 재매핑. 삭제 행은 tombstone 필요.
 - 방송 (안, 미확정): 웹→복수 PC는 기기 수만큼 행 (설계 변경 1개). 실행 주인은 1대 (세션 affinity), 다른 PC 화면은 읽기 거울까지만. 양쪽 실행 주입은 중복 실행·승인 혼선으로 금지.
 - 자동 동기화 (안, 미확정): 기본=수동 push/pull, 유료=dirty+디바운스 자동 (신호 오면 표시만, idle 1~2분·종료 때 1번 업로드). 보는 탭은 배지+확인 후 적용. 주기 차등 아님, 방식 차등.
@@ -262,6 +262,20 @@
 - 삭제 3개 + 연관 전부 (9 테이블 고아 0 확인): API 테스트 2개 + 회귀수선전. 백업 `opencode-backup-20261006.db` 855MB.
 - 개명 4개: jaeholee.xyz / ShortReal AI / TailoredAd / LocalAgentsLink.
 - 용량: 폴더 995MB, event 441MB + part 371MB + message 6.7MB. 대화 본체는 그대로 가벼움.
+
+## 서명 URL 인계 (2026-10-08 완료, 이 PC)
+- 방식 확정: 데몬 `AWS_*` 삭제. `POST /api/handoffs/url`이 서버 `NEON_API_KEY` 1개로 서명 발급 → 데몬 직행. 업로드·다운로드 왕복 실측済み.
+- 근거: Neon presign endpoint (`.../buckets/{b}/objects/{k}/presign`, Beta) + S3 `getSignedUrl` 둘 다 문서상 지원. 실측은 전자.
+- 키 보관: 서버 `.env.local`のみ (`NEON_API_KEY` + `NEON_PROJECT_ID` + `NEON_BRANCH_ID`). PC별 발급 불필요 (키=유저 식별, 접두사로 격리). endpoint는 key가 본인 userId/ 시작 강제.
+- 구 버전 5건은 title NULL → 목록에 id 표시. 새로 push하면 이름 뜸.
+- Storage 탐침 파일 3개 잔류 (`probe-*.bin`, 수십 바이트).
+
+## Mac 첫 동기화 (2026-10-08 완료, 이 PC)
+- 설치: `~/.local/bin/localagents` 래퍼 + 플러그인 복사 (구 `cliagents-sync.js` 유지). `login` 성공 (heartbeat via api).
+- 장애 1: 첫 동기화 4개 전부 실패. 원인 = `localdb.ts` darwin 경로 단정 (`~/Library/...`에 파일 없음, 이 Mac은 XDG). 양쪽 probe로 수정.
+- 장애 2: `session_message` 0행 — 1.18은 `message`+`part` 사용. v1 리더/라이터 추가 + 맛보기 자동 선택. 크로스버전(v2→v1)은 id 유지·그릇 변환.
+- pull upsert 실측: 272행 버전 → 새 탭 생성, 메시지 52+파트 214, 내용 원형. 있으면 병합·없으면 생성. 삭제 행은 미동기화 (tombstone 다음).
+- `b5ef5f6` 푸시済み.
 
 ## OS 등록 (2026-10-03 완료 → 2026-10-06 개명, Arch)
 - `~/.local/bin/localagents` 래퍼 + `~/.config/localagents/env` (DATABASE_URL 1개, 600) + systemd user unit `localagents.service`.
