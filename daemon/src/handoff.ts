@@ -4,7 +4,8 @@ import { createInterface } from "node:readline";
 import { apiGet, type DiscoveredServer } from "./server";
 import { cloudGet, cloudPost } from "./cloud";
 import { readState } from "./device";
-import { applyTabPackage, readTabPackage, type TabPackage } from "./localdb";
+import { applyTabPackage, latestOf, readTabPackage, type TabPackage } from "./localdb";
+import { readPushMark, writePushMark } from "./pushstate";
 import { getBytes, putBytes } from "./storage";
 
 export interface HandoffVersion {
@@ -78,6 +79,10 @@ export async function pushTabs(server: DiscoveredServer, sessionIDs: string[]): 
         });
         putProgress(name, 100);
         process.stdout.write("\n");
+        const mark = latestOf(sid);
+        if (mark) {
+            writePushMark(sid, mark.at, mark.id);
+        }
         pushed++;
         rows += packed.rowCount;
     }

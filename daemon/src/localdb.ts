@@ -45,6 +45,7 @@ function toMessage(row: { id: string; type: string; createdAt: number | null; da
 }
 
 // 커서보다 뒤에 쌓인 행 수. push 목록의 미반영 표시용.
+// 메시지+파트 합산. 파트는 새 메시지에 딸린 것만 셈한다.
 export function countNewer(sessionID: string, createdAt: number | null, messageId: string | null): number {
     const path = dbPath();
     if (!path) {
@@ -53,12 +54,62 @@ export function countNewer(sessionID: string, createdAt: number | null, messageI
     const db = new DatabaseSync(path, { readOnly: true });
     try {
         const at = createdAt ?? 0;
-        const row = db
+        const mid = messageId ?? "";
+        const msgs = db
             .prepare(
                 "SELECT COUNT(*) AS n FROM session_message WHERE session_id = ? AND (time_created > ? OR (time_created = ? AND id > ?))",
             )
-            .get(sessionID, at, at, messageId ?? "") as { n: number };
-        return row.n;
+            .get(sessionID, at, at, mid) as { n: number };
+        const parts = db
+            .prepare(
+                "SELECT COUNT(*) AS n FROM part p INNER JOIN session_message m ON m.id = p.message_id WHERE m.session_id = ? AND (m.time_created > ? OR (m.time_created = ? AND m.id > ?))",
+            )
+            .get(sessionID, at, at, mid) as { n: number };
+        return msgs.n + parts.n;
+    } catch {
+        return 0;
+    } finally {
+        db.close();
+    }
+}
+
+// 탭 최신점. push 워터마크 기록용.
+export function latestOf(sessionID: string): { at: number; id: string } | null {
+    const path = dbPath();
+    if (!path) {
+        return null;
+    }
+    const db = new DatabaseSync(path, { readOnly: true });
+    try {
+        const row = db
+            .prepare("SELECT time_created AS at, id FROM session_message WHERE session_id = ? ORDER BY time_created DESC, id DESC LIMIT 1")
+            .get(sessionID) as { at: number | null; id: string } | undefined;
+        if (!row) {
+            return null;
+        }
+        return { at: row.at ?? 0, id: row.id };
+    } catch {
+        return null;
+    } finally {
+        db.close();
+    }
+}
+
+// 워터마크 없으면 탭 전체 행 수 (메시지+파트). 첫 push 표시용.
+export function countAll(sessionID: string): number {
+    const path = dbPath();
+    if (!path) {
+        return 0;
+    }
+    const db = new DatabaseSync(path, { readOnly: true });
+    try {
+        const msgs = db.prepare("SELECT COUNT(*) AS n FROM session_message WHERE session_id = ?").get(sessionID) as {
+            n: number;
+        };
+        const parts = db
+            .prepare("SELECT COUNT(*) AS n FROM part p INNER JOIN session_message m ON m.id = p.message_id WHERE m.session_id = ?")
+            .get(sessionID) as { n: number };
+        return msgs.n + parts.n;
     } catch {
         return 0;
     } finally {

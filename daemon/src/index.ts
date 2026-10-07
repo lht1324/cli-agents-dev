@@ -6,8 +6,8 @@ import { syncSessions } from "./sessions";
 import { setSessionAgent, setSessionModel, syncCatalog, type ModelRef } from "./catalog";
 import { backfillMissing, syncActiveMessages, syncMessages } from "./messages";
 import { checkboxPick, listVersions, pickNumbers, pullVersion, pushTabs, type HandoffVersion } from "./handoff";
-import { countNewer } from "./localdb";
-import { readCursor } from "./cursors";
+import { countAll, countNewer } from "./localdb";
+import { readPushMark } from "./pushstate";
 import { listPending, reply, pushPending, type ReplyDecision } from "./permissions";
 import { pollCommands } from "./commands";
 
@@ -96,8 +96,8 @@ async function onPush(ids: string[]): Promise<void> {
             titles.push(title ?? s.id);
             let dirty = 0;
             try {
-                const cursor = readCursor(s.id);
-                dirty = countNewer(s.id, cursor?.createdAt ?? null, cursor?.messageId ?? null);
+                const mark = readPushMark(s.id);
+                dirty = mark ? countNewer(s.id, mark.at, mark.id) : countAll(s.id);
             } catch {
                 // 0으로 표시
             }
