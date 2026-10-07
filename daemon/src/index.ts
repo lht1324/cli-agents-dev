@@ -5,7 +5,9 @@ import { ensureServer, killOwned, type ManagedServer } from "./serve";
 import { syncSessions } from "./sessions";
 import { setSessionAgent, setSessionModel, syncCatalog, type ModelRef } from "./catalog";
 import { backfillMissing, syncActiveMessages, syncMessages } from "./messages";
-import { listVersions, pickNumbers, pullVersion, pushTabs, type HandoffVersion } from "./handoff";
+import { checkboxPick, listVersions, pickNumbers, pullVersion, pushTabs, type HandoffVersion } from "./handoff";
+import { countNewer } from "./localdb";
+import { readCursor } from "./cursors";
 import { listPending, reply, pushPending, type ReplyDecision } from "./permissions";
 import { pollCommands } from "./commands";
 
@@ -81,6 +83,7 @@ async function onPush(ids: string[]): Promise<void> {
             return;
         }
         const titles: string[] = [];
+        const dirties: number[] = [];
         for (const s of sorted) {
             let title: string | null = null;
             try {
@@ -91,13 +94,24 @@ async function onPush(ids: string[]): Promise<void> {
                 // id로 표시
             }
             titles.push(title ?? s.id);
+            let dirty = 0;
+            try {
+                const cursor = readCursor(s.id);
+                dirty = countNewer(s.id, cursor?.createdAt ?? null, cursor?.messageId ?? null);
+            } catch {
+                // 0으로 표시
+            }
+            dirties.push(dirty);
         }
-        console.log("Pick tabs to push:");
-        titles.forEach((t, i) => console.log(`  ${i + 1}. ${t}`));
-        const picked = await pickNumbers(titles.length, "tabs");
+        console.log("Pick tabs to push (space to toggle, a for all, Enter to confirm):");
+        const picked = await checkboxPick(
+            titles.map((t, i) => `${t} (${dirties[i]} new)`),
+            titles.map((_, i) => i === 0),
+        );
         targets = picked.map((i) => sorted[i].id);
         if (targets.length === 0) {
-            targets = [sorted[0].id];
+            console.log("Nothing picked.");
+            return;
         }
     } else if (all) {
         const body = (await apiGet(server, "/session")) as { data?: { id: string }[] } | { id: string }[];

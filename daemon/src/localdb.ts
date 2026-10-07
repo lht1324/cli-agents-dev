@@ -44,6 +44,28 @@ function toMessage(row: { id: string; type: string; createdAt: number | null; da
     return null;
 }
 
+// 커서보다 뒤에 쌓인 행 수. push 목록의 미반영 표시용.
+export function countNewer(sessionID: string, createdAt: number | null, messageId: string | null): number {
+    const path = dbPath();
+    if (!path) {
+        return 0;
+    }
+    const db = new DatabaseSync(path, { readOnly: true });
+    try {
+        const at = createdAt ?? 0;
+        const row = db
+            .prepare(
+                "SELECT COUNT(*) AS n FROM session_message WHERE session_id = ? AND (time_created > ? OR (time_created = ? AND id > ?))",
+            )
+            .get(sessionID, at, at, messageId ?? "") as { n: number };
+        return row.n;
+    } catch {
+        return 0;
+    } finally {
+        db.close();
+    }
+}
+
 export interface SessionUsage {
     input: number | null;
     output: number | null;
@@ -158,16 +180,6 @@ export function applyTabPackage(localTabId: string, pkg: TabPackage): { messages
     } finally {
         db.close();
     }
-}
-
-export interface SessionUsage {
-    input: number | null;
-    output: number | null;
-    reasoning: number | null;
-    cacheRead: number | null;
-    cacheWrite: number | null;
-    msgUser: number;
-    msgAssistant: number;
 }
 
 // 마지막 assistant 호출 토큰 + 누적 메시지 횟수. 없으면 null/0.

@@ -114,6 +114,63 @@ function ask(question: string): Promise<string> {
     });
 }
 
+// TTY 체크박스. 방향키 이동, 스페이스 토글, 엔터 확정, a 전체. 의존성 없음.
+export async function checkboxPick(labels: string[], initial: boolean[]): Promise<number[]> {
+    if (!process.stdin.isTTY || !process.stdout.isTTY) {
+        return initial.map((v, i) => (v ? i : -1)).filter((i) => i >= 0);
+    }
+    const checked = [...initial];
+    let cursor = Math.max(0, initial.findIndex((v) => v));
+    const render = () => {
+        let out = "";
+        labels.forEach((label, i) => {
+            out += `${i === cursor ? ">" : " "} [${checked[i] ? "x" : " "}] ${label}\n`;
+        });
+        return out;
+    };
+    process.stdout.write(render());
+    const lines = labels.length;
+    return new Promise((resolve) => {
+        const stdin = process.stdin;
+        const cleanup = () => {
+            stdin.setRawMode(false);
+            stdin.pause();
+            stdin.removeListener("data", onData);
+        };
+        const redraw = () => {
+            process.stdout.write(`\x1B[${lines}A\x1B[J${render()}`);
+        };
+        const onData = (key: Buffer) => {
+            const s = key.toString();
+            if (s === "\u0003") {
+                cleanup();
+                resolve([]);
+            } else if (s === "\r" || s === "\n") {
+                cleanup();
+                resolve(checked.map((v, i) => (v ? i : -1)).filter((i) => i >= 0));
+            } else if (s === " ") {
+                checked[cursor] = !checked[cursor];
+                redraw();
+            } else if (s.toLowerCase() === "a") {
+                const all = !checked.every((v) => v);
+                for (let i = 0; i < checked.length; i++) {
+                    checked[i] = all;
+                }
+                redraw();
+            } else if (s === "\u001b[A") {
+                cursor = (cursor - 1 + labels.length) % labels.length;
+                redraw();
+            } else if (s === "\u001b[B") {
+                cursor = (cursor + 1) % labels.length;
+                redraw();
+            }
+        };
+        stdin.setRawMode(true);
+        stdin.resume();
+        stdin.on("data", onData);
+    });
+}
+
 // TTY 선택. 없으면(파이프·플래그) 묻지 않는다.
 export async function pickNumbers(count: number, what: string): Promise<number[]> {
     if (!process.stdin.isTTY) {
