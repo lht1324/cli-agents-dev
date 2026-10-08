@@ -92,8 +92,17 @@ export function toV1(pkg: TabPackage, ctx: Ctx): Converted {
             return;
         }
         const t = pd["type"];
-        if (t === "text" || t === "reasoning") {
+        if (t === "text") {
             parts.push({ ...p, messageId, data: JSON.stringify({ type: t, text: str(pd["text"]) }) });
+            return;
+        }
+        if (t === "reasoning") {
+            const start = num(p.createdAt, at ?? ctx.now);
+            parts.push({
+                ...p,
+                messageId,
+                data: JSON.stringify({ type: t, text: str(pd["text"]), time: { start, end: num(p.updatedAt, start) } }),
+            });
             return;
         }
         if (t === "tool") {
@@ -258,7 +267,7 @@ export function toV1(pkg: TabPackage, ctx: Ctx): Converted {
                                 messageId: m.id,
                                 createdAt: at,
                                 updatedAt: at,
-                                data: JSON.stringify({ type: "reasoning", text: block["text"] }),
+                                data: JSON.stringify({ type: "reasoning", text: block["text"], time: { start: at, end: at } }),
                             });
                         }
                     }
