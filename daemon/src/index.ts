@@ -135,11 +135,11 @@ async function onPush(ids: string[]): Promise<void> {
         }
         console.log("Pick tabs to push (space to toggle, a for all, Enter to confirm):");
         const picked = await checkboxPick(
-            titles.map((t, i) => `${t} (${dirties[i]} new)`),
-            titles.map((_, i) => i === 0),
+            [...titles.map((t, i) => `${t} (${dirties[i]} new)`), "Not now"],
+            titles.map(() => false),
         );
-        targets = picked.map((i) => sorted[i].id);
-        if (targets.length === 0) {
+        targets = picked.filter((i) => i < sorted.length).map((i) => sorted[i].id);
+        if (picked.includes(titles.length) || targets.length === 0) {
             console.log("Nothing picked.");
             return;
         }
