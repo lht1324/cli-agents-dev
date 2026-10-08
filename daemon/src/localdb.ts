@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { ServerMessage } from "./types";
+import { pkgFlavor, toV1, toV2 } from "./convert";
 
 function dbPath(): string | null {
     // 설치 방식마다 다르다. 둘 다 찔러본다 (이 Mac은 XDG 쪽에 있음).
@@ -217,6 +218,7 @@ export interface TabPart {
 export interface TabPackage {
     tabId: string;
     exportedAt: number;
+    flavor?: "v1" | "v2" | null;
     title?: string | null;
     directory?: string | null;
     version?: string | null;
@@ -299,6 +301,7 @@ export function readTabPackage(sessionID: string): TabPackage {
             return {
                 tabId: sessionID,
                 exportedAt: Date.now(),
+                flavor: "v1" as const,
                 title: meta?.title ?? null,
                 directory: meta?.directory ?? null,
                 version: meta?.version ?? null,
@@ -328,9 +331,12 @@ export function readTabPackage(sessionID: string): TabPackage {
         return {
             tabId: sessionID,
             exportedAt: Date.now(),
+            flavor: "v2" as const,
             title: meta?.title ?? null,
             directory: meta?.directory ?? null,
             version: meta?.version ?? null,
+            agent: meta?.agent ?? null,
+            modelJson: meta?.model ?? null,
             messages: messages.map((m) => ({ id: m.id, type: m.type, seq: m.seq, createdAt: m.createdAt, updatedAt: m.updatedAt, data: m.data })),
             parts,
         };
@@ -351,8 +357,8 @@ export function applyTabPackageUpsert(pkg: TabPackage, fallbackTitle?: string | 
         const exists = db.prepare("SELECT id FROM session WHERE id = ?").get(pkg.tabId) as { id: string } | undefined;
         let created = false;
         const now = Date.now();
+        const dir = pkg.directory ?? process.cwd();
         if (!exists) {
-            const dir = pkg.directory ?? process.cwd();
             const proj =
                 (db.prepare("SELECT id FROM project WHERE worktree = ?").get(dir) as { id: string } | undefined) ??
                 (db.prepare("SELECT id FROM project LIMIT 1").get() as { id: string } | undefined);
@@ -394,6 +400,32 @@ export function applyTabPackageUpsert(pkg: TabPackage, fallbackTitle?: string | 
         })();
         let messages = 0;
         let parts = 0;
+        // 그릇이 다르면 통째로 번역한다. id는 유지.
+        let writeMessages = pkg.messages;
+        let writeParts = pkg.parts;
+        const srcFlavor = pkgFlavor(pkg);
+        if (srcFlavor !== flavor) {
+            const dirRow = db.prepare("SELECT directory FROM session WHERE id = ?").get(pkg.tabId) as
+                | { directory: string }
+                | undefined;
+            const sib = db.prepare("SELECT agent, model FROM session LIMIT 1").get() as
+                | { agent: string | null; model: string | null }
+                | undefined;
+            const modelObj = parseModel(pkg.modelJson);
+            const cctx = {
+                directory: pkg.directory ?? dirRow?.directory ?? dir,
+                agent: pkg.agent ?? sib?.agent ?? "build",
+                modelID: modelObj.id ?? "unknown",
+                providerID: modelObj.providerID ?? "opencode",
+                now,
+            };
+            const converted = srcFlavor === "v2" ? toV1(pkg, cctx) : toV2(pkg, cctx);
+            writeMessages = converted.messages;
+            writeParts = converted.parts;
+            if (converted.skipped > 0) {
+                console.log(`  skipped ${converted.skipped} rows (unknown shape)`);
+            }
+        }
         db.exec("BEGIN");
         try {
             if (flavor === "v2") {
@@ -404,7 +436,7 @@ export function applyTabPackageUpsert(pkg: TabPackage, fallbackTitle?: string | 
                 const putMsg = db.prepare(
                     "INSERT INTO session_message (id, session_id, type, seq, time_created, time_updated, data) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET type = excluded.type, data = excluded.data, time_updated = excluded.time_updated",
                 );
-                for (const m of pkg.messages) {
+                for (const m of writeMessages) {
                     seq += 1;
                     putMsg.run(m.id, pkg.tabId, m.type, seq, m.createdAt ?? now, m.updatedAt ?? now, m.data);
                     messages++;
@@ -414,8 +446,8 @@ export function applyTabPackageUpsert(pkg: TabPackage, fallbackTitle?: string | 
                     "INSERT INTO message (id, session_id, time_created, time_updated, data) VALUES (?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data, time_updated = excluded.time_updated",
                 );
                 let prevId: string | null = null;
-                for (const m of pkg.messages) {
-                    const data = toV1MessageData(m, prevId);
+                for (const m of writeMessages) {
+                    const data = chainParent(m, prevId);
                     prevId = m.id;
                     if (!data) {
                         continue;
@@ -427,7 +459,7 @@ export function applyTabPackageUpsert(pkg: TabPackage, fallbackTitle?: string | 
             const putPart = db.prepare(
                 "INSERT INTO part (id, message_id, session_id, time_created, time_updated, data) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING",
             );
-            for (const p of pkg.parts) {
+            for (const p of writeParts) {
                 putPart.run(p.id, p.messageId, pkg.tabId, p.createdAt ?? now, p.updatedAt ?? now, p.data);
                 parts++;
             }
@@ -446,27 +478,38 @@ export function applyTabPackageUpsert(pkg: TabPackage, fallbackTitle?: string | 
     }
 }
 
-// v2 행 → v1 message.data. user/assistant 텍스트만 옮긴다. 모르는 모양은 버린다.
-// assistant 행은 직전 메시지 id를 parentID로 단다 (1.18 체인 규칙: user 무부모).
-function toV1MessageData(m: TabMessage, prevId: string | null): string | null {
+// v1 체인 규칙: assistant 행에 직전 id를 parentID로. user는 무부모.
+function chainParent(m: TabMessage, prevId: string | null): string | null {
+    let d: Record<string, unknown>;
     try {
-        const d = JSON.parse(m.data) as { role?: unknown };
-        if (typeof d.role === "string") {
-            if (d.role === "assistant" && prevId) {
-                return JSON.stringify({ parentID: prevId, role: d.role, time: { created: m.createdAt ?? Date.now() } });
-            }
-            return m.data;
-        }
+        d = JSON.parse(m.data) as Record<string, unknown>;
     } catch {
-        // 아래에서 type으로 복원
+        return null;
     }
-    if (m.type === "assistant" && prevId) {
-        return JSON.stringify({ parentID: prevId, role: "assistant", time: { created: m.createdAt ?? Date.now() } });
+    if (d["role"] !== "assistant") {
+        return m.data;
     }
-    if (m.type === "user") {
-        return JSON.stringify({ role: "user", time: { created: m.createdAt ?? Date.now() } });
+    if (!prevId) {
+        return m.data;
     }
-    return null;
+    d["parentID"] = prevId;
+    return JSON.stringify(d);
+}
+
+// pkg.modelJson 파싱. v2 객체 {id, providerID} 또는 v1 문자열.
+function parseModel(modelJson?: string | null): { id: string | null; providerID: string | null } {
+    if (!modelJson) {
+        return { id: null, providerID: null };
+    }
+    try {
+        const d = JSON.parse(modelJson) as { id?: unknown; providerID?: unknown };
+        return {
+            id: typeof d.id === "string" ? d.id : modelJson,
+            providerID: typeof d.providerID === "string" ? d.providerID : null,
+        };
+    } catch {
+        return { id: modelJson, providerID: null };
+    }
 }
 
 // 마지막 assistant 호출 토큰 + 누적 메시지 횟수. 없으면 null/0.
