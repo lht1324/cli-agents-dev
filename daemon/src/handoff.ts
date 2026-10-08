@@ -112,12 +112,18 @@ function putProgress(name: string, pct: number): void {
 }
 
 // pull 본체. 버전 고르기 → 받기 → upsert(없으면 생성) → 검증. 함수라 자동화도 같은 걸 부른다.
-export async function pullVersion(version: HandoffVersion): Promise<{ created: boolean; messages: number; parts: number }> {
+export async function pullVersion(version: HandoffVersion): Promise<{ created: boolean; messages: number; parts: number; title: string }> {
+    const name = version.title ?? version.tabId;
+    putProgress(name, 10);
     const raw = await getBytes(version.storageKey);
+    putProgress(name, 50);
     const pkg = unpackTab(raw, version.sha256);
+    putProgress(name, 80);
     const applied = applyTabPackageUpsert(pkg, version.title);
     await cloudPost("/api/handoffs", { receivedVersion: version.version });
-    return applied;
+    putProgress(name, 100);
+    process.stdout.write("\n");
+    return { ...applied, title: pkg.title ?? version.title ?? version.tabId };
 }
 
 export async function listVersions(): Promise<HandoffVersion[]> {

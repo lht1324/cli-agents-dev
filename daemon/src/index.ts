@@ -169,7 +169,7 @@ async function onPull(): Promise<void> {
             continue;
         }
         const applied = await pullVersion(version);
-        console.log(applied.created ? `Created new tab ${version.tabId}.` : `Updated local tab ${version.tabId}.`);
+        console.log(applied.created ? `Created new tab ${applied.title}.` : `Updated local tab ${applied.title}.`);
         console.log(`Done: ${applied.messages} messages, ${applied.parts} parts applied.`);
     }
 }
