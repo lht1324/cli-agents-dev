@@ -327,7 +327,22 @@ async function onLogin(): Promise<void> {
     const { createServer } = await import("node:http");
     const { exec } = await import("node:child_process");
     const { platform } = await import("node:os");
-    const { stableDeviceId, writeState, hostInfo, baseUrl } = await import("./device.js");
+    const { stableDeviceId, writeState, hostInfo, baseUrl, readState } = await import("./device.js");
+    const existing = readState();
+    if (existing?.token) {
+        try {
+            const check = await fetch(`${baseUrl()}/api/auth/whoami`, {
+                headers: { Authorization: `Bearer ${existing.token}` },
+                signal: AbortSignal.timeout(10000),
+            });
+            if (check.ok) {
+                console.log(`already logged in: ${existing.deviceId}. run \`localagents logout\` first to switch.`);
+                return;
+            }
+        } catch {
+            // 죽은 토큰이면 재로그인 진행
+        }
+    }
     const deviceId = stableDeviceId();
     const host = hostInfo();
     const state = Math.random().toString(36).slice(2, 10);
@@ -429,7 +444,9 @@ async function onLogin(): Promise<void> {
         let picked: string[] | null = null;
         if (all.length > 0 && process.stdin.isTTY) {
             const titles: string[] = [];
+            const flags: boolean[] = [];
             for (const s of all) {
+                const synced = have.has(s.id);
                 let title: string | null = null;
                 try {
                     const detail = (await apiGet(syncedServer, `/session/${s.id}`)) as
@@ -440,13 +457,11 @@ async function onLogin(): Promise<void> {
                 } catch {
                     // id로 표시
                 }
-                titles.push(have.has(s.id) ? `${title ?? s.id} (synced)` : (title ?? s.id));
+                titles.push(synced ? `${title ?? s.id} (synced)` : (title ?? s.id));
+                flags.push(!synced);
             }
             console.log("Pick sessions to sync (space: toggle, a: all, n: none, Esc: cancel, Enter: confirm):");
-            const nums = await checkboxPick(
-                [...titles, "Not now"],
-                titles.map((_, i) => !have.has(all[i].id)),
-            );
+            const nums = await checkboxPick([...titles, "Not now"], [...flags, false]);
             if (nums.includes(titles.length)) {
                 console.log("Nothing picked.");
                 picked = [];

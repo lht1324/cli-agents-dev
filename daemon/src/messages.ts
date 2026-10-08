@@ -205,7 +205,7 @@ export async function backfillMissing(server: DiscoveredServer, only?: string[])
     const wanted = only ? new Set(only) : null;
     let filled = 0;
     let rows = 0;
-    const pending = list.filter((s) => typeof s.id === "string" && !have.has(s.id) && (!wanted || wanted.has(s.id)));
+    const pending = list.filter((s) => typeof s.id === "string" && (wanted ? wanted.has(s.id) : !have.has(s.id)));
     if (pending.length > 0) {
         console.log("Please keep this window open until done.");
         console.log(`Syncing ${pending.length} session${pending.length === 1 ? "" : "s"}...`);
