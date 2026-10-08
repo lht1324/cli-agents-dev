@@ -4,7 +4,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { ServerMessage } from "./types";
-import { pkgFlavor, toV1, toV2 } from "./convert";
+import { pkgFlavor, toV1, toV2, v1MessageProblems, v1PartProblems } from "./convert";
 
 function dbPath(): string | null {
     // 설치 방식마다 다르다. 둘 다 찔러본다 (이 Mac은 XDG 쪽에 있음).
@@ -537,7 +537,7 @@ export function applyTabPackageUpsert(pkg: TabPackage, fallbackTitle?: string | 
             const sib = db.prepare("SELECT agent, model FROM session LIMIT 1").get() as
                 | { agent: string | null; model: string | null }
                 | undefined;
-            const modelObj = parseModel(pkg.modelJson);
+            const modelObj = parseModel(pkg.modelJson ?? sib?.model ?? null);
             const cctx = {
                 directory: pkg.directory ?? dirRow?.directory ?? dir,
                 agent: pkg.agent ?? sib?.agent ?? "build",
@@ -550,6 +550,23 @@ export function applyTabPackageUpsert(pkg: TabPackage, fallbackTitle?: string | 
             writeParts = converted.parts;
             if (converted.skipped > 0) {
                 console.log(`  skipped ${converted.skipped} rows (unknown shape)`);
+            }
+            if (flavor === "v1") {
+                // 쓰기 전 게이트. 빠진 키가 있으면 기록하고 중단한다.
+                let prevOk = false;
+                for (const m of writeMessages) {
+                    const problems = v1MessageProblems(m.data, prevOk);
+                    if (problems.length > 0) {
+                        throw new Error(`v1 gate: message ${m.id} missing ${problems.join(", ")}`);
+                    }
+                    prevOk = true;
+                }
+                for (const p of writeParts) {
+                    const problems = v1PartProblems(p.data);
+                    if (problems.length > 0) {
+                        throw new Error(`v1 gate: part ${p.id} missing ${problems.join(", ")}`);
+                    }
+                }
             }
         }
         db.exec("BEGIN");

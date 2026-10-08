@@ -155,6 +155,11 @@ export function toV1(pkg: TabPackage, ctx: Ctx): Converted {
         }
         const at = m.createdAt ?? ctx.now;
         if (m.type === "user" || m.type === "synthetic" || m.type === "system") {
+            // system은 카탈로그 같은 재생성 잡음이라 가져오지 않는다.
+            if (m.type === "system") {
+                skipped++;
+                continue;
+            }
             messages.push({
                 id: m.id,
                 type: "user",
@@ -292,7 +297,72 @@ export function toV1(pkg: TabPackage, ctx: Ctx): Converted {
     return { messages, parts, skipped };
 }
 
-// v1 행 → v2 session_message 모양. 본가 v1-migration 축소판.
+// v1 쓰기 전 게이트. v1.18.33 message.ts Info·파트 6종 기준 필수 키 대조. 빠진 경로를 뱉는다.
+export function v1MessageProblems(data: string, hasPrevUser: boolean): string[] {
+    const missing: string[] = [];
+    let d: Record<string, unknown>;
+    try {
+        d = JSON.parse(data) as Record<string, unknown>;
+    } catch {
+        return ["invalid-json"];
+    }
+    const need = (path: string, ok: boolean) => {
+        if (!ok) {
+            missing.push(path);
+        }
+    };
+    need("role", typeof d["role"] === "string");
+    const time = d["time"] as Record<string, unknown> | undefined;
+    need("time.created", !!time && typeof time["created"] === "number");
+    need("agent", typeof d["agent"] === "string");
+    if (d["role"] === "assistant") {
+        need("parentID", !hasPrevUser || typeof d["parentID"] === "string");
+        need("mode", typeof d["mode"] === "string");
+        need("modelID", typeof d["modelID"] === "string");
+        need("providerID", typeof d["providerID"] === "string");
+        const path = d["path"] as Record<string, unknown> | undefined;
+        need("path.cwd", !!path && typeof path["cwd"] === "string");
+        const tokens = d["tokens"] as Record<string, unknown> | undefined;
+        need("tokens", !!tokens && ["input", "output", "reasoning"].every((k) => typeof tokens[k] === "number"));
+    }
+    if (d["role"] === "user") {
+        const model = d["model"] as Record<string, unknown> | undefined;
+        need("model", !!model && typeof model["modelID"] === "string");
+    }
+    return missing;
+}
+
+export function v1PartProblems(data: string): string[] {
+    const missing: string[] = [];
+    let d: Record<string, unknown>;
+    try {
+        d = JSON.parse(data) as Record<string, unknown>;
+    } catch {
+        return ["invalid-json"];
+    }
+    const need = (path: string, ok: boolean) => {
+        if (!ok) {
+            missing.push(path);
+        }
+    };
+    const t = d["type"];
+    need("type", typeof t === "string");
+    if (t === "text") {
+        need("text", typeof d["text"] === "string");
+    } else if (t === "reasoning") {
+        need("text", typeof d["text"] === "string");
+        const time = d["time"] as Record<string, unknown> | undefined;
+        need("time.start", !!time && typeof time["start"] === "number");
+    } else if (t === "tool") {
+        need("tool", typeof d["tool"] === "string");
+        need("callID", typeof d["callID"] === "string");
+        const state = d["state"] as Record<string, unknown> | undefined;
+        need("state.status", !!state && typeof state["status"] === "string");
+        const time = state?.["time"] as Record<string, unknown> | undefined;
+        need("state.time.start", !!time && typeof time["start"] === "number");
+    }
+    return missing;
+}
 export function toV2(pkg: TabPackage, ctx: Ctx): Converted {
     const messages: TabMessage[] = [];
     const parts: TabPart[] = [];
