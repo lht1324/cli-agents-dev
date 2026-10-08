@@ -71,7 +71,33 @@ async function onLogout(): Promise<void> {
     console.log("logged out.");
 }
 
+// 토큰 사전 검증. 죽은 토큰이면 작업 전에 로그인 메시지로 끝낸다.
+async function ensureAuth(): Promise<{ deviceId: string; userId: string; token: string }> {
+    const { readState, baseUrl } = await import("./device.js");
+    const state = readState();
+    if (!state?.token) {
+        throw new Error("not logged in. run `localagents login` first");
+    }
+    let res: Response;
+    try {
+        res = await fetch(`${baseUrl()}/api/auth/whoami`, {
+            headers: { Authorization: `Bearer ${state.token}` },
+            signal: AbortSignal.timeout(10000),
+        });
+    } catch {
+        throw new Error("cloud unreachable. check your connection");
+    }
+    if (res.status === 401) {
+        throw new Error("not logged in. run `localagents login` first");
+    }
+    if (!res.ok) {
+        throw new Error(`cloud rejected auth check: ${res.status}`);
+    }
+    return { deviceId: state.deviceId, userId: state.userId, token: state.token };
+}
+
 async function onPush(ids: string[]): Promise<void> {
+    await ensureAuth();
     const server = await ensureServer();
     const clean = ids.filter((a) => a !== "--all" && a !== "--jaeholee");
     const all = ids.includes("--all");
@@ -127,6 +153,7 @@ async function onPush(ids: string[]): Promise<void> {
 }
 
 async function onPull(): Promise<void> {
+    await ensureAuth();
     const versions = await listVersions();
     // 탭별 최신 1건으로 묶어 수정일 내림차순. 받은 건(내 기기) 숨김.
     const state = readState();
@@ -689,6 +716,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((err: unknown) => {
-    console.error(err instanceof Error ? err.message : err);
+    console.error(`\n${err instanceof Error ? err.message : err}`);
     process.exitCode = 1;
 });
