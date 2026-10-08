@@ -220,6 +220,8 @@ export interface TabPackage {
     title?: string | null;
     directory?: string | null;
     version?: string | null;
+    agent?: string | null;
+    modelJson?: string | null;
     messages: TabMessage[];
     parts: TabPart[];
 }
@@ -289,8 +291,8 @@ export function readTabPackage(sessionID: string): TabPackage {
     }
     const db = new DatabaseSync(path, { readOnly: true });
     try {
-        const meta = db.prepare("SELECT title, directory, version FROM session WHERE id = ?").get(sessionID) as
-            | { title: string; directory: string; version: string }
+        const meta = db.prepare("SELECT title, directory, version, agent, model FROM session WHERE id = ?").get(sessionID) as
+            | { title: string; directory: string; version: string; agent: string | null; model: string | null }
             | undefined;
         if (dbFlavor() === "v1") {
             const v1 = readTabPackageV1(db, sessionID);
@@ -300,6 +302,8 @@ export function readTabPackage(sessionID: string): TabPackage {
                 title: meta?.title ?? null,
                 directory: meta?.directory ?? null,
                 version: meta?.version ?? null,
+                agent: meta?.agent ?? null,
+                modelJson: meta?.model ?? null,
                 messages: v1.messages,
                 parts: v1.parts,
             };
@@ -355,10 +359,23 @@ export function applyTabPackageUpsert(pkg: TabPackage, fallbackTitle?: string | 
             if (!proj) {
                 throw new Error("no project row to attach the tab to");
             }
-            const sibling = db.prepare("SELECT version FROM session LIMIT 1").get() as { version: string } | undefined;
+            const sibling = db.prepare("SELECT version, agent, model FROM session LIMIT 1").get() as
+                | { version: string; agent: string | null; model: string | null }
+                | undefined;
             db.prepare(
-                "INSERT INTO session (id, project_id, slug, directory, title, version, time_created, time_updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            ).run(pkg.tabId, proj.id, pkg.tabId, dir, pkg.title ?? fallbackTitle ?? pkg.tabId, pkg.version ?? sibling?.version ?? "unknown", now, now);
+                "INSERT INTO session (id, project_id, slug, directory, title, version, agent, model, time_created, time_updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ).run(
+                pkg.tabId,
+                proj.id,
+                pkg.tabId,
+                dir,
+                pkg.title ?? fallbackTitle ?? pkg.tabId,
+                pkg.version ?? sibling?.version ?? "unknown",
+                pkg.agent ?? sibling?.agent ?? null,
+                pkg.modelJson ?? sibling?.model ?? null,
+                now,
+                now,
+            );
             created = true;
         } else {
             db.prepare("UPDATE session SET title = ?, time_updated = ? WHERE id = ?").run(
@@ -396,8 +413,10 @@ export function applyTabPackageUpsert(pkg: TabPackage, fallbackTitle?: string | 
                 const putMsg = db.prepare(
                     "INSERT INTO message (id, session_id, time_created, time_updated, data) VALUES (?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data, time_updated = excluded.time_updated",
                 );
+                let prevId: string | null = null;
                 for (const m of pkg.messages) {
-                    const data = toV1MessageData(m);
+                    const data = toV1MessageData(m, prevId);
+                    prevId = m.id;
                     if (!data) {
                         continue;
                     }
@@ -428,17 +447,24 @@ export function applyTabPackageUpsert(pkg: TabPackage, fallbackTitle?: string | 
 }
 
 // v2 행 → v1 message.data. user/assistant 텍스트만 옮긴다. 모르는 모양은 버린다.
-function toV1MessageData(m: TabMessage): string | null {
+// assistant 행은 직전 메시지 id를 parentID로 단다 (1.18 체인 규칙: user 무부모).
+function toV1MessageData(m: TabMessage, prevId: string | null): string | null {
     try {
         const d = JSON.parse(m.data) as { role?: unknown };
         if (typeof d.role === "string") {
+            if (d.role === "assistant" && prevId) {
+                return JSON.stringify({ parentID: prevId, role: d.role, time: { created: m.createdAt ?? Date.now() } });
+            }
             return m.data;
         }
     } catch {
         // 아래에서 type으로 복원
     }
-    if (m.type === "user" || m.type === "assistant") {
-        return JSON.stringify({ role: m.type, time: { created: m.createdAt ?? Date.now() } });
+    if (m.type === "assistant" && prevId) {
+        return JSON.stringify({ parentID: prevId, role: "assistant", time: { created: m.createdAt ?? Date.now() } });
+    }
+    if (m.type === "user") {
+        return JSON.stringify({ role: "user", time: { created: m.createdAt ?? Date.now() } });
     }
     return null;
 }
