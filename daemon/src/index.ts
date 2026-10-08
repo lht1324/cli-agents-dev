@@ -152,7 +152,7 @@ async function onPull(): Promise<void> {
         const local = sessionExists(v.tabId) ? localRoleCounts(v.tabId) : null;
         const du = Math.max(0, (v.userMsgs ?? 0) - (local?.user ?? 0));
         const da = Math.max(0, (v.aiMsgs ?? 0) - (local?.ai ?? 0));
-        console.log(`  ${i + 1}. ${name} (유저 +${du} · AI +${da})`);
+        console.log(`  ${i + 1}. ${name} (AI +${da} · User +${du})`);
     });
     const picked = await pickNumbers(tabs.length, "a tab");
     const version = tabs[picked[0] ?? 0] ?? tabs[0];
