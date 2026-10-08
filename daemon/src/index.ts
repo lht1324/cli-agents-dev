@@ -336,7 +336,14 @@ async function onLogin(): Promise<void> {
                 signal: AbortSignal.timeout(10000),
             });
             if (check.ok) {
-                console.log(`already logged in: ${existing.deviceId}. run \`localagents logout\` first to switch.`);
+                let email: string | null = null;
+                try {
+                    const who = (await check.json()) as { data?: { email?: string | null } };
+                    email = who.data?.email ?? null;
+                } catch {
+                    // id로 표시
+                }
+                console.log(`already logged in${email ? ` as ${email}` : ""}. run \`localagents logout\` first to switch.`);
                 return;
             }
         } catch {
