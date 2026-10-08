@@ -16,7 +16,10 @@ export interface HandoffVersion {
     storageKey: string;
     baseHash: string;
     rowCount: number;
+    userMsgs?: number | null;
+    aiMsgs?: number | null;
     sha256: string;
+    receivedBy?: string | null;
     receivedAt?: string | null;
     createdAt?: string | null;
 }
@@ -26,13 +29,20 @@ function sha256Hex(data: string): string {
 }
 
 // 통째 스냅샷 포장. 불변 버전, 합치기 없음.
-export function packTab(sessionID: string): { bytes: Uint8Array; sha256: string; rowCount: number; baseHash: string } {
+export function packTab(sessionID: string): { bytes: Uint8Array; sha256: string; rowCount: number; baseHash: string; userMsgs: number; aiMsgs: number } {
     const pkg = readTabPackage(sessionID);
     const canonical = JSON.stringify(pkg);
     const baseHash = sha256Hex(
         JSON.stringify({ tabId: pkg.tabId, first: pkg.messages[0]?.id ?? null, count: pkg.messages.length }),
     );
-    return { bytes: gzipSync(canonical), sha256: sha256Hex(canonical), rowCount: pkg.messages.length + pkg.parts.length, baseHash };
+    return {
+        bytes: gzipSync(canonical),
+        sha256: sha256Hex(canonical),
+        rowCount: pkg.messages.length + pkg.parts.length,
+        baseHash,
+        userMsgs: pkg.messages.filter((m) => m.type === "user").length,
+        aiMsgs: pkg.messages.filter((m) => m.type === "assistant").length,
+    };
 }
 
 export function unpackTab(bytes: Uint8Array, sha256: string): TabPackage {
@@ -65,6 +75,7 @@ export async function pushTabs(server: DiscoveredServer, sessionIDs: string[]): 
         console.log(`Pushing (${i + 1}/${sessionIDs.length}) ${name}...`);
         const packed = packTab(sid);
         const epoch = epochOf(sid);
+        const { userMsgs, aiMsgs } = packed;
         const version = `${Date.now()}`;
         const key = `${state.userId}/${sid}/${epoch}/${version}.bin.gz`;
         putProgress(name, 30);
@@ -73,6 +84,8 @@ export async function pushTabs(server: DiscoveredServer, sessionIDs: string[]): 
         await cloudPost("/api/handoffs", {
             tabId: sid,
             title,
+            userMsgs,
+            aiMsgs,
             epoch,
             version,
             storageKey: key,

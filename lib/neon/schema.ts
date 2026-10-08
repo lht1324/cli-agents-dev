@@ -148,6 +148,8 @@ export const handoffs = pgTable("handoffs", {
     storageKey: text("storage_key").notNull(),
     baseHash: text("base_hash").notNull(),
     rowCount: integer("row_count").notNull().default(0),
+    userMsgs: integer("user_msgs").notNull().default(0),
+    aiMsgs: integer("ai_msgs").notNull().default(0),
     sha256: text("sha256").notNull(),
     receivedBy: text("received_by"),
     receivedAt: timestamp("received_at", { withTimezone: true }),

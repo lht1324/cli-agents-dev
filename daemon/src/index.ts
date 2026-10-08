@@ -6,7 +6,7 @@ import { syncSessions } from "./sessions";
 import { setSessionAgent, setSessionModel, syncCatalog, type ModelRef } from "./catalog";
 import { backfillMissing, syncActiveMessages, syncMessages } from "./messages";
 import { checkboxPick, listVersions, pickNumbers, pullVersion, pushTabs, type HandoffVersion } from "./handoff";
-import { countAll, countNewer, epochOf, sessionExists } from "./localdb";
+import { countAll, countNewer, epochOf, localRoleCounts, sessionExists } from "./localdb";
 import { readPushMark } from "./pushstate";
 import { listPending, reply, pushPending, type ReplyDecision } from "./permissions";
 import { pollCommands } from "./commands";
@@ -124,14 +124,38 @@ async function onPush(ids: string[]): Promise<void> {
 
 async function onPull(): Promise<void> {
     const versions = await listVersions();
-    if (versions.length === 0) {
+    // 탭별 최신 1건으로 묶어 수정일 내림차순. 받은 건(내 기기) 숨김.
+    const state = readState();
+    const mine = state?.deviceId ?? "";
+    const latest = new Map<string, (typeof versions)[number]>();
+    for (const v of versions) {
+        if (v.receivedBy === mine) {
+            continue;
+        }
+        const cur = latest.get(v.tabId);
+        if (!cur || (v.createdAt ?? "") > (cur.createdAt ?? "")) {
+            latest.set(v.tabId, v);
+        }
+    }
+    const tabs = [...latest.values()].sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
+    if (tabs.length === 0) {
         console.log("Nothing to pull.");
         return;
     }
-    console.log("Pick a version to pull:");
-    versions.forEach((v, i) => console.log(`  ${i + 1}. ${v.title ?? v.tabId.slice(0, 12)} (${v.rowCount} rows)`));
-    const picked = await pickNumbers(versions.length, "a version");
-    const version = versions[picked[0] ?? 0] ?? versions[0];
+    console.log("Pick a tab to pull:");
+    tabs.forEach((v, i) => {
+        const name = v.title ?? v.tabId.slice(0, 12);
+        if (v.userMsgs == null && v.aiMsgs == null) {
+            console.log(`  ${i + 1}. ${name} (${v.rowCount} rows)`);
+            return;
+        }
+        const local = sessionExists(v.tabId) ? localRoleCounts(v.tabId) : null;
+        const du = Math.max(0, (v.userMsgs ?? 0) - (local?.user ?? 0));
+        const da = Math.max(0, (v.aiMsgs ?? 0) - (local?.ai ?? 0));
+        console.log(`  ${i + 1}. ${name} (유저 +${du} · AI +${da})`);
+    });
+    const picked = await pickNumbers(tabs.length, "a tab");
+    const version = tabs[picked[0] ?? 0] ?? tabs[0];
     const localEpoch = sessionExists(version.tabId) ? epochOf(version.tabId) : 0;
     if (version.epoch < localEpoch) {
         console.log(`Stopped: version is epoch ${version.epoch}, local tab is epoch ${localEpoch}. Pushing the local tab first, or pick a newer version.`);

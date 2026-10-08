@@ -22,7 +22,10 @@ export async function GET(request: Request): Promise<Response> {
             storageKey: handoffs.storageKey,
             baseHash: handoffs.baseHash,
             rowCount: handoffs.rowCount,
+            userMsgs: handoffs.userMsgs,
+            aiMsgs: handoffs.aiMsgs,
             sha256: handoffs.sha256,
+            receivedBy: handoffs.receivedBy,
             receivedAt: handoffs.receivedAt,
             expiresAt: handoffs.expiresAt,
             createdAt: handoffs.createdAt,
@@ -37,6 +40,8 @@ export async function GET(request: Request): Promise<Response> {
 interface HandoffBody {
     tabId?: unknown;
     title?: unknown;
+    userMsgs?: unknown;
+    aiMsgs?: unknown;
     epoch?: unknown;
     version?: unknown;
     storageKey?: unknown;
@@ -84,6 +89,8 @@ export async function POST(request: Request): Promise<Response> {
         storageKey: body.storageKey,
         baseHash: body.baseHash,
         rowCount: typeof body.rowCount === "number" ? body.rowCount : 0,
+        userMsgs: typeof body.userMsgs === "number" ? body.userMsgs : 0,
+        aiMsgs: typeof body.aiMsgs === "number" ? body.aiMsgs : 0,
         sha256: body.sha256,
         expiresAt,
     });

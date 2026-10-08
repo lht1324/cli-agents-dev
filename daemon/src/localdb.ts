@@ -50,6 +50,53 @@ function toMessage(row: { id: string; type: string; createdAt: number | null; da
     return null;
 }
 
+// 로컬 탭 역할별 누적 합계. 목록 새개수 표시용. v1은 data JSON role을 센다.
+export function localRoleCounts(sessionID: string): { user: number; ai: number } {
+    const path = dbPath();
+    if (!path) {
+        return { user: 0, ai: 0 };
+    }
+    const db = new DatabaseSync(path, { readOnly: true });
+    try {
+        const probe = db.prepare("SELECT COUNT(*) AS n FROM session_message").get() as { n: number };
+        if (probe.n > 0) {
+            const rows = db
+                .prepare("SELECT type, COUNT(*) AS n FROM session_message WHERE session_id = ? GROUP BY type")
+                .all(sessionID) as { type: string; n: number }[];
+            let user = 0;
+            let ai = 0;
+            for (const r of rows) {
+                if (r.type === "user") {
+                    user = r.n;
+                } else if (r.type === "assistant") {
+                    ai = r.n;
+                }
+            }
+            return { user, ai };
+        }
+        const rows = db.prepare("SELECT data FROM message WHERE session_id = ?").all(sessionID) as { data: string }[];
+        let user = 0;
+        let ai = 0;
+        for (const r of rows) {
+            try {
+                const d = JSON.parse(r.data) as { role?: unknown };
+                if (d.role === "user") {
+                    user++;
+                } else if (d.role === "assistant") {
+                    ai++;
+                }
+            } catch {
+                // 스킵
+            }
+        }
+        return { user, ai };
+    } catch {
+        return { user: 0, ai: 0 };
+    } finally {
+        db.close();
+    }
+}
+
 // 탭의 현재 epoch 번호. compaction 횟수 = 지금 세대.
 export function epochOf(sessionID: string): number {
     const path = dbPath();
