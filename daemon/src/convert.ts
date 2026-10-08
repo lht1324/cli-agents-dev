@@ -152,7 +152,13 @@ export function toV1(pkg: TabPackage, ctx: Ctx): Converted {
                 seq: seq++,
                 createdAt: at,
                 updatedAt: m.updatedAt,
-                data: JSON.stringify({ role: "user", time: { created: at } }),
+                data: JSON.stringify({
+                    role: "user",
+                    time: { created: at },
+                    agent: ctx.agent,
+                    model: { providerID: ctx.providerID, modelID: ctx.modelID },
+                    summary: { diffs: [] },
+                }),
             });
             prevUserId = m.id;
             mergeAnchor = null;
@@ -216,6 +222,7 @@ export function toV1(pkg: TabPackage, ctx: Ctx): Converted {
                 ...(typeof model["variant"] === "string" && (model["variant"] as string).length > 0
                     ? { variant: model["variant"] as string }
                     : {}),
+                ...(typeof d["finish"] === "string" && (d["finish"] as string).length > 0 ? { finish: d["finish"] as string } : {}),
                 path: { cwd: ctx.directory, root: ctx.directory },
                 cost: num(d["cost"]),
                 tokens: {
