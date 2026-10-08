@@ -1,4 +1,5 @@
 import { apiGet, apiPost, discoverServer, type DiscoveredServer } from "./server";
+import { cloudGet } from "./cloud";
 import { hostInfo, readState, writeState, baseUrl } from "./device";
 import { forkAndRegister } from "./fork";
 import { ensureServer, killOwned, type ManagedServer } from "./serve";
@@ -393,8 +394,41 @@ async function onLogin(): Promise<void> {
         await onHeartbeat();
         const syncedServer = await ensureServer();
         const sessions = await syncSessions(syncedServer, true);
-        // 조건부 backfill. 클라우드에 없는 탭의 현재 세션만 채운다.
-        await backfillMissing(syncedServer);
+        // 조건부 backfill. 클라우드에 없는 탭만 목록에, 고르는 건 사용자.
+        const listed = (await cloudGet("/api/sync")) as { data?: { tabIds?: string[] } };
+        const have = new Set(Array.isArray(listed.data?.tabIds) ? listed.data.tabIds : []);
+        const body = (await apiGet(syncedServer, "/session")) as { data?: { id: string }[] } | { id: string }[];
+        const all = (Array.isArray(body) ? body : (body.data ?? [])).filter((s) => typeof s.id === "string");
+        const missing = all.filter((s) => !have.has(s.id));
+        let picked: string[] | null = null;
+        if (missing.length > 0 && process.stdin.isTTY) {
+            const titles: string[] = [];
+            for (const s of missing) {
+                let title: string | null = null;
+                try {
+                    const detail = (await apiGet(syncedServer, `/session/${s.id}`)) as
+                        | { data?: { title?: string } }
+                        | { title?: string };
+                    const row = (detail as { data?: { title?: string } }).data ?? detail;
+                    title = (row as { title?: string }).title ?? null;
+                } catch {
+                    // id로 표시
+                }
+                titles.push(title ?? s.id);
+            }
+            console.log("Pick sessions to sync (space to toggle, a for all, Enter to confirm):");
+            const nums = await checkboxPick(
+                titles,
+                titles.map((_, i) => true),
+            );
+            picked = nums.map((i) => missing[i].id);
+            if (picked.length === 0) {
+                console.log("Nothing picked.");
+            }
+        }
+        if (picked === null || picked.length > 0) {
+            await backfillMissing(syncedServer, picked ?? undefined);
+        }
         console.log(`Done: ${sessions.sessions} sessions synced.`);
     } catch (err) {
         console.error(`initial sync failed: ${err instanceof Error ? err.message : err}`);

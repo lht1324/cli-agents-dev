@@ -197,14 +197,15 @@ export async function backfillSession(server: DiscoveredServer, sessionID: strin
 }
 
 // 조건부 backfill. 클라우드에 없는 탭만 채운다. session_id 대조.
-export async function backfillMissing(server: DiscoveredServer): Promise<{ checked: number; filled: number; rows: number }> {
+export async function backfillMissing(server: DiscoveredServer, only?: string[]): Promise<{ checked: number; filled: number; rows: number }> {
     const listed = (await cloudGet("/api/sync")) as { data?: { tabIds?: string[] } };
     const have = new Set(Array.isArray(listed.data?.tabIds) ? listed.data.tabIds : []);
     const body = (await apiGet(server, "/session")) as { data?: { id: string }[] } | { id: string }[];
     const list = Array.isArray(body) ? body : (body.data ?? []);
+    const wanted = only ? new Set(only) : null;
     let filled = 0;
     let rows = 0;
-    const pending = list.filter((s) => typeof s.id === "string" && !have.has(s.id));
+    const pending = list.filter((s) => typeof s.id === "string" && !have.has(s.id) && (!wanted || wanted.has(s.id)));
     if (pending.length > 0) {
         console.log("Please keep this window open until done.");
         console.log(`Syncing ${pending.length} session${pending.length === 1 ? "" : "s"}...`);
