@@ -421,16 +421,15 @@ async function onLogin(): Promise<void> {
         await onHeartbeat();
         const syncedServer = await ensureServer();
         const sessions = await syncSessions(syncedServer, true);
-        // 조건부 backfill. 클라우드에 없는 탭만 목록에, 고르는 건 사용자.
+        // 조건부 backfill. 전부 보여주고 없는 것만 기본 체크. DB 유무는 표시만.
         const listed = (await cloudGet("/api/sync")) as { data?: { tabIds?: string[] } };
         const have = new Set(Array.isArray(listed.data?.tabIds) ? listed.data.tabIds : []);
         const body = (await apiGet(syncedServer, "/session")) as { data?: { id: string }[] } | { id: string }[];
         const all = (Array.isArray(body) ? body : (body.data ?? [])).filter((s) => typeof s.id === "string");
-        const missing = all.filter((s) => !have.has(s.id));
         let picked: string[] | null = null;
-        if (missing.length > 0 && process.stdin.isTTY) {
+        if (all.length > 0 && process.stdin.isTTY) {
             const titles: string[] = [];
-            for (const s of missing) {
+            for (const s of all) {
                 let title: string | null = null;
                 try {
                     const detail = (await apiGet(syncedServer, `/session/${s.id}`)) as
@@ -441,16 +440,21 @@ async function onLogin(): Promise<void> {
                 } catch {
                     // id로 표시
                 }
-                titles.push(title ?? s.id);
+                titles.push(have.has(s.id) ? `${title ?? s.id} (synced)` : (title ?? s.id));
             }
             console.log("Pick sessions to sync (space: toggle, a: all, n: none, Esc: cancel, Enter: confirm):");
             const nums = await checkboxPick(
-                titles,
-                titles.map((_, i) => true),
+                [...titles, "Not now"],
+                titles.map((_, i) => !have.has(all[i].id)),
             );
-            picked = nums.map((i) => missing[i].id);
-            if (picked.length === 0) {
+            if (nums.includes(titles.length)) {
                 console.log("Nothing picked.");
+                picked = [];
+            } else {
+                picked = nums.filter((i) => i < all.length).map((i) => all[i].id);
+                if (picked.length === 0) {
+                    console.log("Nothing picked.");
+                }
             }
         }
         if (picked === null || picked.length > 0) {
