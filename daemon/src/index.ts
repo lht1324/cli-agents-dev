@@ -149,7 +149,9 @@ async function onPush(ids: string[]): Promise<void> {
         targets = list.map((s) => s.id).filter((id) => typeof id === "string");
     }
     const result = await pushTabs(server, targets);
-    console.log(`Done: ${result.pushed} tabs pushed.`);
+    // 같은 동작 1회에 거울 DB도 채운다. 자동과 겹치지만 단일 상태가 우선.
+    await backfillMissing(server, targets);
+    console.log(`Done: ${result.pushed} tabs pushed and synced.`);
 }
 
 async function onPull(): Promise<void> {
