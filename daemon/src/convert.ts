@@ -76,6 +76,8 @@ export function toV1(pkg: TabPackage, ctx: Ctx): Converted {
     const parts: TabPart[] = [];
     let skipped = 0;
     let prevId: string | null = null;
+    let prevUserId: string | null = null;
+    let mergeAnchor: TabMessage | null = null;
     let seq = 0;
     const rowsByMessage = new Map<string, TabPart[]>();
     for (const p of pkg.parts) {
@@ -152,6 +154,8 @@ export function toV1(pkg: TabPackage, ctx: Ctx): Converted {
                 updatedAt: m.updatedAt,
                 data: JSON.stringify({ role: "user", time: { created: at } }),
             });
+            prevUserId = m.id;
+            mergeAnchor = null;
             const separate = rowsByMessage.get(m.id) ?? [];
             if (separate.length === 0) {
                 const text = str(d["text"]);
@@ -176,8 +180,34 @@ export function toV1(pkg: TabPackage, ctx: Ctx): Converted {
             const model = (d["model"] ?? {}) as Record<string, unknown>;
             const tokens = (d["tokens"] ?? {}) as Record<string, unknown>;
             const cache = (tokens["cache"] ?? {}) as Record<string, unknown>;
+            // 1.18은 assistant 연속 불가. 직전 배출이 assistant면 합친다 (첫 id 유지).
+            const last = mergeAnchor;
+            if (last) {
+                try {
+                    const prev = JSON.parse(last.data) as Record<string, unknown>;
+                    const pt = (prev["tokens"] ?? {}) as Record<string, unknown>;
+                    const pc = (pt["cache"] ?? {}) as Record<string, unknown>;
+                    prev["cost"] = num(prev["cost"]) + num(d["cost"]);
+                    prev["tokens"] = {
+                        input: num(pt["input"]) + num(tokens["input"]),
+                        output: num(pt["output"]) + num(tokens["output"]),
+                        reasoning: num(pt["reasoning"]) + num(tokens["reasoning"]),
+                        cache: { read: num(pc["read"]) + num(cache["read"]), write: num(pc["write"]) + num(cache["write"]) },
+                    };
+                    last.data = JSON.stringify(prev);
+                    last.updatedAt = m.updatedAt;
+                } catch {
+                    // 합치기 실패해도 파트는 살린다
+                }
+                const separate = rowsByMessage.get(m.id) ?? [];
+                for (const p of separate) {
+                    convertRow(last.id, p, at);
+                }
+                prevId = m.id;
+                continue;
+            }
             const rowData: Record<string, unknown> = {
-                parentID: prevId,
+                ...(prevUserId ? { parentID: prevUserId } : {}),
                 role: "assistant",
                 mode: str(d["agent"], ctx.agent),
                 agent: str(d["agent"], ctx.agent),
@@ -197,6 +227,7 @@ export function toV1(pkg: TabPackage, ctx: Ctx): Converted {
                 time: { created: at },
             };
             messages.push({ id: m.id, type: "assistant", seq: seq++, createdAt: at, updatedAt: m.updatedAt, data: JSON.stringify(rowData) });
+            mergeAnchor = messages[messages.length - 1];
             const separate = rowsByMessage.get(m.id) ?? [];
             if (separate.length === 0) {
                 const content = d["content"];
@@ -231,6 +262,13 @@ export function toV1(pkg: TabPackage, ctx: Ctx): Converted {
                 }
             }
             prevId = m.id;
+            continue;
+        }
+        if (m.type === "compaction") {
+            // epoch 경계. 합치기 앵커를 끊는다.
+            mergeAnchor = null;
+            prevId = m.id;
+            skipped++;
             continue;
         }
         skipped++;
