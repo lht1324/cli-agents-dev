@@ -1,4 +1,4 @@
-2026-10-08 04:29
+2026-10-08 12:46
 
 # context.md - cli-agents-dev
 
@@ -276,6 +276,13 @@
 - 장애 2: `session_message` 0행 — 1.18은 `message`+`part` 사용. v1 리더/라이터 추가 + 맛보기 자동 선택. 크로스버전(v2→v1)은 id 유지·그릇 변환.
 - pull upsert 실측: 272행 버전 → 새 탭 생성, 메시지 52+파트 214, 내용 원형. 있으면 병합·없으면 생성. 삭제 행은 미동기화 (tombstone 다음).
 - `b5ef5f6` 푸시済み.
+
+## pull 목록·upsert (2026-10-08 완료, 이 PC)
+- 목록이 버전 나열 → 탭별 최신 묶음 (수정일 내림차순). 받은 건(내 기기) 숨김. 구 포인터 5행 삭제済み.
+- 새개수 표시: push 때 역할 합계(`user_msgs`·`ai_msgs`, `0012`) 저장 → 목록에 `유저 +N · AI +M`. 추가만 되면 정확, 삭제·수정은 미반영.
+- pull upsert: 있으면 병합·없으면 생성. v1 리더/라이터 + 맛보기 자동. 272행 실측 (새 탭, 52+214).
+- 서명 URL: 데몬 `AWS_*` 삭제, 서버 `NEON_API_KEY` 1개로 수렴. 왕복 실측済み.
+- `5427df1` + `748c3c4` 푸시済み.
 
 ## OS 등록 (2026-10-03 완료 → 2026-10-06 개명, Arch)
 - `~/.local/bin/localagents` 래퍼 + `~/.config/localagents/env` (DATABASE_URL 1개, 600) + systemd user unit `localagents.service`.
