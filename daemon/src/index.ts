@@ -482,6 +482,11 @@ async function onLogin(): Promise<void> {
         if (picked === null || picked.length > 0) {
             const filled = await backfillMissing(syncedServer, picked ?? undefined);
             console.log(`Done: ${filled.filled} sessions synced.`);
+            const toPush = picked ?? all.filter((s) => !have.has(s.id)).map((s) => s.id);
+            if (toPush.length > 0) {
+                const pushed = await pushTabs(syncedServer, toPush);
+                console.log(`Done: ${pushed.pushed} tabs pushed to storage.`);
+            }
         } else {
             console.log(`Done: ${sessions.sessions} sessions found.`);
         }
