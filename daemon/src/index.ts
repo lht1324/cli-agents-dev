@@ -133,7 +133,7 @@ async function onPush(ids: string[]): Promise<void> {
             }
             dirties.push(dirty);
         }
-        console.log("Pick tabs to push (space to toggle, a for all, Enter to confirm):");
+        console.log("Pick tabs to push (space: toggle, a: all, n: none, Esc: cancel, Enter: confirm):");
         const picked = await checkboxPick(
             [...titles.map((t, i) => `${t} (${dirties[i]} new)`), "Not now"],
             titles.map(() => false),
@@ -173,7 +173,7 @@ async function onPull(): Promise<void> {
         console.log("Nothing to pull.");
         return;
     }
-    console.log("Pick tabs to pull (space to toggle, a for all, Enter to confirm):");
+    console.log("Pick tabs to pull (space: toggle, a: all, n: none, Esc: cancel, Enter: confirm):");
     const labels = tabs.map((v) => {
         const name = v.title ?? v.tabId.slice(0, 12);
         if (v.userMsgs == null && v.aiMsgs == null) {
@@ -443,7 +443,7 @@ async function onLogin(): Promise<void> {
                 }
                 titles.push(title ?? s.id);
             }
-            console.log("Pick sessions to sync (space to toggle, a for all, Enter to confirm):");
+            console.log("Pick sessions to sync (space: toggle, a: all, n: none, Esc: cancel, Enter: confirm):");
             const nums = await checkboxPick(
                 titles,
                 titles.map((_, i) => true),

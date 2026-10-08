@@ -189,6 +189,17 @@ export async function checkboxPick(labels: string[], initial: boolean[]): Promis
                     checked[i] = all;
                 }
                 redraw();
+            } else if (s.toLowerCase() === "n") {
+                for (let i = 0; i < checked.length; i++) {
+                    checked[i] = false;
+                }
+                redraw();
+            } else if (s === "\u001b") {
+                // Esc 단독. 방향키는 뒤에 바이트가 따라온다.
+                setTimeout(() => {
+                    cleanup();
+                    resolve([]);
+                }, 60);
             } else if (s === "\u001b[A") {
                 cursor = (cursor - 1 + labels.length) % labels.length;
                 redraw();
