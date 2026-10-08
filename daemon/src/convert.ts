@@ -176,12 +176,16 @@ export function toV1(pkg: TabPackage, ctx: Ctx): Converted {
             const model = (d["model"] ?? {}) as Record<string, unknown>;
             const tokens = (d["tokens"] ?? {}) as Record<string, unknown>;
             const cache = (tokens["cache"] ?? {}) as Record<string, unknown>;
-            const rowData = {
+            const rowData: Record<string, unknown> = {
                 parentID: prevId,
                 role: "assistant",
+                mode: str(d["agent"], ctx.agent),
                 agent: str(d["agent"], ctx.agent),
                 modelID: str(model["id"], ctx.modelID),
                 providerID: str(model["providerID"], ctx.providerID),
+                ...(typeof model["variant"] === "string" && (model["variant"] as string).length > 0
+                    ? { variant: model["variant"] as string }
+                    : {}),
                 path: { cwd: ctx.directory, root: ctx.directory },
                 cost: num(d["cost"]),
                 tokens: {
