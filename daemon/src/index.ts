@@ -142,28 +142,36 @@ async function onPull(): Promise<void> {
         console.log("Nothing to pull.");
         return;
     }
-    console.log("Pick a tab to pull:");
-    tabs.forEach((v, i) => {
+    console.log("Pick tabs to pull (space to toggle, a for all, Enter to confirm):");
+    const labels = tabs.map((v) => {
         const name = v.title ?? v.tabId.slice(0, 12);
         if (v.userMsgs == null && v.aiMsgs == null) {
-            console.log(`  ${i + 1}. ${name} (${v.rowCount} rows)`);
-            return;
+            return `${name} (${v.rowCount} rows)`;
         }
         const local = sessionExists(v.tabId) ? localRoleCounts(v.tabId) : null;
         const du = Math.max(0, (v.userMsgs ?? 0) - (local?.user ?? 0));
         const da = Math.max(0, (v.aiMsgs ?? 0) - (local?.ai ?? 0));
-        console.log(`  ${i + 1}. ${name} (AI +${da} · User +${du})`);
+        return `${name} (AI +${da} · User +${du})`;
     });
-    const picked = await pickNumbers(tabs.length, "a tab");
-    const version = tabs[picked[0] ?? 0] ?? tabs[0];
-    const localEpoch = sessionExists(version.tabId) ? epochOf(version.tabId) : 0;
-    if (version.epoch < localEpoch) {
-        console.log(`Stopped: version is epoch ${version.epoch}, local tab is epoch ${localEpoch}. Pushing the local tab first, or pick a newer version.`);
+    const picked = await checkboxPick(
+        labels,
+        tabs.map((_, i) => i === 0),
+    );
+    if (picked.length === 0) {
+        console.log("Nothing picked.");
         return;
     }
-    const applied = await pullVersion(version);
-    console.log(applied.created ? `Created new tab ${version.tabId}.` : `Updated local tab ${version.tabId}.`);
-    console.log(`Done: ${applied.messages} messages, ${applied.parts} parts applied.`);
+    for (const n of picked) {
+        const version = tabs[n] ?? tabs[0];
+        const localEpoch = sessionExists(version.tabId) ? epochOf(version.tabId) : 0;
+        if (version.epoch < localEpoch) {
+            console.log(`Skipped ${version.title ?? version.tabId}: version is epoch ${version.epoch}, local tab is epoch ${localEpoch}.`);
+            continue;
+        }
+        const applied = await pullVersion(version);
+        console.log(applied.created ? `Created new tab ${version.tabId}.` : `Updated local tab ${version.tabId}.`);
+        console.log(`Done: ${applied.messages} messages, ${applied.parts} parts applied.`);
+    }
 }
 
 async function onWhoami(): Promise<void> {
