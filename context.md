@@ -1,4 +1,4 @@
-2026-10-08 12:46
+2026-10-08 13:36
 
 # context.md - cli-agents-dev
 
@@ -51,7 +51,6 @@
 - 통 DB 덮어쓰기 금지. B 고유 세션 삭제·절대경로 불일치·WAL 파손. 세션 1개 논리 이식(insert)으로.
 - 파일 diff 아님. `updated_at > last_sync` 행만 전송, 커서는 `last_sync` 토큰 1개. 평소 메타 KB 단위.
 - OAuth는 Google+GitHub 먼저, X는 나중 (심사·유료티어·스펙변경).
-- Storage는 이번 보일러플레이트에서 제외. 필요해지면 Neon Object Storage로 붙임 (아래 참고).
 
 ## 세션 정의 (2026-09-29 확정)
 - 탭 1개 = 세션 1행. GUI 멘탈모델과 DB 일치.
@@ -169,13 +168,13 @@
 - OS 표시는 전부 텍스트. Apple·MS 로고는 상표 허가 필요라 제외. Linux 펭귄도 통일상 제외.
 - Fungies KYC 완료. Waffo 거절 메일 발송済み (출금 중국 한정).
 
-## P3 진행 (2026-10-01, 진행 중)
+## P3 (2026-10-01)
 - fork: `daemon/src/fork.ts` + `fork` 명령 + `sessions_meta` 대장 등록. 실측 6세션(`CLIAgentsDev (fork #1)`) 확인済み.
 - 새 지시: outbox `message` 타입 + 상세 입력창. 종단 검증済み (웹 전송 → poll `message done` → 에이전트 응답 확인).
 - 상세 307 해소済み. 원인은 손 복사 id 오기 (db 행 `...8ph...I41` vs 입력 `...Bph...I4i`). 목록 제목 링크화로 재발 방지. 코드 정상이었음.
 - 남은 것: 예약 실행 ("PC 켜지면 실행" 경고 + 부팅 catch-up).
 
-## 1줄 설치 설계 (2026-10-03 확정, 미구현)
+## 1줄 설치 (2026-10-03 설계)
 - 목표: `npx localagents login` 1줄에 설치·OAuth·등록·서버기동·주기실행까지. 붙여넣기 0건.
 - 데몬이 서버 직접 기동済み (`daemon/src/serve.ts`: 기존 탐색 → 없으면 자식으로 기동, 비번 랜덤 32B 상태 보관, 포트 4096~4105 폴백, 종료 시 kill).
 - 비번은 상태 파일 일원화. 명시 명령도 env 없이 됨. OS unit은 `EnvironmentFile` 1개 (`DATABASE_URL`만).
@@ -253,7 +252,7 @@
 - DB diff: 행 단위로 이미 하는 중. 삭제·스키마·충돌만 별도 처리.
 
 ## Mac 실태 + 버전 정정 (2026-10-07, 이 PC)
-- 설치 없음: 바이너리·`~/.config/localagents/`·신 플러그인 없음. 구 `cliagent` 잔재는 유지 (손대지 않음).
+- 설치 (10-08 변경): `~/.local/bin/localagents` + `login`済み + 신 플러그인 복사. 구 `cliagent` 잔재는 유지 (손대지 않음).
 - serve 1.18뿐 (2.x 번들 없음). v2 플러그인 미발화 실측済み → 즉시 통지 불가, 10초 폴링층으로 동작. 거울/heartbeat/push는 버전 무관.
 - 정정: 이 Mac 데스크톱은 1.18.25 (v2 아님). v1 라인(1.18.x, 09-28에 1.18.33)이 현역, v2(2.0.20)는 별도 라인 공존. CLI 1.18.2 + 데스크톱 1.18.25 = 둘 다 v1.
 - DB 세션 7개 전부 1.18 (1.18.2×3, 1.18.25×4), archived 0, 포크 자식 0. 최신은 이 세션 (10-06 03:30).
@@ -284,6 +283,11 @@
 - 서명 URL: 데몬 `AWS_*` 삭제, 서버 `NEON_API_KEY` 1개로 수렴. 왕복 실측済み.
 - `5427df1` + `748c3c4` 푸시済み.
 
+## 탭 프로젝트 경로 문제 (미결, 2026-10-08)
+- 가져온 탭의 `directory`는 원 PC 절대경로 (예: Arch `/home/jaeho/...`)라 B에 없음. project_id도 B에 매칭 안 됨.
+- 실측: 폴백(daemon cwd)으로 넣었더니 엉뚱한 프로젝트에 붙어 GUI에서 안 보임. `short_real`로 수동 정정済み.
+- 결정 필요: (a) pack에 프로젝트명+상대경로 포함 → pull 때 동명 매칭, 없으면 생성·확인. (b) 가져온 탭 격리 프로젝트에 두고 사용자 지정. (c) 절대경로 그대로 + 경고만.
+
 ## OS 등록 (2026-10-03 완료 → 2026-10-06 개명, Arch)
 - `~/.local/bin/localagents` 래퍼 + `~/.config/localagents/env` (DATABASE_URL 1개, 600) + systemd user unit `localagents.service`.
 - `enable --now`済み. `active (running)` 확인. 재부팅 테스트 미실시.
@@ -296,7 +300,6 @@
 ## 승인 종단 (2026-10-01 완료, 이 PC)
 - 흐름: ask 설정 serve(4097) → bash 지시 → pending 포착 → 데몬 `sync` 거울 → 웹 상세 Allow → outbox → 데몬 `poll` 응답 → 에이전트 실행 → 파일 `WEB-APPROVE-OK` 확인. 대기 목록 비움 확인.
 - 테스트 세션·파일·serve 정리済み. `pkill -f` 자기매칭 주의 (PID 지정으로 대체).
-- 남은 것: P3 (fork·새 지시·예약 실행), P4 (도메인·배포·과금).
 
 ## outbox 종단 (2026-09-30 완료, 이 PC)
 - 스키마: `commands`(우체통, pending→delivered→done→expired + 멱등키·만료) + 거울 3종(`cloud_tabs` UPDATE 헤더, `cloud_messages` INSERT-only 복합키, `cloud_folds` epoch 요약). `0001_massive_plazm.sql` → Neon dev 적용, 6 테이블 실측 확인.
@@ -304,4 +307,3 @@
 - 웹: `POST /api/commands`(outbox INSERT) + `lib/utils/getNextBaseResponse.ts`. curl 201 → 데몬 `poll`이 같은 행 `done` 회수. 웹→PC 종단 완성.
 - 잡음 정리: `drizzle.config.ts`가 `.env.local`을 안 읽어서 generate 실패 → 2줄 로딩으로 수정. `.env.example` 실값 유출未遂 → 플레이스홀더로 복구 (`.env.local`은 무시됨 확인). `next-env.d.ts` 추적 해제 + gitignore. `AGENTS.md`의 nextjs-agent-rules 블록은 `next dev`가 자동 추가한 것이라 커밋.
 - dev DB 테스트 행: `devices/test-pc-1`, `commands/cmd-ping-1` + 웹 ping 1건. 전부 `done`. 둬도 됨.
-- 미결: heartbeat 방식 (`devices.lastSeenAt` 갱신 vs 전용 테이블).
