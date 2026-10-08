@@ -6,7 +6,7 @@ import { ensureServer, killOwned, type ManagedServer } from "./serve";
 import { syncSessions } from "./sessions";
 import { setSessionAgent, setSessionModel, syncCatalog, type ModelRef } from "./catalog";
 import { backfillMissing, syncActiveMessages, syncMessages } from "./messages";
-import { checkboxPick, listVersions, pickNumbers, pullVersion, pushTabs, type HandoffVersion } from "./handoff";
+import { checkboxPick, listVersions, pickNumbers, pullVersion, pushTabs, syncOneTab, type HandoffVersion } from "./handoff";
 import { countAll, countNewer, epochOf, findLocalDirByRemote, localRoleCounts, repoForDirectory, sessionExists, setTabDirectory } from "./localdb";
 import { askTyped, isDir, pickDirectory } from "./sysdialog";
 import { execSync } from "node:child_process";
@@ -482,13 +482,36 @@ async function onLogin(): Promise<void> {
             }
         }
         if (picked === null || picked.length > 0) {
-            const filled = await backfillMissing(syncedServer, picked ?? undefined);
-            console.log(`Done: ${filled.filled} sessions synced.`);
-            const toPush = picked ?? all.filter((s) => !have.has(s.id)).map((s) => s.id);
-            if (toPush.length > 0) {
-                const pushed = await pushTabs(syncedServer, toPush);
-                console.log(`Done: ${pushed.pushed} tabs pushed to storage.`);
+            const ids = picked ?? all.filter((s) => !have.has(s.id)).map((s) => s.id);
+            const nameOf = new Map<string, string>();
+            for (const sid of ids) {
+                let title: string | null = null;
+                try {
+                    const detail = (await apiGet(syncedServer, `/session/${sid}`)) as
+                        | { data?: { title?: string } }
+                        | { title?: string };
+                    const row = (detail as { data?: { title?: string } }).data ?? detail;
+                    title = (row as { title?: string }).title ?? null;
+                } catch {
+                    // id로 표시
+                }
+                nameOf.set(sid, title ?? sid);
             }
+            const items = ids.map((sid) => ({ sid, title: nameOf.get(sid) ?? sid }));
+            console.log("Please keep this window open until done.");
+            let done = 0;
+            for (const item of items) {
+                done++;
+                console.log(`(${done}/${items.length}) ${item.title}`);
+                const draw = (frac: number) => {
+                    const pct = Math.floor(frac * 100);
+                    const width = 40;
+                    const filled = Math.round((pct / 100) * width);
+                    process.stdout.write(`\r  ${item.title} [${"#".repeat(filled)}${"-".repeat(width - filled)}] ${pct}%`);
+                };
+                await syncOneTab(syncedServer, userId, item.sid, item.title, item.title, draw);
+            }
+            console.log(`Done: ${items.length} sessions synced.`);
         } else {
             console.log(`Done: ${sessions.sessions} sessions found.`);
         }

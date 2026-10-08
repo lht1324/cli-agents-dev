@@ -158,15 +158,25 @@ function bar(pct: number, width = 40): string {
 
 // 첫 로그인 backfill. 로컬 DB에서 현재 세션(epoch) 전부를 올린다. 제한 없음.
 // compaction 경계까지 거슬러 올라간다. 200행씩 끊어 올리며 진행률 표시. 실패하면 호출 쪽이 API 창으로 폴백.
-export async function backfillSession(server: DiscoveredServer, sessionID: string, label?: string): Promise<{ rows: number }> {
+export async function backfillSession(
+    server: DiscoveredServer,
+    sessionID: string,
+    label?: string,
+    report?: (frac: number) => void,
+    quiet?: boolean,
+): Promise<{ rows: number }> {
     const messages = readEpochRows(sessionID);
     const rows = flatten(messages);
     const name = label ?? sessionID.slice(0, 12);
     if (rows.length === 0) {
-        console.log(`  ${name} — nothing to sync.`);
+        if (!quiet) {
+            console.log(`  ${name} — nothing to sync.`);
+        }
         return { rows: 0 };
     }
-    process.stdout.write(`\r  ${name} ${bar(0)}`);
+    if (!quiet) {
+        process.stdout.write(`\r  ${name} ${bar(0)}`);
+    }
     for (let i = 0; i < rows.length; i += 10) {
         const part = rows.slice(i, i + 10);
         await cloudPost("/api/messages", {
@@ -181,9 +191,15 @@ export async function backfillSession(server: DiscoveredServer, sessionID: strin
             })),
         });
         const done = Math.min(i + part.length, rows.length);
-        process.stdout.write(`\r  ${name} ${bar(Math.floor((done / rows.length) * 100))}`);
+        if (report) {
+            report(done / rows.length);
+        } else if (!quiet) {
+            process.stdout.write(`\r  ${name} ${bar(Math.floor((done / rows.length) * 100))}`);
+        }
     }
-    process.stdout.write("\n");
+    if (!quiet && !report) {
+        process.stdout.write("\n");
+    }
     let top = rows[0];
     for (const r of rows) {
         const a = r.createdAt ?? 0;

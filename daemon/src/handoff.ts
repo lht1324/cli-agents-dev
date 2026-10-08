@@ -4,6 +4,7 @@ import { createInterface } from "node:readline";
 import { apiGet, type DiscoveredServer } from "./server";
 import { cloudGet, cloudPost } from "./cloud";
 import { readState } from "./device";
+import { backfillSession } from "./messages";
 import { applyTabPackageUpsert, epochOf, latestOf, readTabPackage, type TabPackage } from "./localdb";
 import { readPushMark, writePushMark } from "./pushstate";
 import { getBytes, putBytes } from "./storage";
@@ -77,43 +78,77 @@ export async function pushTabs(server: DiscoveredServer, sessionIDs: string[]): 
         }
         const name = title ?? sid.slice(0, 12);
         console.log(`Pushing (${i + 1}/${sessionIDs.length}) ${name}...`);
-        const packed = packTab(sid);
-        const epoch = epochOf(sid);
-        const { userMsgs, aiMsgs } = packed;        const version = `${Date.now()}`;
-        const key = `${state.userId}/${sid}/${epoch}/${version}.bin.gz`;
-        putProgress(name, 30);
-        await putBytes(key, packed.bytes);
-        putProgress(name, 70);
-        await cloudPost("/api/handoffs", {
-            tabId: sid,
-            title,
-            userMsgs,
-            aiMsgs,
-            remote: packed.remote,
-            branch: packed.branch,
-            epoch,
-            version,
-            storageKey: key,
-            baseHash: packed.baseHash,
-            rowCount: packed.rowCount,
-            sha256: packed.sha256,
-        });
-        putProgress(name, 100);
+        const r = await pushOneTab(server, state.userId, sid, title, (frac) => putProgress(name, Math.round(frac * 100)));
         process.stdout.write("\n");
-        const mark = latestOf(sid);
-        if (mark) {
-            writePushMark(sid, mark.at, mark.id);
-        }
         pushed++;
-        rows += packed.rowCount;
+        rows += r.rows;
     }
     return { pushed, rows };
+}
+
+// 탭 1개 push. report 0→1.
+export async function pushOneTab(
+    server: DiscoveredServer,
+    userId: string,
+    sid: string,
+    title: string | null,
+    report?: (frac: number) => void,
+): Promise<{ rows: number }> {
+    const show = report ?? ((pct01: number) => putProgress(sid.slice(0, 12), Math.round(pct01 * 100)));
+    const packed = packTab(sid);
+    const epoch = epochOf(sid);
+    const { userMsgs, aiMsgs } = packed;
+    const version = `${Date.now()}`;
+    const key = `${userId}/${sid}/${epoch}/${version}.bin.gz`;
+    show(0.3);
+    await putBytes(key, packed.bytes);
+    show(0.7);
+    await cloudPost("/api/handoffs", {
+        tabId: sid,
+        title,
+        userMsgs,
+        aiMsgs,
+        remote: packed.remote,
+        branch: packed.branch,
+        epoch,
+        version,
+        storageKey: key,
+        baseHash: packed.baseHash,
+        rowCount: packed.rowCount,
+        sha256: packed.sha256,
+    });
+    show(1);
+    const mark = latestOf(sid);
+    if (mark) {
+        writePushMark(sid, mark.at, mark.id);
+    }
+    return { rows: packed.rowCount };
 }
 
 function putProgress(name: string, pct: number): void {
     const width = 40;
     const filled = Math.round((pct / 100) * width);
     process.stdout.write(`\r  ${name} [${"#".repeat(filled)}${"-".repeat(width - filled)}] ${pct}%`);
+}
+
+// 탭 1개 통합 동기화. 바 1개: 거울 0→50, Storage 50→100. 채널 구분 노출 없음.
+export async function syncOneTab(
+    server: DiscoveredServer,
+    userId: string,
+    sid: string,
+    label: string,
+    title: string | null,
+    draw: (frac: number) => void,
+): Promise<void> {
+    draw(0);
+    await backfillSession(server, sid, label, (f) => draw(f * 0.5), true);
+    await pushOneTab(server, userId, sid, title, (f) => draw(0.5 + f * 0.5));
+    draw(1);
+    process.stdout.write("\n");
+    const mark = latestOf(sid);
+    if (mark) {
+        writePushMark(sid, mark.at, mark.id);
+    }
 }
 
 // pull 본체. 버전 고르기 → 받기 → upsert(없으면 생성) → 검증. 함수라 자동화도 같은 걸 부른다.
