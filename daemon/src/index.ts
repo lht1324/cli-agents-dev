@@ -454,9 +454,11 @@ async function onLogin(): Promise<void> {
             }
         }
         if (picked === null || picked.length > 0) {
-            await backfillMissing(syncedServer, picked ?? undefined);
+            const filled = await backfillMissing(syncedServer, picked ?? undefined);
+            console.log(`Done: ${filled.filled} sessions synced.`);
+        } else {
+            console.log(`Done: ${sessions.sessions} sessions found.`);
         }
-        console.log(`Done: ${sessions.sessions} sessions synced.`);
     } catch (err) {
         console.error(`initial sync failed: ${err instanceof Error ? err.message : err}`);
     }
