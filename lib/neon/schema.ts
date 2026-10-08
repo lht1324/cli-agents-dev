@@ -143,6 +143,8 @@ export const handoffs = pgTable("handoffs", {
         .references(() => devices.id),
     tabId: text("tab_id").notNull(),
     title: text("title"),
+    remote: text("remote"),
+    branch: text("branch"),
     epoch: integer("epoch").notNull().default(0),
     version: text("version").notNull(),
     storageKey: text("storage_key").notNull(),

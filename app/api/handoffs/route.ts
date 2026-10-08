@@ -17,6 +17,8 @@ export async function GET(request: Request): Promise<Response> {
             id: handoffs.id,
             tabId: handoffs.tabId,
             title: handoffs.title,
+            remote: handoffs.remote,
+            branch: handoffs.branch,
             epoch: handoffs.epoch,
             version: handoffs.version,
             storageKey: handoffs.storageKey,
@@ -40,6 +42,8 @@ export async function GET(request: Request): Promise<Response> {
 interface HandoffBody {
     tabId?: unknown;
     title?: unknown;
+    remote?: unknown;
+    branch?: unknown;
     userMsgs?: unknown;
     aiMsgs?: unknown;
     epoch?: unknown;
@@ -84,6 +88,8 @@ export async function POST(request: Request): Promise<Response> {
         deviceId: authed.deviceId,
         tabId: body.tabId,
         title: typeof body.title === "string" ? body.title : null,
+        remote: typeof body.remote === "string" ? body.remote : null,
+        branch: typeof body.branch === "string" ? body.branch : null,
         epoch: typeof body.epoch === "number" ? body.epoch : 0,
         version: body.version,
         storageKey: body.storageKey,

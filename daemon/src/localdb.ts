@@ -1,3 +1,4 @@
+import { execSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -221,6 +222,7 @@ export interface TabPackage {
     flavor?: "v1" | "v2" | null;
     title?: string | null;
     directory?: string | null;
+    repo?: TabRepo | null;
     version?: string | null;
     agent?: string | null;
     modelJson?: string | null;
@@ -284,7 +286,119 @@ function readTabPackageV1(db: InstanceType<typeof DatabaseSync>, sessionID: stri
     return { messages, parts };
 }
 
-// 인계용 통째 묶음. 현재 세션(epoch) 범위. id 순 정렬, 해시 검증용.
+export interface TabRepo {
+    directory: string | null;
+    remote: string | null;
+    branch: string | null;
+}
+
+// 탭 작업폴더 + git 정체. 폴더 지정·매칭용. 전부 best-effort.
+export function tabRepoInfo(sessionID: string): TabRepo {
+    const path = dbPath();
+    if (!path) {
+        return { directory: null, remote: null, branch: null };
+    }
+    const db = new DatabaseSync(path, { readOnly: true });
+    try {
+        const row = db.prepare("SELECT directory FROM session_v2 WHERE id = ?").get(sessionID) as
+            | { directory: string | null }
+            | undefined;
+        return repoForDirectory(row?.directory ?? null);
+    } catch {
+        return { directory: null, remote: null, branch: null };
+    } finally {
+        db.close();
+    }
+}
+
+export function repoForDirectory(directory: string | null): TabRepo {
+    if (!directory) {
+        return { directory: null, remote: null, branch: null };
+    }
+    return { directory, remote: gitRemote(directory), branch: gitBranch(directory) };
+}
+
+// remote 같은 로컬 폴더 찾기. 없으면 null.
+export function findLocalDirByRemote(remote: string): string | null {
+    if (!remote) {
+        return null;
+    }
+    for (const dir of localProjectDirs()) {
+        try {
+            if (gitRemote(dir) === remote) {
+                return dir;
+            }
+        } catch {
+            // 다음 후보
+        }
+    }
+    return null;
+}
+
+// 탭 작업폴더 재지정. 단일 컬럼이라 안전.
+export function setTabDirectory(tabId: string, directory: string): void {
+    const path = dbPath();
+    if (!path) {
+        throw new Error("opencode db not found");
+    }
+    const db = new DatabaseSync(path);
+    try {
+        const cols = db.prepare("SELECT name FROM pragma_table_info('session_v2')").all() as { name: string }[];
+        const names = new Set(cols.map((c) => c.name));
+        if (names.has("directory")) {
+            db.prepare("UPDATE session_v2 SET directory = ? WHERE id = ?").run(directory, tabId);
+        }
+        const cols1 = db.prepare("SELECT name FROM pragma_table_info('session')").all() as { name: string }[];
+        if (new Set(cols1.map((c) => c.name)).has("directory")) {
+            try {
+                db.prepare("UPDATE session SET directory = ? WHERE id = ?").run(directory, tabId);
+            } catch {
+                // v1에 해당 행 없으면 무시
+            }
+        }
+    } finally {
+        db.close();
+    }
+}
+
+function gitRemote(dir: string): string | null {
+    try {
+        const out = execSync("git remote get-url origin", { cwd: dir, timeout: 5000, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+        const remote = out.trim();
+        return remote.length > 0 ? remote : null;
+    } catch {
+        return null;
+    }
+}
+
+function gitBranch(dir: string): string | null {
+    try {
+        const out = execSync("git branch --show-current", { cwd: dir, timeout: 5000, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+        const branch = out.trim();
+        return branch.length > 0 ? branch : null;
+    } catch {
+        return null;
+    }
+}
+
+// 로컬 후보 폴더 목록. OpenCode가 아는 폴더만. 전수 탐색 없음.
+export function localProjectDirs(): string[] {
+    const path = dbPath();
+    if (!path) {
+        return [];
+    }
+    const db = new DatabaseSync(path, { readOnly: true });
+    try {
+        const rows = db.prepare("SELECT worktree FROM project WHERE worktree IS NOT NULL AND worktree != ''").all() as {
+            worktree: string;
+        }[];
+        return [...new Set(rows.map((r) => r.worktree))];
+    } catch {
+        return [];
+    } finally {
+        db.close();
+    }
+}
 // v2는 session_message, v1은 message+part에서 읽는다.
 export function readTabPackage(sessionID: string): TabPackage {
     const path = dbPath();
@@ -304,6 +418,7 @@ export function readTabPackage(sessionID: string): TabPackage {
                 flavor: "v1" as const,
                 title: meta?.title ?? null,
                 directory: meta?.directory ?? null,
+                repo: repoForDirectory(meta?.directory ?? null),
                 version: meta?.version ?? null,
                 agent: meta?.agent ?? null,
                 modelJson: meta?.model ?? null,
@@ -323,6 +438,16 @@ export function readTabPackage(sessionID: string): TabPackage {
                 "SELECT id, type, seq, time_created AS createdAt, time_updated AS updatedAt, data FROM session_message WHERE session_id = ? AND seq > ? ORDER BY id ASC",
             )
             .all(sessionID, cut) as unknown as (TabMessage & { type: string })[];
+        const v2dir = (() => {
+            try {
+                const r = db.prepare("SELECT directory FROM session_v2 WHERE id = ?").get(sessionID) as
+                    | { directory: string | null }
+                    | undefined;
+                return r?.directory ?? null;
+            } catch {
+                return null;
+            }
+        })();
         const parts = db
             .prepare(
                 "SELECT p.id, p.message_id AS messageId, p.time_created AS createdAt, p.time_updated AS updatedAt, p.data FROM part p INNER JOIN session_message m ON m.id = p.message_id WHERE m.session_id = ? AND m.seq > ? ORDER BY p.id ASC",
@@ -334,6 +459,7 @@ export function readTabPackage(sessionID: string): TabPackage {
             flavor: "v2" as const,
             title: meta?.title ?? null,
             directory: meta?.directory ?? null,
+            repo: repoForDirectory(v2dir ?? meta?.directory ?? null),
             version: meta?.version ?? null,
             agent: meta?.agent ?? null,
             modelJson: meta?.model ?? null,

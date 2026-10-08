@@ -11,6 +11,8 @@ import { getBytes, putBytes } from "./storage";
 export interface HandoffVersion {
     tabId: string;
     title?: string | null;
+    remote?: string | null;
+    branch?: string | null;
     epoch: number;
     version: string;
     storageKey: string;
@@ -29,7 +31,7 @@ function sha256Hex(data: string): string {
 }
 
 // 통째 스냅샷 포장. 불변 버전, 합치기 없음.
-export function packTab(sessionID: string): { bytes: Uint8Array; sha256: string; rowCount: number; baseHash: string; userMsgs: number; aiMsgs: number } {
+export function packTab(sessionID: string): { bytes: Uint8Array; sha256: string; rowCount: number; baseHash: string; userMsgs: number; aiMsgs: number; remote: string | null; branch: string | null } {
     const pkg = readTabPackage(sessionID);
     const canonical = JSON.stringify(pkg);
     const baseHash = sha256Hex(
@@ -42,6 +44,8 @@ export function packTab(sessionID: string): { bytes: Uint8Array; sha256: string;
         baseHash,
         userMsgs: pkg.messages.filter((m) => m.type === "user").length,
         aiMsgs: pkg.messages.filter((m) => m.type === "assistant").length,
+        remote: pkg.repo?.remote ?? null,
+        branch: pkg.repo?.branch ?? null,
     };
 }
 
@@ -75,8 +79,7 @@ export async function pushTabs(server: DiscoveredServer, sessionIDs: string[]): 
         console.log(`Pushing (${i + 1}/${sessionIDs.length}) ${name}...`);
         const packed = packTab(sid);
         const epoch = epochOf(sid);
-        const { userMsgs, aiMsgs } = packed;
-        const version = `${Date.now()}`;
+        const { userMsgs, aiMsgs } = packed;        const version = `${Date.now()}`;
         const key = `${state.userId}/${sid}/${epoch}/${version}.bin.gz`;
         putProgress(name, 30);
         await putBytes(key, packed.bytes);
@@ -86,6 +89,8 @@ export async function pushTabs(server: DiscoveredServer, sessionIDs: string[]): 
             title,
             userMsgs,
             aiMsgs,
+            remote: packed.remote,
+            branch: packed.branch,
             epoch,
             version,
             storageKey: key,

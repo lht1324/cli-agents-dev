@@ -6,7 +6,10 @@ import { syncSessions } from "./sessions";
 import { setSessionAgent, setSessionModel, syncCatalog, type ModelRef } from "./catalog";
 import { backfillMissing, syncActiveMessages, syncMessages } from "./messages";
 import { checkboxPick, listVersions, pickNumbers, pullVersion, pushTabs, type HandoffVersion } from "./handoff";
-import { countAll, countNewer, epochOf, localRoleCounts, sessionExists } from "./localdb";
+import { countAll, countNewer, epochOf, findLocalDirByRemote, localRoleCounts, repoForDirectory, sessionExists, setTabDirectory } from "./localdb";
+import { askTyped, isDir, pickDirectory } from "./sysdialog";
+import { execSync } from "node:child_process";
+import { join } from "node:path";
 import { readPushMark } from "./pushstate";
 import { listPending, reply, pushPending, type ReplyDecision } from "./permissions";
 import { pollCommands } from "./commands";
@@ -168,10 +171,64 @@ async function onPull(): Promise<void> {
             console.log(`Skipped ${version.title ?? version.tabId}: version is epoch ${version.epoch}, local tab is epoch ${localEpoch}.`);
             continue;
         }
+        const dir = await resolveTabDir(version.remote ?? null, version.title ?? version.tabId);
+        if (!dir) {
+            console.log(`Skipped ${version.title ?? version.tabId}: no folder.`);
+            continue;
+        }
         const applied = await pullVersion(version);
-        console.log(applied.created ? `Created new tab ${applied.title}.` : `Updated local tab ${applied.title}.`);
+        try {
+            setTabDirectory(version.tabId, dir);
+        } catch {
+            // 폴더 지정 실패해도 내용은 들어감
+        }
+        console.log(applied.created ? `Created new tab ${applied.title} in ${dir}.` : `Updated local tab ${applied.title} (${dir}).`);
         console.log(`Done: ${applied.messages} messages, ${applied.parts} parts applied.`);
     }
+}
+
+// 작업폴더 확정. 자동 매칭 → 새로/기존 → 선택기/clone/검증.
+async function resolveTabDir(remote: string | null, label: string): Promise<string | null> {
+    if (remote) {
+        const match = findLocalDirByRemote(remote);
+        if (match) {
+            console.log(`Matched folder: ${match}`);
+            return match;
+        }
+    }
+    console.log(`No local folder for ${label}${remote ? ` (${remote})` : ""}.`);
+    const choice = (await askTyped("New clone or existing folder? [new/existing]: ")).toLowerCase();
+    if (choice.startsWith("e")) {
+        const dir = await pickDirectory();
+        if (!dir || !isDir(dir)) {
+            return null;
+        }
+        if (remote) {
+            const got = repoForDirectory(dir).remote;
+            if (got !== remote) {
+                console.log(`Stopped: folder remote is ${got ?? "none"}, expected ${remote}.`);
+                return null;
+            }
+        }
+        return dir;
+    }
+    if (!remote) {
+        return null;
+    }
+    const parent = await pickDirectory();
+    if (!parent || !isDir(parent)) {
+        return null;
+    }
+    const name = remote.split("/").pop()?.replace(/\.git$/, "") ?? "repo";
+    const target = join(parent, name);
+    console.log(`Cloning into ${target}...`);
+    try {
+        execSync(`git clone "${remote}" "${target}"`, { timeout: 300000, stdio: "inherit" });
+    } catch {
+        console.log("Clone failed.");
+        return null;
+    }
+    return target;
 }
 
 async function onWhoami(): Promise<void> {
