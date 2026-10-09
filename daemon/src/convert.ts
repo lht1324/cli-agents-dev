@@ -326,8 +326,8 @@ export function v1MessageProblems(data: string, hasPrevUser: boolean): string[] 
         need("tokens", !!tokens && ["input", "output", "reasoning"].every((k) => typeof tokens[k] === "number"));
     }
     if (d["role"] === "user") {
-        // v1 user행에 model 없음. 본가 스키마상 metadata.assistant는 assistant 전용 optional.
-        return missing;
+        const model = d["model"] as Record<string, unknown> | undefined;
+        need("model", !!model && typeof model["modelID"] === "string");
     }
     return missing;
 }
