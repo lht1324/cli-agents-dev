@@ -6,7 +6,7 @@ import { ensureServer, killOwned, type ManagedServer } from "./serve";
 import { syncSessions } from "./sessions";
 import { setSessionAgent, setSessionModel, syncCatalog, type ModelRef } from "./catalog";
 import { backfillMissing, syncActiveMessages, syncMessages } from "./messages";
-import { checkboxPick, listVersions, pickNumbers, pullVersion, pushTabs, syncOneTab, type HandoffVersion } from "./handoff";
+import { checkboxPick, dumpTab, listVersions, pickNumbers, pullVersion, pushTabs, syncOneTab, type HandoffVersion } from "./handoff";
 import { countAll, countNewer, epochOf, findLocalDirByRemote, localRoleCounts, repoForDirectory, sessionExists, setTabDirectory } from "./localdb";
 import { askTyped, isDir, pickDirectory } from "./sysdialog";
 import { execSync } from "node:child_process";
@@ -259,6 +259,19 @@ async function resolveTabDir(remote: string | null, label: string): Promise<stri
         return null;
     }
     return target;
+}
+
+async function onDump(sessionID: string | undefined): Promise<void> {
+    if (!sessionID) {
+        throw new Error("usage: localagents dump <session-id>");
+    }
+    const state = readState();
+    if (!state) {
+        throw new Error("not logged in. run `localagents login` first");
+    }
+    const server = await ensureServer();
+    const result = await dumpTab(server, state.userId, sessionID);
+    console.log(`dumped: ${result.key} (${result.bytes} bytes)`);
 }
 
 async function onWhoami(): Promise<void> {
@@ -722,6 +735,7 @@ async function main(): Promise<void> {
         "sync-models",
         "sync-sessions",
         "poll",
+        "dump",
     ]);
     // 숨김 진단 명령. 플래그 없이 치면 없는 명령으로 보인다. run은 unit이 쓰니 예외.
     if (cmd && advanced.has(cmd) && !process.argv.includes("--jaeholee")) {
@@ -760,6 +774,8 @@ async function main(): Promise<void> {
         await onRun();
     } else if (cmd === "poll") {
         await pollCommands();
+    } else if (cmd === "dump") {
+        await onDump(args[1]);
     } else {
         if (cmd) {
             console.log(`unknown command: ${cmd}`);

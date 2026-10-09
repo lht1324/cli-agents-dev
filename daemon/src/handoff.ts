@@ -3,7 +3,7 @@ import { gzipSync, gunzipSync } from "node:zlib";
 import { createInterface } from "node:readline";
 import { apiGet, type DiscoveredServer } from "./server";
 import { cloudGet, cloudPost } from "./cloud";
-import { readState } from "./device";
+import { baseUrl, readState } from "./device";
 import { backfillSession } from "./messages";
 import { applyTabPackageUpsert, epochOf, latestOf, readTabPackage, type TabPackage } from "./localdb";
 import { readPushMark, writePushMark } from "./pushstate";
@@ -151,6 +151,35 @@ export async function syncOneTab(
     }
 }
 
+// dump 진단. 정준 패키지를 Storage user_id/dump에 올리고 키만 뱉는다. 포인터 없음.
+export async function dumpTab(server: DiscoveredServer, userId: string, sid: string): Promise<{ key: string; bytes: number }> {
+    const packed = packTab(sid);
+    const key = `${userId}/dump/${sid}-${Date.now()}.bin.gz`;
+    const res = await fetch(`${baseUrl()}/api/handoffs/url`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${readState()?.token ?? ""}` },
+        body: JSON.stringify({ operation: "upload", key }),
+        signal: AbortSignal.timeout(30000),
+    });
+    if (!res.ok) {
+        throw new Error(`url rejected: ${res.status}`);
+    }
+    const body = (await res.json()) as { data?: { url?: string; method?: string; headers?: Record<string, string> } };
+    const url = body.data?.url;
+    if (!url) {
+        throw new Error("presign returned no url");
+    }
+    const put = await fetch(url, {
+        method: body.data?.method ?? "PUT",
+        headers: { "Content-Type": "application/gzip", ...(body.data?.headers ?? {}) },
+        body: Buffer.from(packed.bytes),
+        signal: AbortSignal.timeout(120000),
+    });
+    if (!put.ok) {
+        throw new Error(`upload rejected: ${put.status}`);
+    }
+    return { key, bytes: packed.bytes.length };
+}
 // pull 본체. 버전 고르기 → 받기 → upsert(없으면 생성) → 검증. 함수라 자동화도 같은 걸 부른다.
 export async function pullVersion(version: HandoffVersion): Promise<{ created: boolean; messages: number; parts: number; title: string }> {
     const name = version.title ?? version.tabId;
