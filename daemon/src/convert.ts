@@ -286,10 +286,45 @@ export function toV1(pkg: TabPackage, ctx: Ctx): Converted {
             continue;
         }
         if (m.type === "compaction") {
-            // epoch 경계. 합치기 앵커를 끊는다.
+            // epoch 경계. 합치기 앵커를 끊고, v1 요약 assistant로 남긴다.
             mergeAnchor = null;
-            prevId = m.id;
-            skipped++;
+            const summary = str(d["summary"]);
+            if (summary) {
+                const at = m.createdAt ?? ctx.now;
+                messages.push({
+                    id: m.id,
+                    type: "assistant",
+                    seq: seq++,
+                    createdAt: at,
+                    updatedAt: m.updatedAt,
+                    data: JSON.stringify({
+                        parentID: prevId,
+                        role: "assistant",
+                        mode: ctx.agent,
+                        agent: ctx.agent,
+                        variant: null,
+                        path: { cwd: ctx.directory, root: ctx.directory },
+                        cost: 0,
+                        tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+                        modelID: ctx.modelID,
+                        providerID: ctx.providerID,
+                        time: { created: at },
+                        finish: "stop",
+                        summary: true,
+                    }),
+                });
+                parts.push({
+                    id: `prt_${m.id.slice(4, 16)}_s`,
+                    messageId: m.id,
+                    createdAt: at,
+                    updatedAt: at,
+                    data: JSON.stringify({ type: "text", text: summary }),
+                });
+                prevId = m.id;
+            } else {
+                prevId = m.id;
+                skipped++;
+            }
             continue;
         }
         skipped++;
