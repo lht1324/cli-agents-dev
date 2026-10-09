@@ -155,8 +155,8 @@ export function toV1(pkg: TabPackage, ctx: Ctx): Converted {
         }
         const at = m.createdAt ?? ctx.now;
         if (m.type === "user" || m.type === "synthetic" || m.type === "system") {
-            // system은 카탈로그 같은 재생성 잡음이라 가져오지 않는다.
-            if (m.type === "system") {
+            // system·synthetic은 시스템 통지라 가져오지 않는다. user로 두면 GUI에 섞여 보인다.
+            if (m.type === "system" || m.type === "synthetic") {
                 skipped++;
                 continue;
             }
