@@ -1,4 +1,4 @@
-2026-10-09 04:05
+2026-10-11 04:31
 
 # context.md - cli-agents-dev
 
@@ -290,14 +290,18 @@
 - 실측: 폴백(daemon cwd)으로 넣었더니 엉뚱한 프로젝트에 붙어 GUI에서 안 보임. `short_real`로 수동 정정済み.
 - 결정 필요: (a) pack에 프로젝트명+상대경로 포함 → pull 때 동명 매칭, 없으면 생성·확인. (b) 가져온 탭 격리 프로젝트에 두고 사용자 지정. (c) 절대경로 그대로 + 경고만.
 
-## v1v2 변환기 (2026-10-08~09, 이 PC)
+## v1v2 변환기 (2026-10-08~11, 이 PC)
 - 근거: 본가 GitHub 직접 대조. v2 `session-message.ts`·`model.ts`·`session/sql.ts`·`v1-migration.bun.ts` + v1 태그 `1.18.33` `message.ts`. 본가 이관은 v1→v2 단방향만 (역방향 없음).
 - `daemon/src/convert.ts`: 양방향. v2→v1 full 매핑 (parentID=user 체인·연속 assistant 병합·agent/modelID/mode/variant/finish·tool 결과·reasoning time). v1→v2는 본가 축소판.
-- 크래시 체인 (1.18 검증이 1개씩 뱉음): messageID → modelID → mode → 부모user → agent → reasoning time. 전부 수정済み.
+- 크래시 체인 (1.18 검증이 1개씩 뱉음): messageID → modelID → mode → 부모user → agent → reasoning time → tool title/metadata. 전부 수정済み.
+- 208% 원인: 병합 시 토큰 합산 버그 (실측 435K 5개 합산). 마지막 호출 덮기로 수정. 패널=마지막 호출 1건 (네이티브 대조済み).
+- 843 파트 정상: 패키지 인라인 404개 합성. 중복 아님.
 - v1 쓰기 게이트: 필수 키 전수 검사 후 기록, 빠지면 필드명 뱉고 중단. 시험 대신 대조.
-- 미검증: GUI 확인. 포인터 0건이라 재pull 불가. Arch 재push 대기 중.
+- pull UX: 체크박스 선택·진행률 바·탭 이름·`AI +M · User +N` 순서. 지운 탭 재표시 (`received` + 로컬 부재 시 표시).
+- V1Migration 통째 이식 기각: 단방향 손실 변환이라 역산 불가 + Effect/bun 결합. 해당 함수만 포팅 방침.
 - 버전 정정2: npm `latest` = 1.18.35 (v1이 기본 채널). v2는 별도 BETA. 이 Mac CLI 1.18.2 + 데스크톱 1.18.35 = 둘 다 v1. v1 대응은 제품 차원 필수.
 - 주의: `:3000`은 tailored-ad 서버. 우리 데몬 `baseUrl` 기본값이라 남의 집에 명령감. 우리 웹은 딴 포트 + `LOCALAGENTS_BASE_URL`.
+- 미검증: GUI 확인. 포인터 0건이라 재pull 불가. Arch 재push 대기 중 (`8f7aa88` 푸시済み).
 
 ## OS 등록 (2026-10-03 완료 → 2026-10-06 개명, Arch)
 - `~/.local/bin/localagents` 래퍼 + `~/.config/localagents/env` (DATABASE_URL 1개, 600) + systemd user unit `localagents.service`.
