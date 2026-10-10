@@ -147,6 +147,78 @@ export function toV1(pkg: TabPackage, ctx: Ctx): Converted {
         }
         parts.push({ ...p, messageId });
     };
+    // 인라인 content[] → v1 파트 합성. 별도 행이 없을 때만 쓴다.
+    const synthesizeContent = (messageId: string, content: unknown, at: number | null, updatedAt: number | null): void => {
+        if (!Array.isArray(content)) {
+            return;
+        }
+        const stamp = at ?? ctx.now;
+        for (const b of content) {
+            if (!b || typeof b !== "object") {
+                continue;
+            }
+            const block = b as Record<string, unknown>;
+            if (block["type"] === "text" && typeof block["text"] === "string") {
+                parts.push({
+                    id: `prt_${messageId.slice(4, 16)}_${parts.length}`,
+                    messageId,
+                    createdAt: stamp,
+                    updatedAt: stamp,
+                    data: JSON.stringify({ type: "text", text: block["text"] }),
+                });
+            } else if (block["type"] === "reasoning" && typeof block["text"] === "string") {
+                parts.push({
+                    id: `prt_${messageId.slice(4, 16)}_${parts.length}`,
+                    messageId,
+                    createdAt: stamp,
+                    updatedAt: stamp,
+                    data: JSON.stringify({ type: "reasoning", text: block["text"], time: { start: stamp, end: stamp } }),
+                });
+            } else if (block["type"] === "tool") {
+                const state = (block["state"] ?? {}) as Record<string, unknown>;
+                const status = state["status"];
+                const input = state["input"] ?? {};
+                const callID = str(block["id"], messageId);
+                const tool = str(block["name"], "unknown");
+                const created = num((state["time"] as Record<string, unknown> | undefined)?.["start"], stamp);
+                if (status === "completed") {
+                    const contentBlocks = Array.isArray(state["content"]) ? (state["content"] as unknown[]) : [];
+                    const output = contentBlocks
+                        .filter(
+                            (c): c is { type: string; text: string } =>
+                                !!c && typeof c === "object" && (c as { type?: unknown }).type === "text",
+                        )
+                        .map((c) => c.text)
+                        .join("\n\n");
+                    parts.push({
+                        id: `prt_${messageId.slice(4, 16)}_${parts.length}`,
+                        messageId,
+                        createdAt: stamp,
+                        updatedAt: stamp,
+                        data: JSON.stringify({
+                            type: "tool",
+                            tool,
+                            callID,
+                            state: { status: "completed", input, output, time: { start: created, end: updatedAt ?? created } },
+                        }),
+                    });
+                } else {
+                    parts.push({
+                        id: `prt_${messageId.slice(4, 16)}_${parts.length}`,
+                        messageId,
+                        createdAt: stamp,
+                        updatedAt: stamp,
+                        data: JSON.stringify({
+                            type: "tool",
+                            tool,
+                            callID,
+                            state: { status: "error", input, error: "interrupted before handoff", time: { start: created, end: created } },
+                        }),
+                    });
+                }
+            }
+        }
+    };
     for (const m of pkg.messages) {
         const d = json(m.data);
         if (!d) {
@@ -220,8 +292,12 @@ export function toV1(pkg: TabPackage, ctx: Ctx): Converted {
                     // 합치기 실패해도 파트는 살린다
                 }
                 const separate = rowsByMessage.get(m.id) ?? [];
-                for (const p of separate) {
-                    convertRow(last.id, p, at);
+                if (separate.length === 0) {
+                    synthesizeContent(last.id, d["content"], at, m.updatedAt);
+                } else {
+                    for (const p of separate) {
+                        convertRow(last.id, p, at);
+                    }
                 }
                 prevId = m.id;
                 continue;
@@ -251,32 +327,7 @@ export function toV1(pkg: TabPackage, ctx: Ctx): Converted {
             mergeAnchor = messages[messages.length - 1];
             const separate = rowsByMessage.get(m.id) ?? [];
             if (separate.length === 0) {
-                const content = d["content"];
-                if (Array.isArray(content)) {
-                    for (const b of content) {
-                        if (!b || typeof b !== "object") {
-                            continue;
-                        }
-                        const block = b as Record<string, unknown>;
-                        if (block["type"] === "text" && typeof block["text"] === "string") {
-                            parts.push({
-                                id: `prt_${m.id.slice(4, 16)}_${parts.length}`,
-                                messageId: m.id,
-                                createdAt: at,
-                                updatedAt: at,
-                                data: JSON.stringify({ type: "text", text: block["text"] }),
-                            });
-                        } else if (block["type"] === "reasoning" && typeof block["text"] === "string") {
-                            parts.push({
-                                id: `prt_${m.id.slice(4, 16)}_${parts.length}`,
-                                messageId: m.id,
-                                createdAt: at,
-                                updatedAt: at,
-                                data: JSON.stringify({ type: "reasoning", text: block["text"], time: { start: at, end: at } }),
-                            });
-                        }
-                    }
-                }
+                synthesizeContent(m.id, d["content"], at, m.updatedAt);
             } else {
                 for (const p of separate) {
                     convertRow(m.id, p, at);
@@ -328,6 +379,30 @@ export function toV1(pkg: TabPackage, ctx: Ctx): Converted {
             continue;
         }
         skipped++;
+    }
+    // 유저행 모델 보정. 뒤쪽 assistant 모델을 앞으로 당긴다 (네이티브와 같은 표시).
+    let carry: { modelID: string; providerID: string; variant?: string } | null = null;
+    for (let i = messages.length - 1; i >= 0; i--) {
+        const m = messages[i];
+        try {
+            const d = JSON.parse(m.data) as Record<string, unknown>;
+            if (m.type === "assistant") {
+                const modelID = d["modelID"];
+                const providerID = d["providerID"];
+                if (typeof modelID === "string" && typeof providerID === "string") {
+                    carry = {
+                        modelID,
+                        providerID,
+                        ...(typeof d["variant"] === "string" ? { variant: d["variant"] as string } : {}),
+                    };
+                }
+            } else if (m.type === "user" && carry) {
+                d["model"] = { providerID: carry.providerID, modelID: carry.modelID };
+                m.data = JSON.stringify(d);
+            }
+        } catch {
+            // 유지
+        }
     }
     return { messages, parts, skipped };
 }
