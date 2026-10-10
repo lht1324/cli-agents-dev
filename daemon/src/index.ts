@@ -162,7 +162,8 @@ async function onPull(): Promise<void> {
     const mine = state?.deviceId ?? "";
     const latest = new Map<string, (typeof versions)[number]>();
     for (const v of versions) {
-        if (v.receivedBy === mine) {
+        // 받은 건 숨김. 단 로컬에 탭이 없으면(지웠으면) 다시 보여준다.
+        if (v.receivedBy === mine && sessionExists(v.tabId)) {
             continue;
         }
         const cur = latest.get(v.tabId);
