@@ -85,6 +85,24 @@ export function toV1(pkg: TabPackage, ctx: Ctx): Converted {
         list.push(p);
         rowsByMessage.set(p.messageId, list);
     }
+    // tool 표시 제목. 네이티브 규칙: read=파일명, bash=명령, 기타=도구명.
+    const toolTitle = (tool: string, input: unknown): string => {
+        const args = (input ?? {}) as Record<string, unknown>;
+        if (tool === "read" || tool === "edit" || tool === "write") {
+            const fp = args["filePath"] ?? args["path"] ?? args["file"];
+            if (typeof fp === "string" && fp.length > 0) {
+                const base = fp.split("/").pop() ?? fp;
+                return base.length > 0 ? base : tool;
+            }
+        }
+        if (tool === "bash") {
+            const cmd = args["command"];
+            if (typeof cmd === "string" && cmd.length > 0) {
+                return cmd.slice(0, 200);
+            }
+        }
+        return tool;
+    };
     // 별도 행을 v1 모양으로. id 유지. 모르는 종류는 원문 통과.
     const convertRow = (messageId: string, p: TabPart, at: number | null): void => {
         const pd = json(p.data);
@@ -128,7 +146,7 @@ export function toV1(pkg: TabPackage, ctx: Ctx): Converted {
                         type: "tool",
                         tool,
                         callID,
-                        state: { status: "completed", input, output, time: { start: created, end: p.updatedAt ?? created } },
+                        state: { status: "completed", input, output, title: toolTitle(tool, input), time: { start: created, end: p.updatedAt ?? created } },
                     }),
                 });
             } else {
@@ -139,7 +157,7 @@ export function toV1(pkg: TabPackage, ctx: Ctx): Converted {
                         type: "tool",
                         tool,
                         callID,
-                        state: { status: "error", input, error: "interrupted before handoff", time: { start: created, end: created } },
+                        state: { status: "error", input, error: "interrupted before handoff", title: toolTitle(tool, input), time: { start: created, end: created } },
                     }),
                 });
             }
@@ -199,7 +217,7 @@ export function toV1(pkg: TabPackage, ctx: Ctx): Converted {
                             type: "tool",
                             tool,
                             callID,
-                            state: { status: "completed", input, output, time: { start: created, end: updatedAt ?? created } },
+                            state: { status: "completed", input, output, title: toolTitle(tool, input), time: { start: created, end: updatedAt ?? created } },
                         }),
                     });
                 } else {
@@ -212,7 +230,7 @@ export function toV1(pkg: TabPackage, ctx: Ctx): Converted {
                             type: "tool",
                             tool,
                             callID,
-                            state: { status: "error", input, error: "interrupted before handoff", time: { start: created, end: created } },
+                        state: { status: "error", input, error: "interrupted before handoff", title: toolTitle(tool, input), time: { start: created, end: created } },
                         }),
                     });
                 }
@@ -275,17 +293,11 @@ export function toV1(pkg: TabPackage, ctx: Ctx): Converted {
             // 1.18은 assistant 연속 불가. 직전 배출이 assistant면 합친다 (첫 id 유지).
             const last = mergeAnchor;
             if (last) {
+                // 합산 금지. 패널이 마지막 호출 기준으로 보여서 합치면 부풀어 보인다. 마지막 값으로 덮는다.
                 try {
                     const prev = JSON.parse(last.data) as Record<string, unknown>;
-                    const pt = (prev["tokens"] ?? {}) as Record<string, unknown>;
-                    const pc = (pt["cache"] ?? {}) as Record<string, unknown>;
-                    prev["cost"] = num(prev["cost"]) + num(d["cost"]);
-                    prev["tokens"] = {
-                        input: num(pt["input"]) + num(tokens["input"]),
-                        output: num(pt["output"]) + num(tokens["output"]),
-                        reasoning: num(pt["reasoning"]) + num(tokens["reasoning"]),
-                        cache: { read: num(pc["read"]) + num(cache["read"]), write: num(pc["write"]) + num(cache["write"]) },
-                    };
+                    prev["cost"] = num(d["cost"], num(prev["cost"]));
+                    prev["tokens"] = d["tokens"] ?? prev["tokens"];
                     last.data = JSON.stringify(prev);
                     last.updatedAt = m.updatedAt;
                 } catch {
