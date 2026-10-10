@@ -146,7 +146,7 @@ export function toV1(pkg: TabPackage, ctx: Ctx): Converted {
                         type: "tool",
                         tool,
                         callID,
-                        state: { status: "completed", input, output, title: toolTitle(tool, input), time: { start: created, end: p.updatedAt ?? created } },
+                        state: { status: "completed", input, output, title: toolTitle(tool, input), metadata: {}, time: { start: created, end: p.updatedAt ?? created } },
                     }),
                 });
             } else {
@@ -157,7 +157,7 @@ export function toV1(pkg: TabPackage, ctx: Ctx): Converted {
                         type: "tool",
                         tool,
                         callID,
-                        state: { status: "error", input, error: "interrupted before handoff", title: toolTitle(tool, input), time: { start: created, end: created } },
+                        state: { status: "error", input, error: "interrupted before handoff", title: toolTitle(tool, input), metadata: {}, time: { start: created, end: created } },
                     }),
                 });
             }
@@ -217,7 +217,7 @@ export function toV1(pkg: TabPackage, ctx: Ctx): Converted {
                             type: "tool",
                             tool,
                             callID,
-                            state: { status: "completed", input, output, title: toolTitle(tool, input), time: { start: created, end: updatedAt ?? created } },
+                            state: { status: "completed", input, output, title: toolTitle(tool, input), metadata: {}, time: { start: created, end: updatedAt ?? created } },
                         }),
                     });
                 } else {
@@ -230,7 +230,7 @@ export function toV1(pkg: TabPackage, ctx: Ctx): Converted {
                             type: "tool",
                             tool,
                             callID,
-                        state: { status: "error", input, error: "interrupted before handoff", title: toolTitle(tool, input), time: { start: created, end: created } },
+                            state: { status: "error", input, error: "interrupted before handoff", title: toolTitle(tool, input), metadata: {}, time: { start: created, end: created } },
                         }),
                     });
                 }
@@ -480,6 +480,8 @@ export function v1PartProblems(data: string): string[] {
         need("callID", typeof d["callID"] === "string");
         const state = d["state"] as Record<string, unknown> | undefined;
         need("state.status", !!state && typeof state["status"] === "string");
+        need("state.title", !!state && typeof state["title"] === "string");
+        need("state.metadata", !!state && !!state["metadata"] && typeof state["metadata"] === "object");
         const time = state?.["time"] as Record<string, unknown> | undefined;
         need("state.time.start", !!time && typeof time["start"] === "number");
     }
