@@ -17,19 +17,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     authClient={authClient}
                     social={{ providers: ["google", "github"] }}
                 >
-                    <header className="flex h-14 items-center justify-between border-b border-line px-4">
-                        <nav className="flex items-center gap-5">
-                            <Link href="/" className="font-mono font-bold">
-                                localagents
-                            </Link>
-                            <Link href="/sessions" className="text-sm text-dim hover:text-fog">
-                                Sessions
-                            </Link>
-                            <Link href="/devices" className="text-sm text-dim hover:text-fog">
-                                Devices
-                            </Link>
-                        </nav>
-                        <UserButton size={"icon"} />
+                    <header className="border-b border-line">
+                        <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between px-4">
+                            <nav className="flex items-center gap-5">
+                                <Link href="/" className="font-mono font-bold">
+                                    localagents
+                                </Link>
+                                <Link href="/sessions" className="text-sm text-dim hover:text-fog">
+                                    Sessions
+                                </Link>
+                                <Link href="/devices" className="text-sm text-dim hover:text-fog">
+                                    Devices
+                                </Link>
+                            </nav>
+                            <UserButton size={"icon"} />
+                        </div>
                     </header>
                     {children}
                 </NeonAuthUIProvider>
