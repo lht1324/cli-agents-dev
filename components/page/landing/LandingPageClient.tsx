@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import FeaturesSection from "./features-section/FeaturesSection";
 
 const STEPS = [
     {
@@ -48,10 +49,10 @@ export default function LandingPageClient() {
                         <h1 className="mt-4 text-4xl font-bold tracking-tight md:text-5xl">
                             Mission control for your CLI agents.
                         </h1>
-                        <p className="mt-4 max-w-[65ch] text-dim">
-                            Your tabs follow you from desktop to laptop to phone. No SSH. No lost
-                            sessions. Approvals answerable from anywhere.
-                        </p>
+                            <p className="mt-4 max-w-[65ch] text-dim">
+                                Your tabs follow you from desktop to laptop to phone. No SSH. No lost
+                                sessions. Check in from anywhere.
+                            </p>
                         <div className="mt-6 flex gap-3">
                             <Link
                                 href="/auth/sign-in"
@@ -71,13 +72,6 @@ export default function LandingPageClient() {
                             <img
                                 src="https://cdn.simpleicons.org/opencode/9ca3af"
                                 alt="OpenCode"
-                                width={20}
-                                height={20}
-                                className="h-5 w-5"
-                            />
-                            <img
-                                src="https://cdn.simpleicons.org/claude/9ca3af"
-                                alt="Claude Code"
                                 width={20}
                                 height={20}
                                 className="h-5 w-5"
@@ -104,6 +98,8 @@ export default function LandingPageClient() {
                     </div>
                 </div>
             </section>
+
+            <FeaturesSection />
 
             <section id="how" className="scroll-mt-14 border-t border-line">
                 <div className="mx-auto w-full max-w-6xl px-4 py-16">
