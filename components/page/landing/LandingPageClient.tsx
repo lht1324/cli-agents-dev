@@ -109,8 +109,8 @@ export default function LandingPageClient() {
                     <h2 className="text-2xl font-bold tracking-tight">How it works</h2>
                     <div className="mt-8 grid gap-12 md:grid-cols-2">
                         <div>
-                            <h3 className="text-lg font-bold">On the web</h3>
-                            <p className="mt-1 text-sm text-dim">It runs itself.</p>
+                            <h3 className="text-lg font-bold">PC ↔ Phone</h3>
+                            <p className="mt-1 text-sm text-dim">Just leave your PC on.</p>
                             <ol className="mt-4">
                                 {WEB_STEPS.map((step, i) => (
                                     <li key={step.title} className="border-t border-line py-6">
@@ -127,8 +127,8 @@ export default function LandingPageClient() {
                             </ol>
                         </div>
                         <div>
-                            <h3 className="text-lg font-bold">Between PCs</h3>
-                            <p className="mt-1 text-sm text-dim">You drive.</p>
+                            <h3 className="text-lg font-bold">PC ↔ PC</h3>
+                            <p className="mt-1 text-sm text-dim">You drive, or ask your agent to.</p>
                             <ol className="mt-4">
                                 {PC_STEPS.map((step, i) => (
                                     <li key={step.title} className="border-t border-line py-6">
