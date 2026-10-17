@@ -3,21 +3,24 @@
 import Link from "next/link";
 import FeaturesSection from "./features-section/FeaturesSection";
 
-const STEPS = [
+const WEB_STEPS = [
     {
         code: "$ npx localagents login",
         title: "Pair this PC",
-        body: "One command. The daemon finds your OpenCode server and attaches. Nothing to configure.",
-    },
-    {
-        code: "$ localagents push",
-        title: "Share the tabs you pick",
-        body: "Push on demand, or let the schedule sync for you. Only the current session travels.",
+        body: "One command. After this the daemon syncs on its own schedule.",
     },
     {
         code: "localagents.link",
         title: "Steer from your phone",
-        body: "Watch progress, send instructions or questions, and answer Allow / Deny. No app to install.",
+        body: "The inbox stays current by itself. Watch, send instructions, answer Allow / Deny.",
+    },
+] as const;
+
+const PC_STEPS = [
+    {
+        code: "$ localagents push",
+        title: "Push the tabs you pick",
+        body: "Moving to another machine? Only the current session travels.",
     },
     {
         code: "$ localagents pull",
@@ -104,8 +107,10 @@ export default function LandingPageClient() {
             <section id="how" className="scroll-mt-14 border-t border-line">
                 <div className="mx-auto w-full max-w-6xl px-4 py-16">
                     <h2 className="text-2xl font-bold tracking-tight">How it works</h2>
-                    <ol className="mt-8 grid gap-x-12 md:grid-cols-2">
-                        {STEPS.map((step, i) => (
+                    <h3 className="mt-8 text-lg font-bold">On the web</h3>
+                    <p className="mt-1 text-sm text-dim">It runs itself.</p>
+                    <ol className="mt-4 grid gap-x-12 md:grid-cols-2">
+                        {WEB_STEPS.map((step, i) => (
                             <li key={step.title} className="border-t border-line py-6">
                                 <div className="flex items-baseline gap-4">
                                     <span className="font-mono text-sm text-go">
@@ -113,7 +118,23 @@ export default function LandingPageClient() {
                                     </span>
                                     <p className="font-mono text-xs text-fog">{step.code}</p>
                                 </div>
-                                <h3 className="mt-2 text-lg font-bold">{step.title}</h3>
+                                <h4 className="mt-2 font-bold">{step.title}</h4>
+                                <p className="mt-1 max-w-[60ch] text-sm text-dim">{step.body}</p>
+                            </li>
+                        ))}
+                    </ol>
+                    <h3 className="mt-10 text-lg font-bold">Between PCs</h3>
+                    <p className="mt-1 text-sm text-dim">You drive.</p>
+                    <ol className="mt-4 grid gap-x-12 md:grid-cols-2">
+                        {PC_STEPS.map((step, i) => (
+                            <li key={step.title} className="border-t border-line py-6">
+                                <div className="flex items-baseline gap-4">
+                                    <span className="font-mono text-sm text-go">
+                                        {String(i + 1).padStart(2, "0")}
+                                    </span>
+                                    <p className="font-mono text-xs text-fog">{step.code}</p>
+                                </div>
+                                <h4 className="mt-2 font-bold">{step.title}</h4>
                                 <p className="mt-1 max-w-[60ch] text-sm text-dim">{step.body}</p>
                             </li>
                         ))}
