@@ -15,9 +15,9 @@ const STEPS = [
         body: "Push on demand, or let the schedule sync for you. Only the current session travels.",
     },
     {
-        code: "Allow / Deny",
-        title: "Approve from anywhere",
-        body: "Permission prompts land in your inbox. Answer from your phone while the PC keeps working.",
+        code: "localagents.link",
+        title: "Steer from your phone",
+        body: "Watch progress, send instructions or questions, and answer Allow / Deny. No app to install.",
     },
     {
         code: "$ localagents pull",
