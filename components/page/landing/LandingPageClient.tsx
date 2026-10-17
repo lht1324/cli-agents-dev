@@ -10,7 +10,7 @@ const WEB_STEPS = [
         body: "One command. After this the daemon syncs on its own schedule.",
     },
     {
-        code: "localagents.link/sessions",
+        code: "https://localagents.link/sessions",
         title: "Steer from your phone",
         body: "The inbox stays current by itself. Watch, send instructions, answer Allow / Deny.",
     },
@@ -53,7 +53,9 @@ function StepList({ steps }: { steps: readonly Step[] }) {
         <ol className="mt-4">
             {steps.map((step, i) => {
                 const isCommand = step.code.startsWith("$ ");
-                const code = isCommand ? step.code.slice(2) : step.code;
+                const protocolAt = isCommand ? -1 : step.code.indexOf("://");
+                const protocol = protocolAt >= 0 ? step.code.slice(0, protocolAt + 3) : null;
+                const code = isCommand ? step.code.slice(2) : protocol ? step.code.slice(protocol.length) : step.code;
                 return (
                     <li key={step.title} className="border-t border-line py-6">
                         <div className="flex items-start gap-4">
@@ -64,6 +66,7 @@ function StepList({ steps }: { steps: readonly Step[] }) {
                                 <div className="inline-flex items-center rounded border border-line bg-black px-3 py-1.5">
                                     <span className="font-mono text-xs">
                                         {isCommand ? <span className="text-go">$ </span> : null}
+                                        {protocol ? <span className="text-dim">{protocol}</span> : null}
                                         <span className="text-fog">{code}</span>
                                     </span>
                                 </div>
