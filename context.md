@@ -1,4 +1,4 @@
-2026-10-11 04:31
+2026-10-18 05:41
 
 # context.md - cli-agents-dev
 
@@ -116,8 +116,23 @@
 - 보류: `logout`(출시 직전, revoke+상태삭제 30분) · `--help`(표면 안정 후) · `doctor`(진단 묶음) · `sessions` 표면 잔류 여부.
 - `send` 폐기. 메시지 전송은 웹에서만.
 
+## 랜딩 1차 개편 (2026-10-11 완료, 이 PC)
+- 스킬: `design-taste-frontend` 로드 후 적용. 데스크탑 전용으로 진행 (모바일은 나중에 `LandingPageDesktopClient`/`MobileClient` 분리 예정).
+- 구조: `proxy.ts` matcher에서 `/` 제외 (미로그인 공개). 헤더 내용물 `max-w-6xl`로 축소해 아바타를 콘텐츠 끝에 정렬.
+- 폭: `max-w-3xl`(768) → `max-w-6xl`(1152). 히어로 좌(카피+CTA+Works with)·우(터미널 트랜스크립트) 분할. 섹션마다 전체폭 `border-t`.
+- `features-section/FeaturesSection.tsx` 분리. "Walk away"(PC ↔ Phone 상황) / "Take it with you"(PC ↔ PC 상황) 2열, divide-x. `[~]-section` 폴더 규칙 시작.
+- HIW: PC ↔ Phone(자동, login→sessions) / PC ↔ PC(수동, push→pull) 2열. 자동/수동 축은 코드 실측 근거 (`run` 느린 층이 syncSessions·syncActiveMessages 자동, push/pull만 수동). HIW엔 구분선 없이 간격만 (Features와 레이아웃 반복 회피).
+- 터미널 칩: 명령줄을 `bg-black`(body `#0a0c10`보다 어둡게)+border 블록으로 분리. `$`만 `go` 초록. URL은 `https://` 흐림 + 도메인 밝게 (주소창 느낌). 목적지는 `/sessions` (devices 아님).
+- Claude 로고 제거 (데몬 미구현). OpenCode만 표기. 이모지 대신 텍스트+`↔` (터미널 감성, 렌더 편차 회피).
+- 카피: 서브 `Check in from anywhere`. HIW 서브 `Just leave your PC on.` / `You drive, or ask your agent to.` (에이전트 대행은 실제 가능한 범위만 주장).
+- 커밋: `e3e3752`~`9ace649` 8건.
+- 남음: 실물 스크린샷(1600×1000)·og:image, 모바일 분리, 나머지 섹션(문제-해결·신뢰) 검토.
+
 ## 다음 할 일
-- [ ] LandingPage 디자인 개선 (최우선. `LANDING-DESIGN-REVIEW.md` 참고. 1순위 = proxy matcher에서 `/` 제외 — 미로그인 시 랜딩 안 보임. 이후 실물 스크린샷·섹션 추가·카드 레이아웃 탈출)
+- [ ] 개발용 서버 분리 (:3000 경합 해소. 프로젝트별 포트·스크립트. 데몬 baseUrl 기본값도 함께 정리)
+- [ ] 랜딩 외 페이지 디자인 업데이트 (sessions 목록·상세, devices, auth)
+- [ ] 랜딩 남은 것 (실물 스크린샷 1600×1000·og:image·모바일 분리)
+- [x] LandingPage 1차 개편 (proxy 공개·6xl·Features/HIW 분리·터미널 칩. 위 2026-10-11 기록)
 - [x] 세션 정의 확정 (탭>세션, 현재 epoch 전문 + 이전 접기)
 - [x] MVP 플로우 3개 고정 (전문+초과 폴백 / 허용·거부 2버튼 / 주기+수동 버튼)
 - [ ] MVP 범위 확정 (통합 목록+승인)
