@@ -85,10 +85,11 @@
 - Neon Object Storage (2026-09-28 조사): S3 호환 내장 스토리지. 별도 AWS 계정·IAM 없이 Neon credential 1개. `neon.ts`에 bucket 선언 후 `neon deploy` 1방. 브랜치와 함께 copy-on-write 분기. Free에 5GB 포함. 단 설정 예시가 `preview.buckets`라 프리뷰 성격. 필요해지면 붙이고 R2/S3 별도 계약은不要.
 - Neon Free에 Managed Better Auth 포함 (Google/GitHub OAuth 설정 몇 줄).
 
-## SKILLS.md / 스킬 상태 (2026-09-28 완료)
+## SKILLS.md / 스킬 상태 (2026-09-28 완료 → 2026-10-10 정밀 점검)
 - `SKILLS.md` 작성 완료, `develop`에 커밋·푸시 (`692bcaa [Update] [Paddle 스킬 문서 제거]` + `.idea` 1건, `origin/develop` 동기화).
 - 전역 스킬 60여 개 유지. Paddle은 전역·로컬 어디에도 미설치.
 - `tailored-ad`는 손대지 않음 (SKILLS.md 99줄 동일 사본 존재, Paddle 포함).
+- **정밀 점검 (2026-10-10):** 문서와 실물 어긋남 확인. 디자인 계열 중 실물 = `design-taste-frontend`·`ui-ux-pro-max`·`ui-styling`·`design-system`·`brand`·`design`·`banner-design`·`slides`. **미설치: `impeccable`·taste 9종(`gpt-taste`·`high-end-visual-design`·`minimalist-ui`·`industrial-brutalist-ui`·`image-to-code`·`redesign-existing-projects`·`brandkit`·`stitch-design-taste`·`imagegen-*`)·`design-taste-frontend-v1`.** ui-ux-pro-max의 `landing` 도메인은 DB 비어 검색 0건. SKILLS.md 목록 갱신 or 스킬 보강 필요.
 
 ## 에이전트·모델 원격 전환 (2026-10-02, 코드 완료·종단 미검증)
 - API 실측: `GET /api/model` 1방에 provider+variants. `GET /api/agent`는 위치 귀속. 전환은 세션별 POST 2개 (`/agent {agent}`, `/model {id,providerID,variant?}`).
@@ -116,6 +117,7 @@
 - `send` 폐기. 메시지 전송은 웹에서만.
 
 ## 다음 할 일
+- [ ] LandingPage 디자인 개선 (최우선. `LANDING-DESIGN-REVIEW.md` 참고. 1순위 = proxy matcher에서 `/` 제외 — 미로그인 시 랜딩 안 보임. 이후 실물 스크린샷·섹션 추가·카드 레이아웃 탈출)
 - [x] 세션 정의 확정 (탭>세션, 현재 epoch 전문 + 이전 접기)
 - [x] MVP 플로우 3개 고정 (전문+초과 폴백 / 허용·거부 2버튼 / 주기+수동 버튼)
 - [ ] MVP 범위 확정 (통합 목록+승인)
