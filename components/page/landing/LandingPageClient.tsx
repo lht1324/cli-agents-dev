@@ -107,38 +107,44 @@ export default function LandingPageClient() {
             <section id="how" className="scroll-mt-14 border-t border-line">
                 <div className="mx-auto w-full max-w-6xl px-4 py-16">
                     <h2 className="text-2xl font-bold tracking-tight">How it works</h2>
-                    <h3 className="mt-8 text-lg font-bold">On the web</h3>
-                    <p className="mt-1 text-sm text-dim">It runs itself.</p>
-                    <ol className="mt-4 grid gap-x-12 md:grid-cols-2">
-                        {WEB_STEPS.map((step, i) => (
-                            <li key={step.title} className="border-t border-line py-6">
-                                <div className="flex items-baseline gap-4">
-                                    <span className="font-mono text-sm text-go">
-                                        {String(i + 1).padStart(2, "0")}
-                                    </span>
-                                    <p className="font-mono text-xs text-fog">{step.code}</p>
-                                </div>
-                                <h4 className="mt-2 font-bold">{step.title}</h4>
-                                <p className="mt-1 max-w-[60ch] text-sm text-dim">{step.body}</p>
-                            </li>
-                        ))}
-                    </ol>
-                    <h3 className="mt-10 text-lg font-bold">Between PCs</h3>
-                    <p className="mt-1 text-sm text-dim">You drive.</p>
-                    <ol className="mt-4 grid gap-x-12 md:grid-cols-2">
-                        {PC_STEPS.map((step, i) => (
-                            <li key={step.title} className="border-t border-line py-6">
-                                <div className="flex items-baseline gap-4">
-                                    <span className="font-mono text-sm text-go">
-                                        {String(i + 1).padStart(2, "0")}
-                                    </span>
-                                    <p className="font-mono text-xs text-fog">{step.code}</p>
-                                </div>
-                                <h4 className="mt-2 font-bold">{step.title}</h4>
-                                <p className="mt-1 max-w-[60ch] text-sm text-dim">{step.body}</p>
-                            </li>
-                        ))}
-                    </ol>
+                    <div className="mt-8 grid gap-12 md:grid-cols-2">
+                        <div>
+                            <h3 className="text-lg font-bold">On the web</h3>
+                            <p className="mt-1 text-sm text-dim">It runs itself.</p>
+                            <ol className="mt-4">
+                                {WEB_STEPS.map((step, i) => (
+                                    <li key={step.title} className="border-t border-line py-6">
+                                        <div className="flex items-baseline gap-4">
+                                            <span className="font-mono text-sm text-go">
+                                                {String(i + 1).padStart(2, "0")}
+                                            </span>
+                                            <p className="font-mono text-xs text-fog">{step.code}</p>
+                                        </div>
+                                        <h4 className="mt-2 font-bold">{step.title}</h4>
+                                        <p className="mt-1 max-w-[60ch] text-sm text-dim">{step.body}</p>
+                                    </li>
+                                ))}
+                            </ol>
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-bold">Between PCs</h3>
+                            <p className="mt-1 text-sm text-dim">You drive.</p>
+                            <ol className="mt-4">
+                                {PC_STEPS.map((step, i) => (
+                                    <li key={step.title} className="border-t border-line py-6">
+                                        <div className="flex items-baseline gap-4">
+                                            <span className="font-mono text-sm text-go">
+                                                {String(i + 1).padStart(2, "0")}
+                                            </span>
+                                            <p className="font-mono text-xs text-fog">{step.code}</p>
+                                        </div>
+                                        <h4 className="mt-2 font-bold">{step.title}</h4>
+                                        <p className="mt-1 max-w-[60ch] text-sm text-dim">{step.body}</p>
+                                    </li>
+                                ))}
+                            </ol>
+                        </div>
+                    </div>
                 </div>
             </section>
 
