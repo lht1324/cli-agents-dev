@@ -10,7 +10,7 @@ const WEB_STEPS = [
         body: "One command. After this the daemon syncs on its own schedule.",
     },
     {
-        code: "localagents.link",
+        code: "localagents.link/sessions",
         title: "Steer from your phone",
         body: "The inbox stays current by itself. Watch, send instructions, answer Allow / Deny.",
     },
@@ -42,6 +42,42 @@ const TRANSCRIPT = [
     { text: "  Done: 106 messages applied.", tone: "out" },
 ] as const;
 
+type Step = {
+    code: string;
+    title: string;
+    body: string;
+};
+
+function StepList({ steps }: { steps: readonly Step[] }) {
+    return (
+        <ol className="mt-4">
+            {steps.map((step, i) => {
+                const isCommand = step.code.startsWith("$ ");
+                const code = isCommand ? step.code.slice(2) : step.code;
+                return (
+                    <li key={step.title} className="border-t border-line py-6">
+                        <div className="flex items-start gap-4">
+                            <span className="pt-1.5 font-mono text-sm text-go">
+                                {String(i + 1).padStart(2, "0")}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                                <div className="inline-flex items-center rounded border border-line bg-black px-3 py-1.5">
+                                    <span className="font-mono text-xs">
+                                        {isCommand ? <span className="text-go">$ </span> : null}
+                                        <span className="text-fog">{code}</span>
+                                    </span>
+                                </div>
+                                <h4 className="mt-3 font-bold">{step.title}</h4>
+                                <p className="mt-1 max-w-[60ch] text-sm text-dim">{step.body}</p>
+                            </div>
+                        </div>
+                    </li>
+                );
+            })}
+        </ol>
+    );
+}
+
 export default function LandingPageClient() {
     return (
         <main>
@@ -52,10 +88,10 @@ export default function LandingPageClient() {
                         <h1 className="mt-4 text-4xl font-bold tracking-tight md:text-5xl">
                             Mission control for your CLI agents.
                         </h1>
-                            <p className="mt-4 max-w-[65ch] text-dim">
-                                Your tabs follow you from desktop to laptop to phone. No SSH. No lost
-                                sessions. Check in from anywhere.
-                            </p>
+                        <p className="mt-4 max-w-[65ch] text-dim">
+                            Your tabs follow you from desktop to laptop to phone. No SSH. No lost
+                            sessions. Check in from anywhere.
+                        </p>
                         <div className="mt-6 flex gap-3">
                             <Link
                                 href="/auth/sign-in"
@@ -111,38 +147,12 @@ export default function LandingPageClient() {
                         <div>
                             <h3 className="text-lg font-bold">PC ↔ Phone</h3>
                             <p className="mt-1 text-sm text-dim">Just leave your PC on.</p>
-                            <ol className="mt-4">
-                                {WEB_STEPS.map((step, i) => (
-                                    <li key={step.title} className="border-t border-line py-6">
-                                        <div className="flex items-baseline gap-4">
-                                            <span className="font-mono text-sm text-go">
-                                                {String(i + 1).padStart(2, "0")}
-                                            </span>
-                                            <p className="font-mono text-xs text-fog">{step.code}</p>
-                                        </div>
-                                        <h4 className="mt-2 font-bold">{step.title}</h4>
-                                        <p className="mt-1 max-w-[60ch] text-sm text-dim">{step.body}</p>
-                                    </li>
-                                ))}
-                            </ol>
+                            <StepList steps={WEB_STEPS} />
                         </div>
                         <div>
                             <h3 className="text-lg font-bold">PC ↔ PC</h3>
                             <p className="mt-1 text-sm text-dim">You drive, or ask your agent to.</p>
-                            <ol className="mt-4">
-                                {PC_STEPS.map((step, i) => (
-                                    <li key={step.title} className="border-t border-line py-6">
-                                        <div className="flex items-baseline gap-4">
-                                            <span className="font-mono text-sm text-go">
-                                                {String(i + 1).padStart(2, "0")}
-                                            </span>
-                                            <p className="font-mono text-xs text-fog">{step.code}</p>
-                                        </div>
-                                        <h4 className="mt-2 font-bold">{step.title}</h4>
-                                        <p className="mt-1 max-w-[60ch] text-sm text-dim">{step.body}</p>
-                                    </li>
-                                ))}
-                            </ol>
+                            <StepList steps={PC_STEPS} />
                         </div>
                     </div>
                 </div>
