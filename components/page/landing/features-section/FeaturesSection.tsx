@@ -1,13 +1,13 @@
 const WEB_POINTS = [
-    "Watch your sessions as they work",
-    "Send new instructions or questions",
-    "Approve Allow / Deny from your phone",
+    "Watch sessions as they work",
+    "Send instructions or questions",
+    "Approve with a tap",
 ] as const;
 
 const PC_POINTS = [
-    "Pick a tab and pull it over",
     "It lands as a real session, ready to continue",
-    "The full context travels, nothing to re-explain",
+    "Full context travels, nothing to re-explain",
+    "Push back when you return",
 ] as const;
 
 export default function FeaturesSection() {
@@ -17,9 +17,9 @@ export default function FeaturesSection() {
                 <h2 className="text-2xl font-bold tracking-tight">Wherever you are</h2>
                 <div className="mt-8 grid gap-10 md:grid-cols-2 md:gap-0 md:divide-x md:divide-line">
                     <div className="md:pr-12">
-                        <h3 className="text-lg font-bold">On the web</h3>
+                        <h3 className="text-lg font-bold">Walk away</h3>
                         <p className="mt-1 text-sm text-dim">
-                            Leave the PC running. From any browser.
+                            PC stays on. Your phone is the remote.
                         </p>
                         <ul className="mt-4 space-y-2">
                             {WEB_POINTS.map((point) => (
@@ -31,9 +31,9 @@ export default function FeaturesSection() {
                         </ul>
                     </div>
                     <div className="md:pl-12">
-                        <h3 className="text-lg font-bold">On another PC</h3>
+                        <h3 className="text-lg font-bold">Take it with you</h3>
                         <p className="mt-1 text-sm text-dim">
-                            Heading out with the laptop. Pick up mid-work.
+                            Laptop day? Pull the tab over.
                         </p>
                         <ul className="mt-4 space-y-2">
                             {PC_POINTS.map((point) => (
