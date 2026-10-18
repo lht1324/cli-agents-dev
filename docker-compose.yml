@@ -1,0 +1,12 @@
+services:
+    next-server:
+        build: .
+        container_name: localagents-server
+        ports:
+            - "3001:3000"
+        volumes:
+            - ./:/workdir
+            - /workdir/node_modules
+            - /workdir/.next
+        environment:
+            - DOCKER=true

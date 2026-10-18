@@ -99,7 +99,7 @@ export function readState(): DeviceState | null {
 }
 
 export function baseUrl(): string {
-    return process.env.LOCALAGENTS_BASE_URL ?? "http://localhost:3000";
+    return process.env.LOCALAGENTS_BASE_URL ?? "http://localhost:3001";
 }
 
 export function writeState(state: DeviceState): void {
