@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { messagesClientAPI } from "@/lib/api/client/messagesClientAPI";
 import type { ThreadRow } from "@/components/page/sessions/SessionDetailClient";
 
 // 스레드 실시간 폴링. 5초마다 스레드+presence만 다시 가져온다. 탭이 숨겨지면 쉰다.
@@ -20,28 +21,13 @@ export function useLiveThread(tabId: string, initial: ThreadRow[], initialSeenAt
         if (document.hidden) {
             return;
         }
-        try {
-            const res = await fetch(`/api/messages?tabId=${encodeURIComponent(tabIdRef.current)}`, {
-                cache: "no-store",
-            });
-            if (!res.ok) {
-                return;
-            }
-            const body = (await res.json()) as {
-                data?: { messages?: ThreadRow[]; deviceLastSeenAt?: string | null; lastSyncAt?: string | null };
-            };
-            if (Array.isArray(body.data?.messages)) {
-                setThread(body.data.messages);
-            }
-            if (body.data?.deviceLastSeenAt !== undefined) {
-                setDeviceLastSeenAt(body.data.deviceLastSeenAt);
-            }
-            if (body.data?.lastSyncAt !== undefined) {
-                setLastSyncAt(body.data.lastSyncAt);
-            }
-        } catch {
-            // 다음 틱이 잡는다
+        const thread = await messagesClientAPI.getThread(tabIdRef.current);
+        if (!thread) {
+            return;
         }
+        setThread(thread.messages);
+        setDeviceLastSeenAt(thread.deviceLastSeenAt);
+        setLastSyncAt(thread.lastSyncAt);
     }, []);
 
     useEffect(() => {

@@ -1,5 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { auth } from "@/lib/auth/server";
+import { readInternalUser } from "@/lib/auth/internal";
 import { verifyDeviceToken } from "@/lib/auth/device";
 import { getDb } from "@/lib/neon/client";
 import { cloudMessages, cloudTabs, devices, sessionsMeta } from "@/lib/neon/schema";
@@ -84,8 +85,10 @@ export async function POST(request: Request): Promise<Response> {    const authe
 
 // 웹 실시간 폴링용 스레드 조회. 본인 탭만. 5초 폴링 1회가 이 쿼리 1방이다.
 export async function GET(request: Request): Promise<Response> {
-    const { data: session } = await auth.getSession();
-    if (!session?.user) {
+    const internalUser = readInternalUser(request);
+    const { data: session } = internalUser ? { data: null } : await auth.getSession();
+    const viewerId = internalUser ?? session?.user?.id;
+    if (!viewerId) {
         return getNextBaseResponse(401).json({ success: false, status: 401, error: "login required" });
     }
     const tabId = new URL(request.url).searchParams.get("tabId");
@@ -104,14 +107,14 @@ export async function GET(request: Request): Promise<Response> {
         })
         .from(cloudMessages)
         .innerJoin(cloudTabs, eq(cloudMessages.tabId, cloudTabs.id))
-        .where(and(eq(cloudMessages.tabId, tabId), eq(cloudTabs.userId, session.user.id)))
+        .where(and(eq(cloudMessages.tabId, tabId), eq(cloudTabs.userId, viewerId)))
         .orderBy(cloudMessages.createdAt, cloudMessages.seq);
     const seen = await db
         .select({ lastSeenAt: devices.lastSeenAt, lastSyncAt: sessionsMeta.lastSyncAt })
         .from(devices)
         .innerJoin(cloudTabs, eq(cloudTabs.deviceId, devices.id))
         .innerJoin(sessionsMeta, eq(sessionsMeta.id, cloudTabs.id))
-        .where(and(eq(cloudTabs.id, tabId), eq(cloudTabs.userId, session.user.id)))
+        .where(and(eq(cloudTabs.id, tabId), eq(cloudTabs.userId, viewerId)))
         .limit(1);
     return getNextBaseResponse(200).json({
         success: true,

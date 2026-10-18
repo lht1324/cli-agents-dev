@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLiveThread } from "@/lib/neon/live";
+import { commandsClientAPI } from "@/lib/api/client/commandsClientAPI";
 import { editCounts, parseToolCall, toolDetail, toolSummary } from "./toolFormat";
 import MarkdownText from "./MarkdownText";
 
@@ -201,7 +202,6 @@ function parseCurrentModel(json: string | null): { id: string; providerID: strin
 }
 
 async function onDecide(
-    userId: string,
     deviceId: string,
     sessionID: string,
     requestID: string,
@@ -212,17 +212,12 @@ async function onDecide(
     setBusy(requestID);
     setDone(null);
     try {
-        const res = await fetch("/api/commands", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                userId,
-                deviceId,
-                type: "approve",
-                payload: JSON.stringify({ sessionID, requestID, decision }),
-            }),
+        const queued = await commandsClientAPI.queue({
+            deviceId,
+            type: "approve",
+            payload: { sessionID, requestID, decision },
         });
-        if (!res.ok) {
+        if (!queued) {
             setDone("failed to queue");
             return;
         }
@@ -248,14 +243,12 @@ export default function SessionDetailClient({
     info,
     approvals,
     messages,
-    userId,
     catalogJson,
     stats,
 }: {
     info: SessionInfo;
     approvals: ApprovalRow[];
     messages: ThreadRow[];
-    userId: string;
     catalogJson: string | null;
     stats: StatsInput;
 }) {
@@ -362,22 +355,17 @@ export default function SessionDetailClient({
             setBusy("agent");
             setDone(null);
             try {
-                const res = await fetch("/api/commands", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        userId,
-                        deviceId: info.deviceId,
-                        type: "set-agent",
-                        payload: JSON.stringify({ sessionID: info.id, agent: value }),
-                    }),
+                const queued = await commandsClientAPI.queue({
+                    deviceId: info.deviceId,
+                    type: "set-agent",
+                    payload: { sessionID: info.id, agent: value },
                 });
-                setDone(res.ok ? `agent -> ${value} queued.` : "failed to queue");
+                setDone(queued ? `agent -> ${value} queued.` : "failed to queue");
             } finally {
                 setBusy(null);
             }
         },
-        [info, userId],
+        [info],
     );
     const queueModel = useCallback(
         async (modelValue: string, variantValue: string) => {
@@ -388,27 +376,22 @@ export default function SessionDetailClient({
             setBusy("model");
             setDone(null);
             try {
-                const res = await fetch("/api/commands", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        userId,
-                        deviceId: info.deviceId,
-                        type: "set-model",
-                        payload: JSON.stringify({
-                            sessionID: info.id,
-                            model: { id, providerID, variant: variantValue || undefined },
-                        }),
-                    }),
+                const queued = await commandsClientAPI.queue({
+                    deviceId: info.deviceId,
+                    type: "set-model",
+                    payload: {
+                        sessionID: info.id,
+                        model: { id, providerID, variant: variantValue || undefined },
+                    },
                 });
                 setDone(
-                    res.ok ? `model -> ${modelValue}${variantValue ? `#${variantValue}` : ""} queued.` : "failed to queue",
+                    queued ? `model -> ${modelValue}${variantValue ? `#${variantValue}` : ""} queued.` : "failed to queue",
                 );
             } finally {
                 setBusy(null);
             }
         },
-        [info, userId],
+        [info],
     );
     const onSelectAgent = useCallback(
         (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -442,8 +425,8 @@ export default function SessionDetailClient({
     }, [deviceLastSeenAt]);
     const onClickDecide = useCallback(
         (requestID: string, decision: "once" | "reject") =>
-            onDecide(userId, info.deviceId, info.id, requestID, decision, setBusy, setDone),
-        [info, userId],
+            onDecide(info.deviceId, info.id, requestID, decision, setBusy, setDone),
+        [info],
     );
     const onClickSend = useCallback(async () => {
         const text = draft.trim();
@@ -453,17 +436,12 @@ export default function SessionDetailClient({
         setBusy("send");
         setDone(null);
         try {
-            const res = await fetch("/api/commands", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    userId,
-                    deviceId: info.deviceId,
-                    type: "message",
-                    payload: JSON.stringify({ sessionID: info.id, text }),
-                }),
+            const queued = await commandsClientAPI.queue({
+                deviceId: info.deviceId,
+                type: "message",
+                payload: { sessionID: info.id, text },
             });
-            if (!res.ok) {
+            if (!queued) {
                 setDone("failed to queue");
                 return;
             }
@@ -472,7 +450,7 @@ export default function SessionDetailClient({
         } finally {
             setBusy(null);
         }
-    }, [draft, info, userId]);
+    }, [draft, info]);
     const onChangeDraft = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
         setDraft(e.target.value);
     }, []);

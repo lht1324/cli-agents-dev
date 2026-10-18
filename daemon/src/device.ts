@@ -99,7 +99,8 @@ export function readState(): DeviceState | null {
 }
 
 export function baseUrl(): string {
-    return process.env.LOCALAGENTS_BASE_URL ?? "http://localhost:3001";
+    // dev: API 컨테이너(3003) 또는 ngrok URL. prod: 배포 도메인.
+    return process.env.LOCALAGENTS_BASE_URL ?? "http://localhost:3003";
 }
 
 export function writeState(state: DeviceState): void {

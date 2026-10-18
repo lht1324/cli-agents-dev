@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { readInternalUser } from "@/lib/auth/internal";
 import { getDb } from "@/lib/neon/client";
 import { commands } from "@/lib/neon/schema";
 import { getNextBaseResponse } from "@/lib/utils/getNextBaseResponse";
@@ -12,16 +13,17 @@ interface CommandBody {
     payload?: unknown;
 }
 
-// 웹 입력 → outbox INSERT. 데몬이 폴링해서 실행한다.
+// 웹 입력 → outbox INSERT. 게이트웨이를 거친 호출만 허용하고, userId는 세션에서 온 값을 쓴다.
 export async function POST(request: Request): Promise<Response> {
+    const userId = readInternalUser(request);
+    if (!userId) {
+        return getNextBaseResponse(401).json({ success: false, status: 401, error: "unauthorized" });
+    }
     let body: CommandBody;
     try {
         body = (await request.json()) as CommandBody;
     } catch {
         return getNextBaseResponse(400).json({ success: false, status: 400, error: "invalid JSON body" });
-    }
-    if (typeof body.userId !== "string" || body.userId.length === 0) {
-        return getNextBaseResponse(400).json({ success: false, status: 400, error: "userId is required" });
     }
     if (typeof body.deviceId !== "string" || body.deviceId.length === 0) {
         return getNextBaseResponse(400).json({ success: false, status: 400, error: "deviceId is required" });
@@ -32,7 +34,7 @@ export async function POST(request: Request): Promise<Response> {
     const id = randomUUID();
     await getDb().insert(commands).values({
         id,
-        userId: body.userId,
+        userId,
         deviceId: body.deviceId,
         type: body.type,
         payload: typeof body.payload === "string" ? body.payload : "{}",

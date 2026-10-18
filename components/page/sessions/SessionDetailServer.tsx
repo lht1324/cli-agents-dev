@@ -98,7 +98,6 @@ export default async function SessionDetailServer({ id }: { id: string }) {
             info={info}
             approvals={approvals}
             messages={messages}
-            userId={session.user.id}
             catalogJson={catalog[0]?.payload ?? null}
             stats={stats}
         />

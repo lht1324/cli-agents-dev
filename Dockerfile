@@ -14,4 +14,4 @@ RUN npm install
 # 이유는 아래 docker-compose에서 [PC 프로젝트]와 '연결(Link)'할 것이기 때문.
 
 # 서버 실행
-CMD ["npm", "run", "dev"]
+CMD ["npm", "run", "dev:api"]
