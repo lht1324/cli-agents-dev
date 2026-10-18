@@ -1,4 +1,4 @@
-2026-10-18 05:41
+2026-10-19 02:26
 
 # context.md - cli-agents-dev
 
@@ -129,7 +129,10 @@
 - 남음: 실물 스크린샷(1600×1000)·og:image, 모바일 분리, 나머지 섹션(문제-해결·신뢰) 검토.
 
 ## 다음 할 일
-- [ ] 개발용 서버 분리 (:3000 경합 해소. 프로젝트별 포트·스크립트. 데몬 baseUrl 기본값도 함께 정리)
+- [x] 개발용 서버 분리 (클라 3002·API 컨테이너 3003·데몬 baseUrl 3003. 재시작 후 검증 대기. 아래 2026-10-18~19 기록)
+- [x] push/pull 마감 + CLI 정리 (2026-10-12~18 보충 기록. 아래 참고)
+- [x] 브라우저 게이트웨이·CORS·env 컨벤션 (2026-10-18~19. 아래 기록)
+- [ ] dev 서버 재시작 후 게이트웨이 플로우 검증 (지시 전송·승인·모델 변경. 신 env + CORS 코드 반영 필요)
 - [ ] 랜딩 외 페이지 디자인 업데이트 (sessions 목록·상세, devices, auth)
 - [ ] 랜딩 남은 것 (실물 스크린샷 1600×1000·og:image·모바일 분리)
 - [x] LandingPage 1차 개편 (proxy 공개·6xl·Features/HIW 분리·터미널 칩. 위 2026-10-11 기록)
@@ -339,3 +342,20 @@
 - 웹: `POST /api/commands`(outbox INSERT) + `lib/utils/getNextBaseResponse.ts`. curl 201 → 데몬 `poll`이 같은 행 `done` 회수. 웹→PC 종단 완성.
 - 잡음 정리: `drizzle.config.ts`가 `.env.local`을 안 읽어서 generate 실패 → 2줄 로딩으로 수정. `.env.example` 실값 유출未遂 → 플레이스홀더로 복구 (`.env.local`은 무시됨 확인). `next-env.d.ts` 추적 해제 + gitignore. `AGENTS.md`의 nextjs-agent-rules 블록은 `next dev`가 자동 추가한 것이라 커밋.
 - dev DB 테스트 행: `devices/test-pc-1`, `commands/cmd-ping-1` + 웹 ping 1건. 전부 `done`. 둬도 됨.
+
+## push/pull 마감 + CLI 정리 (2026-10-12~18 보충, 기록 누락분)
+- push/pull UX 확정: TTY 체크박스 목록 (최신순, `push.json` 워터마크로 dirty 계산) + 진행 바. push는 Storage 업로드 + 거울 DB backfill을 한 바에 합침 (`syncOneTab`, 0→50→100. 채널 분리 표시 없음).
+- 폴더 연결: 원격 탭 프로젝트를 OpenCode `project` 테이블 `git remote get-url`로 매칭 → 새/기존 폴더 선택 → OS 폴더 선택기 (`sysdialog.ts`) → clone 또는 검증 → `setTabDirectory`. push 중 변경 방지 epoch 가드.
+- `handoffs` 포인터 테이블 (마이그레이션 0010~0013): 탭별 최신 버전 포인터. 받은 건(내 기기)은 목록에서 숨김.
+- v1 쓰기 게이트 수정 (user model 필수, upstream 스키마 요구). 왕복 실측 불량 0.
+- CLI: `status`(주소 없음)·`whoami`(이메일+플랜)·`dump`(진단 업로드 `<userId>/dump/`). 미로그인 push/pull은 선두 개행 + `not logged in. run \`localagents login\` first` (`ensureAuth()`).
+- login 중복 실행 가드: 이미 로그인이면 이메일 표시 + `logout` 안내로 차단. 첫 backfill 목록: 미동기만 기본 체크, `(synced)` 라벨, "Not now" 마지막 항목, 힌트 `space: toggle, a: all, n: none, Esc: cancel`.
+- 게이트웨이 리팩터: `lib/api/client/baseFetch.ts` (30초 타임아웃·credentials include·게이트웨이 래핑) + `messagesClientAPI`/`commandsClientAPI`. SessionDetailClient 원시 fetch 4건 + `live.ts` 폴링 교체. 클라 컴포넌트 userId prop 제거.
+- 인증 분리: 게이트웨이가 세션 확인 후 `x-internal-secret` + `x-user-id` 주입. `/api/commands`는 내부 헤더 전용 신뢰 (바디 userId 폐기), `/api/messages`는 내부 우선 + 세션 폴백. `lib/auth/internal.ts` = `timingSafeEqual` 대조 `INTERNAL_FIRE_AND_FORGET_API_SECRET` (256bit hex, `.env.local`).
+
+## 포트 분리·CORS·env 컨벤션 (2026-10-18~19, 이 PC)
+- 포트 분리: 클라 3002 (`npm run dev`) / API 컨테이너 3003:3000 (`npm run dev:api`, Dockerfile CMD `dev:api`). 데몬 `baseUrl` 기본값 `http://localhost:3003`. `:3000`은 tailored-ad 보호.
+- CORS (게이트웨이에만): `CORS_ALLOWED_ORIGINS` (쉼표 구분, dev 미설정 시 `http://localhost:3002`) + OPTIONS preflight (preflight엔 쿠키 안 실림 → 인증 없이 204) + 모든 응답에 Allow-Origin·Allow-Credentials·메서드·헤더·`Vary: Origin`. 허용 목록 밖 origin엔 헤더 미부착 (브라우저가 알아서 거부). prod는 같은 origin이라 CORS가 개입하지 않아 미부착. 근거: dev 브라우저(3002)가 `credentials: include`로 3003을 크로스 오리진 호출.
+- env 컨벤션 (tailored-ad 준용, 확정): `NEXT_PUBLIC_BASE_URL`=브라우저가 API 부를 주소 (dev `http://localhost:3003`, **ngrok 아님**) / `BASE_URL`=서버가 외부에 알릴 자기 주소 (dev ngrok. 웹훅 등 외부 콜백용 — 현재 서버 코드 소비처 없음) / `LOCALAGENTS_BASE_URL`=데몬 전용. prod는 전부 사이트 URL. `baseFetch`는 prod에서 prefix를 안 붙이므로 prod 값은 무해. `.env.example` 갱신 + `CORS_ALLOWED_ORIGINS` 항목 추가.
+- ngrok 로그인 깨짐 정리: 세션 쿠키는 도메인 귀속 (쿠키는 포트 무시 → 3002↔3003 공유, ngrok 도메인은 별개). Neon Auth OAuth 콜백이 `NEON_AUTH_BASE_URL`(localhost) 기준으로 만들어져 ngrok 탭엔 세션이 끝내 안 생김. → **ngrok은 데몬 전용** (Bearer 기기 토큰, 쿠키 불필요). 브라우저 로그인용 주소 분리 (`LOCALAGENTS_WEB_URL`)는 보류.
+- OpenCode v2 Pairing 조사 (2026-10-19): `opencode pair` = 서버 URL+username+password 출력 → 웹 UI 접속. 서버당 1회선, 기본 주소 127.0.0.1이라 LAN/Tailscale/터널은 유저 몫. QR 페어링 이슈 #35943 완료 (10-01, `service qr` + connection-details 엔드포인트), `serve --qr` 제안 #47241, 모바일 페어링 #20087. 영향 판정: 본체(PC↔PC 복원)·통합 inbox·이력 미러는 무관. 웹 리모컨 슬라이스만 부분 경쟁 → 리모컨은 "Claude 포함 통합함" 포지션으로 조정. 미확인: v2 pair 웹 UI 실범위 (세션 생성·승인·파일 뷰 어디까지).
