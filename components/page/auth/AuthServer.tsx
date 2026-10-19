@@ -44,13 +44,14 @@ const CLASS_NAMES = {
     },
 };
 
-export default function AuthServer({ path }: { path: string }) {
+export default function AuthServer({ path, callbackURL }: { path: string; callbackURL: string }) {
     const copy = COPY[path] ?? FALLBACK;
     return (
         <main className="mx-auto flex min-h-[calc(100dvh-3.5rem)] w-full max-w-6xl flex-col items-center justify-center px-4 py-16">
             <div className="w-full max-w-sm">
                 <AuthView
                     path={path}
+                    callbackURL={callbackURL}
                     cardHeader={
                         <div>
                             <p className="font-mono text-xs text-go">{copy.eyebrow}</p>

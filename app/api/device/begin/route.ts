@@ -1,7 +1,7 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth/server";
-import { sealConnect, sealText, unsealConnect } from "@/lib/auth/packet";
+import { sealConnect, unsealConnect } from "@/lib/auth/packet";
 
 // 로그인 전 기기 연결 진입. data(봉투) 우선, 평문 폴백.
 // 로그인済み면 바로 authorize로 (봉투 URL), 미로그인이면 봉투를 들고 로그인으로.
@@ -53,15 +53,10 @@ export async function GET(request: Request): Promise<Response> {
     const back = `/device/authorize?${new URLSearchParams({ device, port, state, label, platform, hostname }).toString()}`;
     const jar = await cookies();
     jar.set("localagents_connect", back, { maxAge: 600, path: "/", httpOnly: true });
-    // 안쪽 봉투(기기 파라미터) → 복귀 경로 → 바깥 봉투(문자열 통째). URL엔 암호문만 남는다.
-    let callbackURL = back;
-    if (inner) {
-        try {
-            const innerPath = `/api/device/consume?data=${encodeURIComponent(inner)}`;
-            callbackURL = `/r/${sealText(innerPath)}`;
-        } catch {
-            // 봉투 실패. 쿠키 폴백으로 진행.
-        }
-    }
-    redirect(`/auth/sign-in?callbackURL=${encodeURIComponent(callbackURL)}`);
+    // 콜백은 고정 라우트 하나로. 도착지 분기(복귀 경로)는 쿠키가 들고 있다.
+    const h = await headers();
+    const origin = `${h.get("x-forwarded-proto") ?? "http"}://${h.get("x-forwarded-host") ?? h.get("host")}`;
+    redirect(
+        `/auth/sign-in?callbackURL=${encodeURIComponent(`${origin}/api/auth/callback`)}`,
+    );
 }
