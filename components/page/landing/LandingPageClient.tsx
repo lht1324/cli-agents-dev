@@ -111,13 +111,17 @@ export default function LandingPageClient() {
                         </div>
                         <div className="mt-10 flex items-center gap-3" aria-label="Supported agents">
                             <p className="text-sm text-dim">Works with</p>
-                            <img
-                                src="https://cdn.simpleicons.org/opencode/9ca3af"
-                                alt="OpenCode"
-                                width={20}
-                                height={20}
-                                className="h-5 w-5"
-                            />
+                            {/* 벤더 칩: 랜딩 터미널 칩과 같은 문법(bg-black + border-line, 4px).
+                                OpenCode 마크는 흰 프레임 + 어두운 플레이트라 검정 바탕에서 실루엣이 살아난다. */}
+                            <span className="flex h-7 w-7 items-center justify-center rounded border border-line bg-black">
+                                <img
+                                    src="https://cdn.simpleicons.org/opencode/9ca3af"
+                                    alt="OpenCode"
+                                    width={16}
+                                    height={16}
+                                    className="h-4 w-4"
+                                />
+                            </span>
                         </div>
                     </div>
                     <div className="rounded border border-line bg-ink p-4">
