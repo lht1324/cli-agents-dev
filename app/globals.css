@@ -12,6 +12,31 @@
     --color-stop: #f85149;
 }
 
+/* auth-ui(shadcn 계열)가 자기 토큰(--neon-*)을 들고 와 별도 세계를 사는 것을 막는다.
+   랜딩 토큰이 단일 소스. 여기선 참조만 하고 새 색값을 만들지 않는다. */
+:root {
+    --neon-background: var(--color-ink);
+    --neon-foreground: var(--color-fog);
+    --neon-card: var(--color-panel);
+    --neon-card-foreground: var(--color-fog);
+    --neon-popover: var(--color-panel);
+    --neon-popover-foreground: var(--color-fog);
+    --neon-primary: var(--color-go);
+    --neon-primary-foreground: var(--color-ink);
+    --neon-secondary: color-mix(in srgb, var(--color-line) 40%, var(--color-ink));
+    --neon-secondary-foreground: var(--color-fog);
+    --neon-muted: color-mix(in srgb, var(--color-line) 30%, var(--color-ink));
+    --neon-muted-foreground: var(--color-dim);
+    --neon-accent: color-mix(in srgb, var(--color-line) 40%, var(--color-ink));
+    --neon-accent-foreground: var(--color-fog);
+    --neon-destructive: var(--color-stop);
+    --neon-destructive-foreground: var(--color-ink);
+    --neon-border: var(--color-line);
+    --neon-input: var(--color-line);
+    --neon-ring: var(--color-go);
+    --neon-radius: 0.25rem;
+}
+
 body {
     background-color: var(--color-ink);
     color: var(--color-fog);

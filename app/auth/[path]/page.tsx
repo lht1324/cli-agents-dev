@@ -1,5 +1,5 @@
-import { AuthView } from "@neondatabase/auth-ui";
 import { authViewPaths } from "@neondatabase/auth-ui/server";
+import AuthServer from "@/components/page/auth/AuthServer";
 
 export const dynamicParams = false;
 
@@ -9,9 +9,5 @@ export function generateStaticParams() {
 
 export default async function AuthPage({ params }: { params: Promise<{ path: string }> }) {
     const { path } = await params;
-    return (
-        <main>
-            <AuthView path={path} />
-        </main>
-    );
+    return <AuthServer path={path} />;
 }
