@@ -5,8 +5,8 @@ import { NeonAuthUIProvider, UserButton } from "@neondatabase/auth-ui";
 import "./globals.css";
 
 export const metadata: Metadata = {
-    title: "localagents",
-    description: "Mission control for your CLI agents",
+    title: "Local AI Agent Sync Service | localagents",
+    description: "Session sync for your local AI agents. Start on one PC, finish on another. No SSH, nothing left behind.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

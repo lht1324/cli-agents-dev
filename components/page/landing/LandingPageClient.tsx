@@ -89,7 +89,7 @@ export default function LandingPageClient() {
                     <div>
                         <p className="font-mono text-sm text-go">$ localagents --help</p>
                         <h1 className="mt-4 text-4xl font-bold tracking-tight md:text-5xl">
-                            Mission control for your CLI agents.
+                            Start a session on one PC. Continue it on every PC.
                         </h1>
                         <p className="mt-4 max-w-[65ch] text-dim">
                             Your tabs follow you from desktop to laptop to phone. No SSH. No lost

@@ -1,11 +1,12 @@
 import { AuthView } from "@neondatabase/auth-ui";
+import { headers } from "next/headers";
 
 // 카드 카피. 랜딩 문법을 그대로 쓴다 — 모노 eyebrow → 헤드라인 → dim 보조문.
 const COPY: Record<string, { eyebrow: string; title: string; body: string }> = {
     "sign-in": {
         eyebrow: "$ localagents login",
-        title: "Pair this PC.",
-        body: "Sign in once. The daemon on this machine takes it from here.",
+        title: "Sign in.",
+        body: "Start a session on one PC. Continue it on every PC.",
     },
     "sign-up": {
         eyebrow: "$ localagents login",
