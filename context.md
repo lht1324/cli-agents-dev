@@ -1,4 +1,4 @@
-2026-10-19 02:26
+2026-10-25 04:39
 
 # context.md - cli-agents-dev
 
@@ -206,6 +206,12 @@
 - 상호 `LocalAgentsLink`, 도메인 구입済み. `cliagents.dev`는 리다이렉트용 유지.
 - 개명 검토 기록: `CLI`는 CLI·GUI 병행 현실과 어긋남 (OpenCode·Claude 데스크톱 존재). `overlord` 전멸. `agentsync` 계열 사용 금지 (AGENTSYNC 미국 등록상표 6836288호, 권리자 소송 전적. `agenticsync`·`localagentsync` 포함).
 - `remote*`는 부속을 본체로 오해시킴. `.tech` 갱신 함정 (`remoteagent.tech` $9.99→$49.20) 주의.
+
+## 네이밍 원칙 (2026-10-25 확정)
+- 사용자 접점 전부 `LocalAgents` (단수형): 명령어·npm·env(`LOCALAGENTS_*`)·UI 헤더·Dodo 브랜드·카드 명세. 근거: 타이핑 비용, 도메인 `localagents.link`가 Link 역할 대행, 결제 신뢰는 URL·descriptor가 담당.
+- `LocalAgentsLink`는 상호·법적 명칭만 유지. npm 발행 전에 확정해 재개명 없음.
+- Dodo 브랜드 생성済み (사장 직접): `brnd_0NqSDEWhhRh98FCCuDWhy` (LocalAgents, url `https://localagents.link`, support `support@localagents.link`, descriptor `DODOPAY_LOCALAGENTS`, 인증 Success). 기존 TailoredAd 상품 3개는 기본 브랜드(Jaeho Lee) 소속으로 손대지 않음.
+- PLAN-BILLING.md 작성 (2026-10-24, `1de1101`로 §3·§6 Polar→Dodo 정정): 단일 Pro $7/월·$70/연, 30일 no-card 트라이얼, 31일 hard cutoff, 데이터 보관 후 복원.
 
 ## Dodo 가입 (2026-10-03 진행 중)
 - 후보 1순위 등극. 4%+40¢(美내)+1.5% 해외+0.5% 구독. 한국 merchant·KRW·카카오/네이버/페이코 가능. SaaS·AI 환영 명시.
