@@ -1,4 +1,4 @@
-2026-10-25 04:39
+2026-10-25 05:00
 
 # context.md - cli-agents-dev
 
@@ -174,7 +174,7 @@
 - [x] 메시지 핀포인트 동기화 (PK `(tab_id, message_id)` + 커서 증분 + 조건부 backfill. 아래 기록 참고)
 - [x] 실시간 폴링 (웹 5초 + 터미널식 고정 입력. Ably/Pusher 기각, 아래 기록 참고)
 - [x] 기기 연결 암호 봉투 (아래 기록 참고)
-- [ ] P4 (Dodo 브랜드済み·상품/가격 생성 대기·도메인 연결·배포·과금. MoR: Fungies 심사 대기)
+- [ ] P4 (Dodo 브랜드·상품 생성 완료 (2026-10-25, 아래 기록). 남음: 체크아웃 링크·웹훅·도메인 연결·배포. MoR: Fungies 심사 대기)
 
 ## 실행 계획 (2026-09-30)
 - P1: outbox·heartbeat 스키마 + 데몬 승인 중계. 돈값 코어의 로컬 절반.
@@ -211,7 +211,15 @@
 - 사용자 접점 전부 `LocalAgents` (단수형): 명령어·npm·env(`LOCALAGENTS_*`)·UI 헤더·Dodo 브랜드·카드 명세. 근거: 타이핑 비용, 도메인 `localagents.link`가 Link 역할 대행, 결제 신뢰는 URL·descriptor가 담당.
 - `LocalAgentsLink`는 상호·법적 명칭만 유지. npm 발행 전에 확정해 재개명 없음.
 - Dodo 브랜드 생성済み (사장 직접): `brnd_0NqSDEWhhRh98FCCuDWhy` (LocalAgents, url `https://localagents.link`, support `support@localagents.link`, descriptor `DODOPAY_LOCALAGENTS`, 인증 Success). 기존 TailoredAd 상품 3개는 기본 브랜드(Jaeho Lee) 소속으로 손대지 않음.
-- PLAN-BILLING.md 작성 (2026-10-24, `1de1101`로 §3·§6 Polar→Dodo 정정): 단일 Pro $7/월·$70/연, 30일 no-card 트라이얼, 31일 hard cutoff, 데이터 보관 후 복원.
+- PLAN-BILLING.md 작성 (2026-10-24, `1de1101`로 §3·§6 Polar→Dodo 정정) + 가격 $9/월·$90/연 조정 (`bec4908`): 30일 no-card 트라이얼, 31일 hard cutoff, 데이터 보관 후 복원.
+
+## Dodo 상품 생성 (2026-10-25 완료)
+- LocalAgents 브랜드(`brnd_0NqSDEWhhRh98FCCuDWhy`)에 구독 상품 2개 생성. `products.create`가 `brand_id`를 생성 시 직접 받아 별도 지정 단계 불필요 확인.
+- 월간: `pdt_0NqSIczhD3rElCnCCxUB1` — $9.00/mo, recurring 1개월 주기
+- 연간: `pdt_0NqSId35FkZiLVrZaYNp3` — $90.00/yr, recurring 1년 주기
+- `trial_type: none` — 30일 트라이얼은 우리 DB로 강제 (no-card)라 Dodo 트라이얼 미사용
+- `tax_category: saas`, `tax_inclusive: false`, metadata `{plan, interval}` (웹훅에서 상품 식별용)
+- 남음: 체크아웃 링크 2종, 웹훅 → 구독 상태 동기화, 도메인 연결·배포
 
 ## Dodo 가입 (2026-10-03 진행 중)
 - 후보 1순위 등극. 4%+40¢(美내)+1.5% 해외+0.5% 구독. 한국 merchant·KRW·카카오/네이버/페이코 가능. SaaS·AI 환영 명시.
