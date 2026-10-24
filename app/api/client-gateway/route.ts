@@ -14,7 +14,7 @@ interface RouteEntry {
 const ROUTE_ENTRIES: RouteEntry[] = [
     { method: "GET", pattern: ["api", "messages"], load: () => import("@/app/api/messages/route") },
     { method: "POST", pattern: ["api", "commands"], load: () => import("@/app/api/commands/route") },
-    { method: "POST", pattern: ["api", "checkout"], load: () => import("@/app/api/checkout/route") },
+    { method: "POST", pattern: ["api", "dodo", "checkout"], load: () => import("@/app/api/dodo/checkout/route") },
 ];
 
 // 비로그인 허용 경로. 랜딩에서 공개 데이터를 부를 때만 추가한다.

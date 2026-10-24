@@ -42,7 +42,7 @@ export default function PricingSection() {
         setBusy(interval);
         setError(null);
         try {
-            const res = await postFetch("/api/checkout", { interval, origin: window.location.origin });
+            const res = await postFetch("/api/dodo/checkout", { interval, origin: window.location.origin });
             const data = (await res.json()) as { success: boolean; data?: { checkoutUrl?: string } };
             const url = data.data?.checkoutUrl;
             if (data.success && url) {
