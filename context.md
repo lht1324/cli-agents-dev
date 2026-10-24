@@ -1,4 +1,4 @@
-2026-10-25 05:00
+2026-10-25 05:15
 
 # context.md - cli-agents-dev
 
@@ -134,6 +134,9 @@
 - [x] 브라우저 게이트웨이·CORS·env 컨벤션 (2026-10-18~19. 아래 기록)
 - [ ] dev 서버 재시작 후 게이트웨이 플로우 검증 (지시 전송·승인·모델 변경. 신 env + CORS 코드 반영 필요)
 - [ ] 랜딩 외 페이지 디자인 업데이트 (sessions 목록·상세, devices, auth)
+- [ ] Dodo env 5개 입력 + test/live 모드 일치 확인 (API 키 ≠ 상품 모드면 해당 모드에서 상품 재생성)
+- [ ] 과금 UI 검증 (서버 재기동 후 3002 랜딩 → Subscribe → Dodo 결제 페이지 도달)
+- [ ] Dodo 웹훅 (`app/api/dodo/webhook`): 서명 검증 (whsec HMAC) + 구독 이벤트 → `subscriptions` 테이블 동기화 (status·trial_ends_at 등 필드 추가 마이그레이션 필요)
 - [ ] 랜딩 남은 것 (실물 스크린샷 1600×1000·og:image·모바일 분리)
 - [x] LandingPage 1차 개편 (proxy 공개·6xl·Features/HIW 분리·터미널 칩. 위 2026-10-11 기록)
 - [x] 세션 정의 확정 (탭>세션, 현재 epoch 전문 + 이전 접기)
@@ -174,7 +177,7 @@
 - [x] 메시지 핀포인트 동기화 (PK `(tab_id, message_id)` + 커서 증분 + 조건부 backfill. 아래 기록 참고)
 - [x] 실시간 폴링 (웹 5초 + 터미널식 고정 입력. Ably/Pusher 기각, 아래 기록 참고)
 - [x] 기기 연결 암호 봉투 (아래 기록 참고)
-- [ ] P4 (Dodo 브랜드·상품 생성 완료 (2026-10-25, 아래 기록). 남음: 체크아웃 링크·웹훅·도메인 연결·배포. MoR: Fungies 심사 대기)
+- [ ] P4 (Dodo 브랜드·상품·체크아웃 API 완료 (2026-10-25, 아래 기록). 남음: 웹훅·31일 게이트(403)·도메인 연결·배포. MoR: Fungies 심사 대기)
 
 ## 실행 계획 (2026-09-30)
 - P1: outbox·heartbeat 스키마 + 데몬 승인 중계. 돈값 코어의 로컬 절반.
@@ -219,7 +222,27 @@
 - 연간: `pdt_0NqSId35FkZiLVrZaYNp3` — $90.00/yr, recurring 1년 주기
 - `trial_type: none` — 30일 트라이얼은 우리 DB로 강제 (no-card)라 Dodo 트라이얼 미사용
 - `tax_category: saas`, `tax_inclusive: false`, metadata `{plan, interval}` (웹훅에서 상품 식별용)
-- 남음: 체크아웃 링크 2종, 웹훅 → 구독 상태 동기화, 도메인 연결·배포
+- 상품명 접두사 제거 (사장 지시): LocalAgents 제외 → `Pro (Monthly)` / `Pro (Annual)`. 체크아웃 화면에 브랜드(LocalAgents)가 찍히므로 중복 제거.
+- 남음: 웹훅 → 구독 상태 동기화, 도메인 연결·배포. 체크아웃 링크 2종은 동적 세션 API로 대체되어 보류 (사장 결정).
+
+## 과금 UI·체크아웃 (2026-10-25, 이 PC)
+- 스택 결정: Dodo SDK 미도입. `lib/dodo.ts`가 REST를 fetch로 직접 호출 — 의존성 0 (npm install 불필요).
+- 구현: `POST /api/dodo/checkout` (브라우저 → 게이트웨이 → 내부 헤더 신뢰, commands 패턴 준용). body `{interval, origin}` → Dodo `/checkouts` 세션 생성 → `checkout_url` 반환. metadata에 `user_id`·`interval` 심음 (웹훅 매핑용). return_url = 클라이언트 origin + `/sessions` (dev 3002/3003 분리 대응. return_url에 토큰 없어 변조 위험 낮음).
+- 게이트웨이: ROUTE_ENTRIES에 `["api","dodo","checkout"]` 등록. 미로그인 401 실측 확인 (`login required`).
+- 랜딩 pricing 섹션: `components/page/landing/pricing-section/` (기존 `[~]-section` 규칙). Monthly $9/mo + Yearly $90/year (`$7.50/mo · billed annually` + `2 months free` 배지). Subscribe 클릭 → 체크아웃 리다이렉트, 미로그인 클릭 시 `/auth/sign-in` (401 판정은 postFetch 에러 메시지 문자열 포함 — 임시).
+- 구조: Dodo 관련 API는 `app/api/dodo/` 하위로 모음 (사장 지시. 이후 웹훅도 `app/api/dodo/webhook`).
+- `.env.example` 신규 5개: `DODO_PAYMENTS_API_KEY` · `DODO_API_BASE_URL` (test/live 구분) · `DODO_PRODUCT_MONTHLY` · `DODO_PRODUCT_ANNUAL` · `DODO_PAYMENTS_WEBHOOK_KEY`.
+- 미확인: (1) 3002 랜딩 렌더·Subscribe 플로우 (서버 꺼져 있어 미검증. 게이트웨이 재기동 후 필요) (2) 상품 생성에 쓴 API 키의 test/live 모드 — env에 넣을 때 API 키와 같은 모드의 상품 ID 필수, 다르면 해당 모드에서 상품 재생성.
+- 커밋: `dbe3686` (구현) + `3c5ea40` (api/dodo 이동).
+
+## Neon 조회·스토리지 정리 (2026-10-25, 이 PC)
+- MCP로 Neon 테이블·Storage 조회 가능 확인. production 브랜치는 `devices`·`sessions_meta`만 있고 0행 — 앱 테이블 전무. 배포 때 마이그레이션 필요.
+- development 브랜치 조회 시 archived에서 자동 wake (`ready` 복귀). 실사용 DB는 development.
+- 중복 판정: 로컬 DB 세션 8개 = Mac 원본 4 + Arch pull 사본 4 (제목 중복 3쌍: TailoredAd·LocalAgentsLink·jaeholee.xyz). 서로 다른 ID라 정상 동작의 흔적. 스크린샷의 탭 중복도 같은 구조.
+- handoffs 7행 = 4탭 버전 이력 (중복 행 아님). LocalAgentsLink 최신 1건·테스트 1건 미수신.
+- Storage 고아 정리: 26개 중 handoffs 미참조 19개 (구 `dump/` 3 + 구버전 blob 16) 삭제, ~89MB 확보. 잔여 7개 = handoffs 포인터 1:1.
+- 구분 근거: `handoffs.device_id`가 출처 (이 Mac `01a11781…` / Arch `68049b59…`. 전부 Arch → 이 PC push 0건 확인). 단 로컬에 pull 표식이 없어 Neon 대조 필요 — `pulled_from` 표식 검토.
+- 실측 버그 2건 (미수정): `cloud_tabs.title`이 세션 ID로 저장 (웹 목록에 ID 노출), `sessions_meta` Mac 4행 msg 수 0으로 정체.
 
 ## Dodo 가입 (2026-10-03 진행 중)
 - 후보 1순위 등극. 4%+40¢(美내)+1.5% 해외+0.5% 구독. 한국 merchant·KRW·카카오/네이버/페이코 가능. SaaS·AI 환영 명시.
