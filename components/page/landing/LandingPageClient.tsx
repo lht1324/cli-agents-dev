@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import FeaturesSection from "./features-section/FeaturesSection";
+import PricingSection from "./pricing-section/PricingSection";
 
 const WEB_STEPS = [
     {
@@ -164,6 +165,8 @@ export default function LandingPageClient() {
                     </div>
                 </div>
             </section>
+
+            <PricingSection />
 
             <section className="border-t border-line">
                 <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-16 md:flex-row md:items-center md:justify-between">
