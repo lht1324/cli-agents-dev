@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { Unlink } from "lucide-react";
+import { deleteFetch } from "@/lib/api/client/baseFetch";
 
 export interface DeviceRow {
     id: string;
@@ -55,6 +57,10 @@ function presenceColor(state: Presence): string {
 }
 
 export default function DevicesPageClient({ items }: { items: DeviceRow[] }) {
+    const [unlinkTarget, setUnlinkTarget] = useState<DeviceRow | null>(null);
+    const [isUnlinking, setIsUnlinking] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
     const rows = useMemo(
         () =>
             items.map((item) => ({
@@ -63,22 +69,95 @@ export default function DevicesPageClient({ items }: { items: DeviceRow[] }) {
             })),
         [items],
     );
+
+    const onClickUnlink = useCallback((row: DeviceRow) => {
+        setError(null);
+        setUnlinkTarget(row);
+    }, []);
+
+    const onClickCloseModal = useCallback(() => {
+        if (!isUnlinking) {
+            setUnlinkTarget(null);
+        }
+    }, [isUnlinking]);
+
+    const onConfirmUnlink = useCallback(async () => {
+        if (!unlinkTarget) {
+            return;
+        }
+        setIsUnlinking(true);
+        try {
+            const res = await deleteFetch(`/api/devices?deviceId=${encodeURIComponent(unlinkTarget.id)}`);
+            const body = (await res.json()) as { success?: boolean; error?: string };
+            if (body.success) {
+                setUnlinkTarget(null);
+                window.location.reload();
+            } else {
+                setError(body.error ?? "Failed to unlink device.");
+            }
+        } catch {
+            setError("Failed to unlink device. Please try again later.");
+        } finally {
+            setIsUnlinking(false);
+        }
+    }, [unlinkTarget]);
+
     return (
         <main className="mx-auto max-w-5xl px-6 py-10">
             <h1 className="font-mono text-xl font-bold">Devices</h1>
             {rows.length === 0 && (
-                <p className="mt-4 text-dim">No devices yet. Run `localagents register` on your PC.</p>
+                <p className="mt-4 text-dim">No devices yet. Run `localagents login` on your PC.</p>
             )}
             <ul className="mt-4 space-y-2">
                 {rows.map((row) => (
-                    <li key={row.id} className="rounded border border-line bg-panel p-4">
-                        <p className="font-bold">{row.label}</p>
-                        <p className="mt-1 font-mono text-xs">
-                            <span className={presenceColor(row.presence.state)}>{row.presence.label}</span>
-                        </p>
+                    <li key={row.id} className="flex items-center justify-between rounded border border-line bg-panel p-4">
+                        <div>
+                            <p className="font-bold">{row.label}</p>
+                            <p className="mt-1 font-mono text-xs">
+                                <span className={presenceColor(row.presence.state)}>{row.presence.label}</span>
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => onClickUnlink(row)}
+                            className="flex items-center gap-1.5 rounded border border-line px-3 py-1.5 font-mono text-xs text-dim transition-colors hover:bg-black disabled:opacity-50"
+                        >
+                            <Unlink size={13} />
+                            Unlink
+                        </button>
                     </li>
                 ))}
             </ul>
+            {error ? <p className="mt-3 font-mono text-xs text-warn">{error}</p> : null}
+
+            {unlinkTarget && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+                    <div className="mx-4 rounded border border-line bg-panel p-6">
+                        <h3 className="font-mono text-sm font-bold">Unlink device</h3>
+                        <p className="mt-2 max-w-sm text-sm text-dim">
+                            <span className="font-bold">{unlinkTarget.label}</span> will stop syncing. The daemon on that PC
+                            signs out and can reconnect anytime with `localagents login`.
+                        </p>
+                        <div className="mt-4 flex justify-end gap-3">
+                            <button
+                                type="button"
+                                onClick={onClickCloseModal}
+                                className="rounded border border-line px-4 py-2 text-sm font-medium text-dim transition-colors hover:bg-black"
+                            >
+                                No, keep it
+                            </button>
+                            <button
+                                type="button"
+                                onClick={onConfirmUnlink}
+                                disabled={isUnlinking}
+                                className="rounded bg-warn px-4 py-2 text-sm font-bold text-ink transition-opacity hover:opacity-85 disabled:opacity-50"
+                            >
+                                {isUnlinking ? "Unlinking..." : "Yes, unlink"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </main>
     );
 }

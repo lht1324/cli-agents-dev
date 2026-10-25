@@ -14,6 +14,7 @@ interface RouteEntry {
 const ROUTE_ENTRIES: RouteEntry[] = [
     { method: "GET", pattern: ["api", "messages"], load: () => import("@/app/api/messages/route") },
     { method: "POST", pattern: ["api", "commands"], load: () => import("@/app/api/commands/route") },
+    { method: "DELETE", pattern: ["api", "devices"], load: () => import("@/app/api/devices/route") },
     { method: "POST", pattern: ["api", "dodo", "checkout"], load: () => import("@/app/api/dodo/checkout/route") },
     { method: "POST", pattern: ["api", "dodo", "cancel"], load: () => import("@/app/api/dodo/cancel/route") },
     { method: "POST", pattern: ["api", "dodo", "resume"], load: () => import("@/app/api/dodo/resume/route") },
