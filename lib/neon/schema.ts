@@ -1,4 +1,4 @@
-import { integer, pgTable, primaryKey, real, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, integer, pgTable, primaryKey, real, text, timestamp } from "drizzle-orm/pg-core";
 
 // 상주 데몬 1대 = 1행. 페어링 코드로 웹 계정과 연결한다.
 export const devices = pgTable("devices", {
@@ -115,10 +115,19 @@ export const modelCatalog = pgTable("model_catalog", {
 });
 
 // 구독(플랜 배정). plan_id가 진실, 해석된 값은 함께 저장한다.
+// 과금 상태: status는 Dodo 웹훅이 갱신, trial_ends_at은 첫 API 활동 시 초기화 (30일 no-card 트라이얼).
 export const subscriptions = pgTable("subscriptions", {
     userId: text("user_id").primaryKey(),
     planId: text("plan_id").notNull().default("plan-1"),
     syncIntervalSec: integer("sync_interval_sec").notNull().default(1800),
+    // Dodo 웹훅이 채우는 필드. null = 아직 결제 이력 없음.
+    dodoSubscriptionId: text("dodo_subscription_id"),
+    status: text("status"), // active | canceled | expired
+    interval: text("interval"), // monthly | annual
+    currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
+    trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
+    // 취소 예정 (기간 끝까지 유효). subscription.updated 웹훅이 cancel_at_next_billing_date를 거울로 기록.
+    cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

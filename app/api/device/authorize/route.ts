@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { auth } from "@/lib/auth/server";
+import { checkBillingGate } from "@/lib/billing";
 import { getDb } from "@/lib/neon/client";
 import { devices, deviceTokens } from "@/lib/neon/schema";
 import { getNextBaseResponse } from "@/lib/utils/getNextBaseResponse";
@@ -16,6 +17,10 @@ export async function POST(request: Request): Promise<Response> {
     const { data: session } = await auth.getSession();
     if (!session?.user) {
         return getNextBaseResponse(401).json({ success: false, status: 401, error: "login required" });
+    }
+    const gate = await checkBillingGate(session.user.id);
+    if (!gate.allowed) {
+        return getNextBaseResponse(403).json({ success: false, status: 403, error: "trial_ended" });
     }
     let body: AuthorizeBody;
     try {

@@ -2,12 +2,18 @@ import { desc, eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth/server";
 import { devices, getDb, sessionsMeta } from "@/lib/neon";
+import { checkBillingGate } from "@/lib/billing";
 import SessionsPageClient, { type SessionRow } from "./SessionsPageClient";
 
 export default async function SessionsPageServer() {
     const { data: session } = await auth.getSession();
     if (!session?.user) {
         redirect("/auth/sign-in");
+    }
+
+    const gate = await checkBillingGate(session.user.id);
+    if (!gate.allowed) {
+        redirect("/billing/locked");
     }
     const db = getDb();
     const rows = await db

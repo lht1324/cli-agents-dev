@@ -327,6 +327,25 @@ async function onStatus(): Promise<void> {
     } catch {
         console.log("pending: unknown (cloud unreachable)");
     }
+    // 과금 상태. 403이면 트라이얼 종료 — 구독 안내를 붙인다.
+    try {
+        const res = await fetch(`${baseUrl()}/api/billing/status`, {
+            headers: { Authorization: `Bearer ${state.token}` },
+            signal: AbortSignal.timeout(10000),
+        });
+        if (res.status === 403) {
+            console.log("billing: trial ended. subscribe at localagents.link");
+        } else if (res.ok) {
+            const body = (await res.json()) as { data?: { active?: boolean; daysLeft?: number | null } };
+            if (body.data?.active) {
+                console.log("billing: pro");
+            } else if (typeof body.data?.daysLeft === "number") {
+                console.log(`billing: trial, ${body.data.daysLeft} days left`);
+            }
+        }
+    } catch {
+        // 도달 실패는 server 줄이 이미 말한다.
+    }
 }
 
 async function onSessions(): Promise<void> {

@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { auth } from "@/lib/auth/server";
 import { readInternalUser } from "@/lib/auth/internal";
 import { verifyDeviceToken } from "@/lib/auth/device";
+import { checkBillingGate } from "@/lib/billing";
 import { getDb } from "@/lib/neon/client";
 import { cloudMessages, cloudTabs, devices, sessionsMeta } from "@/lib/neon/schema";
 import { getNextBaseResponse } from "@/lib/utils/getNextBaseResponse";
@@ -25,6 +26,10 @@ interface MessagesBody {
 export async function POST(request: Request): Promise<Response> {    const authed = await verifyDeviceToken(request);
     if (!authed) {
         return getNextBaseResponse(401).json({ success: false, status: 401, error: "unauthorized" });
+    }
+    const gate = await checkBillingGate(authed.userId);
+    if (!gate.allowed) {
+        return getNextBaseResponse(403).json({ success: false, status: 403, error: "trial_ended" });
     }
     let body: MessagesBody;
     try {

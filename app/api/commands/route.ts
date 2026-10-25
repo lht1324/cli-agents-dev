@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { readInternalUser } from "@/lib/auth/internal";
+import { checkBillingGate } from "@/lib/billing";
 import { getDb } from "@/lib/neon/client";
 import { commands } from "@/lib/neon/schema";
 import { getNextBaseResponse } from "@/lib/utils/getNextBaseResponse";
@@ -18,6 +19,11 @@ export async function POST(request: Request): Promise<Response> {
     const userId = readInternalUser(request);
     if (!userId) {
         return getNextBaseResponse(401).json({ success: false, status: 401, error: "unauthorized" });
+    }
+
+    const gate = await checkBillingGate(userId);
+    if (!gate.allowed) {
+        return getNextBaseResponse(403).json({ success: false, status: 403, error: "trial_ended" });
     }
     let body: CommandBody;
     try {

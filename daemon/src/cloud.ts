@@ -16,6 +16,9 @@ export async function cloudGet(path: string): Promise<unknown> {
     });
     if (!res.ok) {
         const text = await res.text();
+        if (res.status === 403) {
+            throw new BillingError(path);
+        }
         throw new Error(`cloud rejected ${path}: ${res.status} ${text.slice(0, 200)}`);
     }
     return res.json();
@@ -31,7 +34,18 @@ export async function cloudPost(path: string, body: unknown): Promise<unknown> {
     });
     if (!res.ok) {
         const text = await res.text();
+        if (res.status === 403) {
+            throw new BillingError(path);
+        }
         throw new Error(`cloud rejected ${path}: ${res.status} ${text.slice(0, 200)}`);
     }
     return res.json();
+}
+
+// 31일 트라이얼 종료. 재시도해도 소용없으니 안내 메시지로 끝낸다.
+export class BillingError extends Error {
+    constructor(path: string) {
+        super(`trial ended. syncing stopped. subscribe at localagents.link (rejected ${path})`);
+        this.name = "BillingError";
+    }
 }

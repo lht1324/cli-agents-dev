@@ -1,5 +1,6 @@
 import { and, asc, eq, gt } from "drizzle-orm";
 import { verifyDeviceToken } from "@/lib/auth/device";
+import { checkBillingGate } from "@/lib/billing";
 import { getDb } from "@/lib/neon/client";
 import { commands } from "@/lib/neon/schema";
 import { getNextBaseResponse } from "@/lib/utils/getNextBaseResponse";
@@ -9,6 +10,11 @@ export async function GET(request: Request): Promise<Response> {
     const authed = await verifyDeviceToken(request);
     if (!authed) {
         return getNextBaseResponse(401).json({ success: false, status: 401, error: "unauthorized" });
+    }
+
+    const gate = await checkBillingGate(authed.userId);
+    if (!gate.allowed) {
+        return getNextBaseResponse(403).json({ success: false, status: 403, error: "trial_ended" });
     }
     const db = getDb();
     const oldest = await db
