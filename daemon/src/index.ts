@@ -334,13 +334,23 @@ async function onStatus(): Promise<void> {
             signal: AbortSignal.timeout(10000),
         });
         if (res.status === 403) {
-            console.log("billing: trial ended. subscribe at localagents.link");
+            console.log("billing: Subscription ended. Subscribe at localagents.link");
         } else if (res.ok) {
-            const body = (await res.json()) as { data?: { active?: boolean; daysLeft?: number | null } };
+            const body = (await res.json()) as {
+                data?: { active?: boolean; daysLeft?: number | null; cancelAtPeriodEnd?: boolean; currentPeriodEnd?: string | null };
+            };
             if (body.data?.active) {
-                console.log("billing: pro");
+                if (body.data.cancelAtPeriodEnd && body.data.currentPeriodEnd) {
+                    const end = new Date(body.data.currentPeriodEnd);
+                    const date = Number.isNaN(end.getTime()) ? "period end" : end.toISOString().slice(0, 10);
+                    console.log(`billing: Pro, cancels at ${date}`);
+                } else {
+                    console.log("billing: Pro");
+                }
+            } else if (body.data?.daysLeft === 0) {
+                console.log("billing: Subscription ended. Subscribe at localagents.link");
             } else if (typeof body.data?.daysLeft === "number") {
-                console.log(`billing: trial, ${body.data.daysLeft} days left`);
+                console.log(`billing: Trial, ${body.data.daysLeft} days left`);
             }
         }
     } catch {

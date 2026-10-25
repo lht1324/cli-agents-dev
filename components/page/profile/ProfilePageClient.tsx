@@ -53,12 +53,32 @@ export default function ProfilePageClient({ data }: { data: ProfileData }) {
             const body = (await res.json()) as { success?: boolean; error?: string };
             if (!body.success) {
                 setError(body.error ?? "Failed to cancel subscription.");
+                setShowCancelModal(false);
+                return;
             }
+            // 서버에서 이미 반영됐다. 최신 구독 상태로 화면을 다시 그린다.
             setShowCancelModal(false);
+            window.location.reload();
         } catch {
             setError("Failed to cancel subscription. Please try again later.");
+            setShowCancelModal(false);
         } finally {
             setIsCanceling(false);
+        }
+    }, []);
+
+    const onClickResume = useCallback(async () => {
+        setError(null);
+        try {
+            const res = await postFetch("/api/dodo/resume", {});
+            const body = (await res.json()) as { success?: boolean; error?: string };
+            if (body.success) {
+                window.location.reload();
+                return;
+            }
+            setError(body.error ?? "Failed to resume subscription.");
+        } catch {
+            setError("Failed to resume subscription. Please try again later.");
         }
     }, []);
 
@@ -67,19 +87,6 @@ export default function ProfilePageClient({ data }: { data: ProfileData }) {
             setShowCancelModal(false);
         }
     }, [isCanceling]);
-
-    const onClickResume = useCallback(async () => {
-        setError(null);
-        try {
-            const res = await postFetch("/api/dodo/resume", {});
-            const body = (await res.json()) as { success?: boolean; error?: string };
-            if (!body.success) {
-                setError(body.error ?? "Failed to resume subscription.");
-            }
-        } catch {
-            setError("Failed to resume subscription. Please try again later.");
-        }
-    }, []);
 
     return (
         <main className="mx-auto max-w-5xl px-6 py-10">
