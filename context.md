@@ -1,398 +1,112 @@
-2026-10-25 05:15
+2026-10-26 01:36
 
 # context.md - cli-agents-dev
 
 ## 프로젝트
 - 폴더: `cli-agents-dev` (구 `new_project`)
 - 서비스 가명: localagents (명령어는 단수 `localagents`)
-- 도메인 후보: `cliagents.dev` (연 $12.2, 본선) / `localagents.nexus` (연 $10.2, 리다이렉트용)
-- 스택: Next.js 15+ / TypeScript / Tailwind CSS (사장 기술 기준)
+- 도메인: `localagents.link` 본선 + `cliagents.dev` 리다이렉트용. dev 터널 `dev.localagents.link`
+- 스택: Next.js 16.3.6 (Turbopack) / TypeScript / Tailwind CSS
 
 ## 사업 아이템 (확정 방향)
 - 다중에이전트 세션 온라인 관리. Claude Code + OpenCode 세션을 한 화면 통합 inbox로.
-- 제외: 메일 범용 클라이언트, 게임, 범용 메신저 (경쟁 과포화)
-- 제외: Antigravity (공개 API 없음), 엔터프라이즈 AMP (SI 영업 필요)
+- 본체 = PC 간 탭 복원. 부속 = 웹 리모컨(보기·승인·새 지시, 실행은 PC 서버). 웹에 터미널 재현 없음.
+- 웹 범위: 랜딩·요금제 + 프로필·구독 관리 + 원격 inbox.
+- 레포 구조: 데몬은 같은 레포 `daemon/` 하위. 패키지 분리는 2번째 프로젝트 때.
 
-## 아키텍처 (A안 확정)
-- 로컬 데몬(유저 PC 백그라운드 프로세스) + 클라우드 제어서버(Next.js + Neon 메타DB) + 웹 UI(뷰어)
-- 브라우저에서 CLI 직접 실행 불가. 데몬이 아웃바운드 WS 1개로 명령 수신·결과 푸시.
-- OpenCode는 `opencode serve` API 활용. Claude는 JSONL 감시 + `-p --resume` + SDK SessionStore.
-- PC 꺼지면 offline 표시. `PC 꺼져도 실시간`은 B안(클라우드 실행)이며 후순위. B안은 Daytona류 외부 샌드박스 임대 전제.
-- MVP 범위: 통합 목록 + 상태 + 원격 승인 1개. 전문 미러링은 2단계.
-- 분배 확정: 플러그인·per-project npm 아님. 상주 데몬 1개 (`npx localagents login` 1방).
-- 클라이언트 확정: 웹 뷰어 1개. CLI 클라이언트는 중복, Electron은 과함. 터미널 부착은 2단계 이후.
-- 기능 분리 확정 (2026-09-29): 본체 = PC 간 탭 복원. 부속 = 웹 리모컨(보기·승인·새 지시, 실행은 PC 서버). 웹에 터미널 재현 없음.
-- 웹 범위 확정: 랜딩·설명서·요금제 + 프로필·구독 관리 + 원격 inbox. 계정면 + 마케팅면 + 동반 기능.
-- 레포 구조 확정: 데몬은 별도 레포 아님. 같은 레포 `daemon/` 하위. 타입 공유·단일 푸시. 패키지 분리는 2번째 프로젝트 때.
+## 개발 환경 (2026-10-25 포트 변경 확정)
+- 클라 3004 (`npm run dev`) / API 컨테이너 3005:3000 (`npm run dev:api` + docker compose). 데몬 baseUrl 기본값 `localhost:3005`.
+- `:3000`은 tailored-ad 서버 보호. ngrok은 데몬 전용 (Bearer 토큰), 브라우저는 localhost (세션 쿠키 도메인 귀속).
+- 사장님이 ngrok → **Cloudflare Tunnel** 전환 (프로젝트별 dev 서브도메인). API 서브도메인이 3005로 향하는지 확인 필요했음.
+- env 컨벤션: `NEXT_PUBLIC_BASE_URL`=브라우저→API (dev localhost:3005, 터널 URL 넣으면 로그인 깨짐) / `BASE_URL`=서버 외부 알림용 (웹훅 등) / `LOCALAGENTS_BASE_URL`=데몬 전용.
+- CORS: 게이트웨이만. `CORS_ALLOWED_ORIGINS` (dev 기본값 localhost:3004).
 
-## 데이터·요금 원칙
-- Neon에는 세션 메타/요약만. transcript 전문 상시 동기화 없음 (요금+개인정보).
-- 전문은 필요 시 해당 1건만 온디맨드 조회 (E2E 암호화·만료기한付き). opt-in + 로컬 마스킹(sk-*, ghp_* 등) + 30일 보관.
-- 플랜별 동기화 차등: 30분/10분 배치 vs 쿼리마다 실시간. 플래그 1개로 제어. 세션 개수 차등 아이디어는 후보 (용량 상한·보관기간과 세트).
-- 마지막 성공 동기화 시각을 1급 상태로 UI 표시 (`synced N분 전`).
+## 과금 (2026-10-25~26 완성. 전 경로 실증)
+- 요금제 확정: **단일 플랜 Pro $9/월·$90/연 (2개월 할인)**. 30일 no-card 트라이얼, 31일째 hard cutoff (유료 아니면 사용 불가). 데이터는 삭제하지 않고 보관 (재구독 시 복원).
+- 결정 배경: 기기 수는 3대+ 유저가 적어 약한 훅 → 기각. Free 티어는 차별점 약함+비용 → 기각 (사장: "쳐내는 게 맞다"). 트라이얼 30일로 확정 (14일은 가치 확정 전 끊길 위험).
+- 결제사 **Dodo** (MoR). 브랜드 `brnd_0NqSDEWhhRh98FCCuDWhy` (LocalAgents), 상품 월간 `pdt_0NqSIczhD3rElCnCCxUB1` / 연간 `pdt_0NqSId35FkZiLVrZaYNp3`, `trial_type: none` (트라이얼은 우리 DB 관리), metadata `{plan: pro, interval}`.
+- 네이밍: 사용자 접점 전부 `LocalAgents`. `LocalAgentsLink`는 상호만.
+- **Dodo 키 형식 주의**: 신형 키는 `sk_test_` 프리픽스가 없음 (예: `ds0wIEP...`). test/live는 **`DODO_PAYMENTS_ENVIRONMENT`** env로 명시 (`test_mode` | `live_mode`, SDK 공식 규약). 프리픽스 판정·런타임 프로브 금지 (Cloudflare edge에서 프로브 불가).
+- 상품 ID 하드코딩 금지: 서버가 `products.list()`를 metadata `{plan, interval}`로 매핑 (1시간 캐시, 월·연 각 정확히 1개 아니면 loudly 실패. tailored-ad `dodoProducts.ts` 패턴).
+- `.env` Dodo 관련 3개: `DODO_PAYMENTS_API_KEY` · `DODO_PAYMENTS_ENVIRONMENT` · `DODO_PAYMENTS_WEBHOOK_KEY`.
+- **웹훅** (`app/api/dodo/webhook`): Standard Webhooks 규격 (webhook-id/signature/timestamp, HMAC-SHA256, node:crypto 수동 검증, 리플레이 5분). `subscription.active/renewed/updated` → upsert, `cancelled/expired` → status=canceled. 유저 매핑은 체크아웃 metadata `user_id`. 구독 ID는 `subscription_id` 우선 → `id` 폴백 (이벤트 버전별 위치 갈림 실측). 유저 미상은 200 무시, DB 장애는 500 재시도. 게이트웨이에 넣지 않음 (외부 직호출).
+- **스키마**: `subscriptions`에 `dodo_subscription_id`·`status`·`interval`·`current_period_end`·`trial_ends_at` (0014) + `cancel_at_period_end` (0015) 추가. dev DB 마이그레이션 적용 완료.
+- **과금 게이트** `lib/billing.ts`: 구독 active 통과 / `trial_ends_at` null이면 첫 API 활동+30일 초기화 / 만료 403 (`trial_ended`). 적용: 데몬 경로 4개 (sync GET/POST·messages·commands/next·handoffs/url) + 웹 fetch 2개 (commands·device/authorize) + 서버 컴포넌트 3면 (sessions 목록·상세·devices → `/billing/locked` redirect). heartbeat는 제외 (presence 유지).
+- **`/billing/locked`**: 트라이얼 종료 화면 ("Trial ended. Your sessions are safe and waiting.") + Subscribe 버튼 2종. 실증 완료 (DB 조작 시뮬레이션으로).
+- **`/api/billing/status`**: 데몬용 읽기 전용 (토큰 인증, 게이트 아님). `active`·`daysLeft`·`cancelAtPeriodEnd`·`currentPeriodEnd` 반환.
+- **체크아웃**: `POST /api/dodo/checkout` (게이트웨이 경유, 내부 헤더 신뢰). body `{interval, origin}` → Dodo checkout 세션 → `checkout_url` 반환. return_url = 클라 origin + `/sessions`.
+- **취소/복원**: `POST /api/dodo/cancel`·`/resume` — Dodo `PATCH /subscriptions/{id}`의 `cancel_at_next_billing_date` 토글 + DB 즉시 반영 (웹훅과 멱등). 프로필 UI: 취소 확정 모달, 취소 예정 시 "Subscription Ending" 배너 + "Keep subscription" 버튼, 성공 시 `window.location.reload()`로 즉시 반영.
+- **데몬 표시** (`localagents status`의 `billing:` 라인): `Pro` / `Pro, cancels at YYYY-MM-DD` / `Trial, N days left` / `Subscription ended. Subscribe at localagents.link`. 플랜 이름 첫 글자 대문자 (사장 지시). 데몬 403 수신 시 `BillingError` (cloud.ts) — 재시도 없이 안내로 종료.
+- **실증 완료**: 체크아웃(test 카드 $9.90 결제) → 웹훅 실수신 → DB active → 게이트 통과 → 취소/복원 플로우 → 31일 만료 시뮬레이션 (웹 locked + 데몬 감지). 가짜 이벤트 검증 (유효 서명 200 / 변조 401).
+- 미검증: 연간 결제 플로우 (월간과 경로 동일해 위험 낮음).
 
-## OpenCode 로컬 DB 실측 (2026-09-28, 사장 PC)
-- 경로: `~/.local/share/opencode/opencode.db`. 당초 예상 300MB → 실측 **832MB** (폴더 전체 989MB).
-- 테이블 행수 (정리 전): session 25, message 4,232, part 16,217, project 5, event 39,983.
-- 용량 구성: **event 408MB + part 350MB + message 5.8MB** + 인덱스 나머지. 사장이 보존하려는 '대화'(message)는 4개 세션 합쳐 5.8MB에 불과.
-- 세션별 무게: `TailorAd context.md 확인` 1개가 약 680MB로 전체의 86% (part 322MB + event 357MB). 나머지 3개는 합쳐 약 80MB.
-- 범인 2개: (1) `tool=read` × `/Users/jaeho/Downloads/` 대용량 파일 반복 읽기, 개당 4.7~5.1MB가 part에 적재. (2) 이중 저장. `message.part.updated` 이벤트 12,488행·332.8MB가 part 내용의 복사본. 같은 5MB가 part와 event에 중복.
-- 참고: `session` 테이블에 `directory` 절대경로 저장. 통 DB 덮어쓰기 금지의 근거.
-- 현재 세션 컨텍스트 패널 실측: 제한 1,048,576 토큰, 사용률 8%, 내역은 사용자 4.2% / 어시스턴트 22.4% / 도구 호출 73.2% / 기타 0.2%. 도구 호출이 컨텍스트의 7할.
+## 프로필 페이지 (2026-10-26 완료)
+- `/profile` (`app/(main)/profile/` + `components/page/profile/`): 서버 컴포넌트가 `neon_auth.user` 직독 (이메일·이름·아바타·가입일) + `subscriptions` + 기기/세션 수 집계.
+- **neon_auth 스키마 컬럼은 camelCase** (`createdAt`·`emailVerified`). `created_at`로 쓰면 컬럼 없음 크래시 (실측).
+- 클라이언트: 계정 카드(아바타·이메일·기기 수·세션 수) + 구독 카드(Plan/Billing cycle/Next billing + Cancel) + 취소 모달 + Member since.
+- 헤더 UserButton 드롭다운에 **Profile 링크 추가**: `components/page/auth/UserMenuButton.tsx` (클라이언트 컴포넌트, `additionalLinks` prop 사용 — 서버 컴포넌트에서 ReactNode 아이콘 전달 불가 때문에 분리).
+- 수동 개발: tailored-ad `ProfilePageClient.tsx` 참고. Change Plan은 플랜 1개라 제외 (v2), 결제 내역(Orders API) v1.5, 로고 업로드는 제품 특성상 제외.
 
-## 세션 정리 작업 (2026-09-28 완료)
-- 25개 → 4개로 축소. 남긴 것: `cli-agents-dev 컨텍스트 검토`(ses_f1c05c…), `TailorAd context.md 확인`(ses_f82fb9…), `브리핑 요청`/short_real 최신 09-15(ses_fc05e0…), `브리핑 요청`/portfolio(ses_f7dcd1…).
-- 연관 삭제: message 1,334행, part 5,000행, event 5,248행. CASCADE 확인 테이블: message→part, todo, session_share, session_message, session_input, session_context_epoch (전부 session(id) 참조). event는 session을 직접 참조하지 않아 `event_sequence` 21건을 함께 삭제해 연쇄 처리. project/workspace/permission은 프로젝트 귀속이라 유지.
-- 결과: 832MB → 793MB. 39MB만 감소 (남긴 4개가 본체: message 2,898행·part 11,217행). 진짜 다이어트는 남긴 세션 안의 거대 read 파트 정리이며 미실시 (A안: 손대지 않음).
-- 백업: `/var/folders/7y/5m9115_d3tv0jz49btch7lth0000gn/T/opencode/opencode-backup-20260928.db` 832MB. VACUUM + `wal_checkpoint(TRUNCATE)` 수행 (WAL 798MB→24KB). OpenCode.app 실행 중 작업, 무사.
+## 기기 해제 (2026-10-26 완료)
+- `DELETE /api/devices?deviceId=` (게이트웨이 등록): 세션 주인 기기만 (타인 404) → 토큰 전부 revoke + 기기 행 삭제. 해제된 데몬은 401 → not logged in.
+- Devices 페이지: Unlink 버튼 + 확인 모달 ("can reconnect anytime with `localagents login`"). 빈 화면 문구도 옛 `register` → `login` 수정.
+- 구분: `/api/device/revoke`는 데몬 본인 logout용 (기존), 웹 해제는 `/api/devices` (신규).
 
-## 동기화 설계 결론 (이번 세션 확정)
-- '꺼지기 직전 무조건 동기화' 불가. OS가 수 초만 주고 강제 종료·전원단절에는 훅 없음. n분 주기 + 종료/수면 best-effort flush + 부팅 catch-up.
-- 통 DB 덮어쓰기 금지. B 고유 세션 삭제·절대경로 불일치·WAL 파손. 세션 1개 논리 이식(insert)으로.
-- 파일 diff 아님. `updated_at > last_sync` 행만 전송, 커서는 `last_sync` 토큰 1개. 평소 메타 KB 단위.
-- OAuth는 Google+GitHub 먼저, X는 나중 (심사·유료티어·스펙변경).
+## Dodo 상품 생성 (2026-10-25)
+- `products.create`가 `brand_id`를 생성 시 직접 받음. 상품명은 `Pro (Monthly)`/`Pro (Annual)` (브랜드가 체크아웃에 찍히므로 접두사 제거).
+- 체크아웃 링크 2종(정적)은 동적 세션 API로 대체되어 보류.
 
-## 세션 정의 (2026-09-29 확정)
-- 탭 1개 = 세션 1행. GUI 멘탈모델과 DB 일치.
-- 동기화 범위 = 현재 epoch 전문 + 이전 epoch 접기(요약 1줄). 압축 발동 시 compaction 행 기준으로 자름. 서버는 전부 보유, 클라우드는 현재만(큐, flush는 우리 DB에서만).
-- 복원 3층: 텍스트 항상 + tool 메타 유료 + payload 제외(온디맨드 1건). 전송 gzip. 키는 user_id Partition + (session_id, seq).
-- 연산: 로그 INSERT-only + 헤더 UPDATE(제목·비용·토큰·시간) + flush DELETE(클라우드 전용).
-- MVP = 보기 + 새 턴 잇기. 이어서 실행은 workspace 동기화 붙는 2단계.
-- 전용 세션 = fork 분기. 기존 탭은 읽기·승인만. TUI 직접 운전 금지.
-- 로컬 큐-DELETE 없음. 우리 탭은 입력 통제로 마르게 + 세대 교체는 fork. 이식은 import 우선, 선택 이식은 직접 SQL(2단계).
+## 랜딩·가격 UI (2026-10-25)
+- `components/page/landing/pricing-section/`: Monthly $9/mo + Yearly $90/year (`$7.50/mo · billed annually` + `2 months free` 배지). Subscribe → 체크아웃 리다이렉트, 미로그인 401 → `/auth/sign-in`.
+- 카피: "30-day free trial. No card required."
 
-## 용어 확정 (2026-09-30)
-- 탭 > 세션. 탭 = 대화 공간(CLI 터미널 탭·GUI 탭, `session_v2` 1행). 세션 = 사용량 0→100% 구간 1개(압축 경계). 동기화 단위는 세션.
-- 기존 "탭 1개 = 세션 1행" 표현은 폐기.
+## 로그인·콜백 (2026-10-24 완료)
+- 고정 콜백 라우트 `/api/auth/callback`: `localagents_connect` 쿠키(기기 페어링 복귀 경로) 있으면 소각하고 authorize로, 없으면 `/sessions`로. verifier query 계승.
+- 근본 원인 교훈: Neon verifier→세션 교환은 **미들웨어(proxy.ts)**에서 돈다. matcher에 인증 화면(`/sessions`·`/devices`·`/device`) 등록 필수 — 안 걸면 SSR의 getSession이 세션을 못 봐 307 튕김.
+- `app/auth/[path]/page.tsx`: callbackURL = 항상 `${origin}/api/auth/callback` (headers 기반). `app/api/device/begin`: 봉투 없이 고정 콜백 + 쿠키로 복귀 경로.
 
-## 터미널풍 UI + 입력 (2026-09-30 확정)
-- 모양은 터미널풍 스크롤 + 입력창 가능. OpenCode 웹 통째 이식은 아님.
-- 입력 경로: 웹 입력 → 클라우드 명령 outbox → 데몬 → 로컬 서버 실행. Neon 역할 2개 (세션 저장소 + 명령 outbox).
-- 첨부: user 행에 base64 임베드 확인(PNG 클립보드 15KB·스크린샷 300KB대, `source: inline`). 저장은 영구, 기억은 윈도우 한정. 파일 메타만 항상 동기화, 본문 온디맨드.
-- presence: heartbeat 3-state (online·stale·offline) + last seen. 수면·꺼짐·단선 구분 불가. 주기는 동기화 플랜과 묶음.
-- 예약 실행: outbox 상태 4개 + 만료(예 7일) + 멱등키. offline·stale 기기엔 "PC 켜지면 실행됩니다" 경고.
-
-## 결제사 점검 결과
-- Polar / Paddle / Lemon Squeezy / Creem / Fungies.io 모두 devtool SaaS 허용.
-- 금지는 AI 이미지·딥페이크·음성복제·스파이웨어 한정. 세션 매니저는 workflow측이라 통과 라인.
-- 주의: 타서비스 우회 마케팅 금지, 지원메일·취소버튼·약관 필수.
-- MoR 미정. `SKILLS.md`에서 Paddle 10종 삭제하고 빈 상태로 둠. Paddle 설치 형식 확인됨: `developer.paddle.com@paddle-xxx` (각 1.6~1.7K installs).
-
-## Neon vs Supabase 결론
-- Neon Console SQL Editor로 값 확인·SQL 실행 가능. Supabase식 인라인 표편집감은 아님.
-- Supabase Pro 사용량을 Neon에 얹으면 약 $23~24로 동가. scale-to-zero 저트래픽이면 Neon 압승.
-- Neon은 제어DB로 도입. Realtime/Edge 대체는 별도 WS 필요.
-- Neon Object Storage (2026-09-28 조사): S3 호환 내장 스토리지. 별도 AWS 계정·IAM 없이 Neon credential 1개. `neon.ts`에 bucket 선언 후 `neon deploy` 1방. 브랜치와 함께 copy-on-write 분기. Free에 5GB 포함. 단 설정 예시가 `preview.buckets`라 프리뷰 성격. 필요해지면 붙이고 R2/S3 별도 계약은不要.
-- Neon Free에 Managed Better Auth 포함 (Google/GitHub OAuth 설정 몇 줄).
-
-## SKILLS.md / 스킬 상태 (2026-09-28 완료 → 2026-10-10 정밀 점검)
-- `SKILLS.md` 작성 완료, `develop`에 커밋·푸시 (`692bcaa [Update] [Paddle 스킬 문서 제거]` + `.idea` 1건, `origin/develop` 동기화).
-- 전역 스킬 60여 개 유지. Paddle은 전역·로컬 어디에도 미설치.
-- `tailored-ad`는 손대지 않음 (SKILLS.md 99줄 동일 사본 존재, Paddle 포함).
-- **정밀 점검 (2026-10-10):** 문서와 실물 어긋남 확인. 디자인 계열 중 실물 = `design-taste-frontend`·`ui-ux-pro-max`·`ui-styling`·`design-system`·`brand`·`design`·`banner-design`·`slides`. **미설치: `impeccable`·taste 9종(`gpt-taste`·`high-end-visual-design`·`minimalist-ui`·`industrial-brutalist-ui`·`image-to-code`·`redesign-existing-projects`·`brandkit`·`stitch-design-taste`·`imagegen-*`)·`design-taste-frontend-v1`.** ui-ux-pro-max의 `landing` 도메인은 DB 비어 검색 0건. SKILLS.md 목록 갱신 or 스킬 보강 필요.
-
-## 에이전트·모델 원격 전환 (2026-10-02, 코드 완료·종단 미검증)
-- API 실측: `GET /api/model` 1방에 provider+variants. `GET /api/agent`는 위치 귀속. 전환은 세션별 POST 2개 (`/agent {agent}`, `/model {id,providerID,variant?}`).
-- 에이전트 필터: `mode=primary + hidden≠true` = Build·Plan만. 목록 기본값 = 현재값 (`sessions_meta.agent/model` 컬럼 추가, 데몬 `sync-sessions`으로 채움).
-- 모델 선택: 공급자별 optgroup + variant 분리 선택. 값 있으면 placeholder 숨김.
-- 거울: `model_catalog` 테이블 (device PK). 데몬 `sync-models`. serve 기동 직후 빈 목록 주의 (웜업 후 재실행).
-
-## tool 호출 가공 (2026-10-02)
-- 전수 5,058행: 출력은 text·file(이미지 74건)·빈값 3종. 입력 키 2세대 공존 (`filePath|path`, skill `name|id`).
-- 저장: `{tool, input(본문·base64 제외), exit, hasImage, answer}` envelope. UI에서 종류별 가공. `tools.ts`는 exit 판정만残存.
-- shell 2번째 줄 = 종료 상태 (`Command exited with code N`, SIGTERM, 백그라운드 알림). ✓/✗ 표시.
-- question 출력 = `Q=A` 텍스트. 답변 500자 포함 저장.
-
-## UI 개편 (2026-10-02)
-- 스킬: `design-taste-frontend`. 다크 터미널풍 (ink·panel·line·go·warn 토큰). shadcn 미사용.
-- 랜딩 개편 + 헤더 내비(Sessions·Devices). 본문 `max-w-5xl`. 대화 말풍선 (user 우·assistant 좌·tool 접힘·summary 구분선).
-- assistant text 마크다운 렌더 (`react-markdown@10.1.0` + `remark-gfm@4.0.1`). 진입 시 최하단 + `↓` 플로팅 버튼.
-- 메시지 원본 시각: `cloud_messages.createdAt`에 원본 기록. 말풍선 아래 `3:24 PM` 표시. 걸린 시간은 다음(컬럼 필요).
-
-## CLI 명령어 목록 (2026-10-06 확정)
-- 유저 표면 4개: `login`(OAuth+첫동기화) · `status`(기기·서버도달·마지막성공·밀린명령, 주소 없음) · `whoami`(이메일·플랜) · `push`(묶음 1회).
-- 삭제済み: `register`·`token`(login이 대체) · `approve`(웹 버튼으로) · `pull`(2단계 이식 때 부활).
-- 숨김 진단 (`--jaeholee` 없이 치면 unknown): `sessions`·`heartbeat`·`sync`·`fork`·`sync-messages`·`sync-models`·`sync-sessions`·`poll`. `run`은 unit용이라 예외.
-- 보류: `logout`(출시 직전, revoke+상태삭제 30분) · `--help`(표면 안정 후) · `doctor`(진단 묶음) · `sessions` 표면 잔류 여부.
-- `send` 폐기. 메시지 전송은 웹에서만.
-
-## 랜딩 1차 개편 (2026-10-11 완료, 이 PC)
-- 스킬: `design-taste-frontend` 로드 후 적용. 데스크탑 전용으로 진행 (모바일은 나중에 `LandingPageDesktopClient`/`MobileClient` 분리 예정).
-- 구조: `proxy.ts` matcher에서 `/` 제외 (미로그인 공개). 헤더 내용물 `max-w-6xl`로 축소해 아바타를 콘텐츠 끝에 정렬.
-- 폭: `max-w-3xl`(768) → `max-w-6xl`(1152). 히어로 좌(카피+CTA+Works with)·우(터미널 트랜스크립트) 분할. 섹션마다 전체폭 `border-t`.
-- `features-section/FeaturesSection.tsx` 분리. "Walk away"(PC ↔ Phone 상황) / "Take it with you"(PC ↔ PC 상황) 2열, divide-x. `[~]-section` 폴더 규칙 시작.
-- HIW: PC ↔ Phone(자동, login→sessions) / PC ↔ PC(수동, push→pull) 2열. 자동/수동 축은 코드 실측 근거 (`run` 느린 층이 syncSessions·syncActiveMessages 자동, push/pull만 수동). HIW엔 구분선 없이 간격만 (Features와 레이아웃 반복 회피).
-- 터미널 칩: 명령줄을 `bg-black`(body `#0a0c10`보다 어둡게)+border 블록으로 분리. `$`만 `go` 초록. URL은 `https://` 흐림 + 도메인 밝게 (주소창 느낌). 목적지는 `/sessions` (devices 아님).
-- Claude 로고 제거 (데몬 미구현). OpenCode만 표기. 이모지 대신 텍스트+`↔` (터미널 감성, 렌더 편차 회피).
-- 카피: 서브 `Check in from anywhere`. HIW 서브 `Just leave your PC on.` / `You drive, or ask your agent to.` (에이전트 대행은 실제 가능한 범위만 주장).
-- 커밋: `e3e3752`~`9ace649` 8건.
-- 남음: 실물 스크린샷(1600×1000)·og:image, 모바일 분리, 나머지 섹션(문제-해결·신뢰) 검토.
+## Neon 조회·스토리지 정리 (2026-10-25)
+- production 브랜치는 `devices`·`sessions_meta`만 있고 앱 테이블 전무 — **배포 때 마이그레이션 전체 적용 필요**.
+- Storage 고아 19개 삭제 (~89MB 확보). 잔여 7개 = handoffs 1:1.
+- 실측 버그 2건 (미수정): `cloud_tabs.title`이 세션 ID로 저장 (웹 목록에 ID 노출), `sessions_meta` Mac 4행 msg 수 0 정체.
 
 ## 다음 할 일
-- [x] 개발용 서버 분리 (클라 3002·API 컨테이너 3003·데몬 baseUrl 3003. 재시작 후 검증 대기. 아래 2026-10-18~19 기록)
-- [x] push/pull 마감 + CLI 정리 (2026-10-12~18 보충 기록. 아래 참고)
-- [x] 브라우저 게이트웨이·CORS·env 컨벤션 (2026-10-18~19. 아래 기록)
-- [ ] dev 서버 재시작 후 게이트웨이 플로우 검증 (지시 전송·승인·모델 변경. 신 env + CORS 코드 반영 필요)
-- [ ] 랜딩 외 페이지 디자인 업데이트 (sessions 목록·상세, devices, auth)
-- [ ] Dodo env 5개 입력 + test/live 모드 일치 확인 (API 키 ≠ 상품 모드면 해당 모드에서 상품 재생성)
-- [ ] 과금 UI 검증 (서버 재기동 후 3002 랜딩 → Subscribe → Dodo 결제 페이지 도달)
-- [ ] Dodo 웹훅 (`app/api/dodo/webhook`): 서명 검증 (whsec HMAC) + 구독 이벤트 → `subscriptions` 테이블 동기화 (status·trial_ends_at 등 필드 추가 마이그레이션 필요)
-- [ ] 랜딩 남은 것 (실물 스크린샷 1600×1000·og:image·모바일 분리)
-- [x] LandingPage 1차 개편 (proxy 공개·6xl·Features/HIW 분리·터미널 칩. 위 2026-10-11 기록)
-- [x] 세션 정의 확정 (탭>세션, 현재 epoch 전문 + 이전 접기)
-- [x] MVP 플로우 3개 고정 (전문+초과 폴백 / 허용·거부 2버튼 / 주기+수동 버튼)
-- [ ] MVP 범위 확정 (통합 목록+승인)
-- [x] 도메인 구입 (`cliagents.dev` 구입済み. consigliere는 별명·기능명 후보, `.salon` 반대)
-- [x] Next.js + Drizzle + Neon 보일러플레이트 (Storage 제외, OAuth Google+GitHub)
-- [x] Neon Auth dev/prod 분리 (브랜치별 Auth URL, `.env` 교체済み. GitHub 콜백 2개目は 배포 시)
-- [x] `daemon/` 스캐폴드 (서버 탐색·인증·세션 목록, 종단 검증済み)
-- [x] 데몬 승인 중계 (`permissions` 조회·응답 + `sync` 거울, 실사격済み)
-- [x] 명령 outbox 테이블 (commands + cloud_tabs/messages/folds, Neon dev 적용済み)
-- [x] heartbeat 방식 결정 (`devices.lastSeenAt` 갱신으로 확정)
-- [x] 웹 원격 inbox UI (보기·승인) + 기기 목록 (웹→PC 종단済み: sync→Allow→poll→실행)
-- [x] `localagents fork` 명령 (fork + 대장 등록, 실측済み)
-- [x] 새 지시 종단 (웹 전송 → poll → 에이전트 응답 확인済み)
-- [x] 상세 307 해소 (원인: 손 복사 id 오기. 목록 링크화로 재발 방지)
-- [x] 에이전트·모델 전환 코드 + 종단 (variant medium 변경 → poll → PC GUI 확인済み 2026-10-02)
-- [x] 대화 동기화·시각·tool 가공·UI 개편 (말풍선·마크다운·폭·점프 버튼)
-- [x] OS 등록 Arch (`active (running)` 확인, 재부팅 미확인)
-- [x] 토큰 API (heartbeat·poll·sync·messages 전환済み)
-- [x] loopback 로그인 구현 (브라우저 OAuth → Connect → 토큰 → heartbeat 종단済み 2026-10-05)
-- [x] `push` 묶음 명령 + `status` 개편 (주소 제거, 2026-10-06) + `whoami` 추가 (이메일·플랜)
-- [ ] UI 개선 (최우선, 진행 중. 아래 2026-10-07 기록 참고)
-- [x] `logout` 구현 (revoke+상태삭제. 401이면 로컬만 정리. `d5a7433`)
-- [x] 기기 지문 고정 ID (machine-id+유저 해시. `24cb7ad`. 중복행 정리済み)
-- [x] `GET /api/commands/pending` 읽기 전용 (next의 delivered 부작용 회피)
-- [x] `register`·`token`·`approve` 삭제, `--jaeholee` 숨김, `run` 예외
-- [x] 항시 서버 통일 (탐색 4096~4105, exit kill 제거, unit `KillMode=process`)
-- [x] 하트비트 10초 분리 (presence 정확. `lastSyncAt` 기록漏れ 수정)
-- [ ] `--help` (표면 안정 후로 보류)
-- [ ] `doctor` 진단 묶음 (고급 명령 숨김)
-- [x] 개명 `localagents` (2026-10-06, 코드+PC 이관済み. `7a8d301`. 도메인·DB 테이블 유지)
-- [x] 플러그인 통지 (2층 루프 + 즉시 drain. 아래 완료 기록 참고)
-- [x] Storage 인계 기반 (서명 URL 왕복 + `AWS_*` 삭제 + pull upsert·v1 대응. `b5ef5f6`. 구버전 title NULL은 재push 시 해결)
-- [ ] 방송·자동동기화 설계 확정 (복수 PC 행 + 주인-PC 원칙 + dirty·디바운스)
-- [ ] GUI 검증 대기 (Arch 재push 후 pull → 데스크톱 확인. 변환기 최종 판정)
+- [ ] Sessions 빈 화면 온보딩 (CLI 설치·`localagents login` 안내. 전환 직결)
+- [ ] 연간 결제 플로우 확인 (프로필/랜딩에서 Subscribe $90/yr → Dodo 도달)
+- [ ] 기기 해제 실사 테스트 (Arch 기기로 — 해제 후 `localagents login` 재연결 확인)
+- [ ] device authorize 페이지 스타일 정리
+- [ ] 랜딩 외 페이지 디자인 정합 (sessions 목록·상세 vs 랜딩 토큰)
+- [ ] 배포 체크리스트: 도메인 연결 + Neon 콘솔 신뢰 도메인 등록 / Neon production 마이그레이션 전체 적용 / Cloudflare `DODO_PAYMENTS_ENVIRONMENT=live_mode`+라이브 키 / 웹훅 URL prod 재등록 / 약관 페이지 (결제사 규약 필수) / og:image
+- [ ] MoR: Fungies 심사 대기
+- [ ] 게이트웨이 플로우 빠른 확인 (지시 전송·승인·모델 변경 — 포트 변경 후 미검증이나 데몬 heartbeat/sync로 사실상 붙어 있음)
+- [ ] 방송·자동동기화 설계 확정 (v2. 복수 PC 행 + 주인-PC 원칙 + dirty·디바운스)
+- [ ] v2 후보: 플랜 변경(월↔연)·결제 내역(Orders API)·세션 ID 어뷰징 검사·tombstone·탭 프로젝트 경로 문제
+- [ ] `--help`·`doctor` (표면 안정 후)
 - [ ] login Esc 문구 수정 (`Nothing picked` + `Done N sessions` 모순)
-- [x] 메시지 핀포인트 동기화 (PK `(tab_id, message_id)` + 커서 증분 + 조건부 backfill. 아래 기록 참고)
-- [x] 실시간 폴링 (웹 5초 + 터미널식 고정 입력. Ably/Pusher 기각, 아래 기록 참고)
-- [x] 기기 연결 암호 봉투 (아래 기록 참고)
-- [ ] P4 (Dodo 브랜드·상품·체크아웃 API 완료 (2026-10-25, 아래 기록). 남음: 웹훅·31일 게이트(403)·도메인 연결·배포. MoR: Fungies 심사 대기)
+- [ ] GUI 검증 (Arch push → pull → 데스크톱 확인. 변환기 최종 판정)
+- [ ] 랜딩 남은 것 (실물 스크린샷 1600×1000·og:image·모바일 분리)
+- [ ] 실측 버그: `cloud_tabs.title` 세션 ID 저장 / `sessions_meta` msg 수 0 정체
+- [ ] 알려진 노이즈: "script tag" 콘솔 경고 (NeonAuthUIProvider 내부 테마 스크립트. 무해, prod 미발생. 기록용)
 
-## 실행 계획 (2026-09-30)
-- P1: outbox·heartbeat 스키마 + 데몬 승인 중계. 돈값 코어의 로컬 절반.
-- P2: 웹 inbox (보기·승인) + 기기 목록. P1과 합쳐져 첫 종단(폰 승인) 완성.
-- P3: fork 실행·새 지시 + 예약 실행("PC 켜지면 실행" 경고付き). bypass 세션은 배지 + 원격 지시 주의.
-- P4: 도메인 연결·배포·과금. Storage·이어서 실행·자동화 관제는 2단계.
+## 커밋 이력 (최근)
+- `107423c` [Fix] [데몬 과금 표시 구분(취소 예정·만료)·프로필 취소 즉시 반영]
+- `aa4f2b7` [Feature] [Devices 기기 해제 버튼·빈 화면 문구 수정]
+- `d794b34` [Feature] [프로필 페이지·구독 취소/복원·드롭다운 Profile 링크]
+- `b5d3603` [Feature] [Dodo 웹훅·과금 게이트·트라이얼 관리]
+- `7472d71` [Update] [포트 분리 3004·3005 전환·Dodo 체크아웃 metadata 매핑 전환]
+- `1dfd637` [Update] [과금·요금제 도입 계획 문서 추가] (PLAN-BILLING.md)
 
-## 기기·로그인 결정 (2026-10-01)
-- `devices`에 `platform`·`hostname` 컬럼 추가, dev 적용済み. 값은 Node `os` 모듈.
-- device_id = UUIDv7 (시간+랜덤). hostname 합성 반대. user_id = Auth id 그대로.
-- 식별은 env 아님. 상태 파일(`~/.config/localagents/device.json`, 600). env는 배포 설정만.
-- 로그인은 loopback 우선 (`localagents login` → 브라우저 OAuth → localhost 콜백 → whoami → 상태 파일). 페어링 코드는 headless 폴백.
-- OS 표시는 전부 텍스트. Apple·MS 로고는 상표 허가 필요라 제외. Linux 펭귄도 통일상 제외.
-- Fungies KYC 완료. Waffo 거절 메일 발송済み (출금 중국 한정).
+## 실행 계획 (참고)
+- P1: outbox·heartbeat 스키마 + 데몬 승인 중계 (완료)
+- P2: 웹 inbox (보기·승인) + 기기 목록 (완료)
+- P3: fork 실행·새 지시 + 예약 실행 (예약 실행 미완)
+- P4: 도메인 연결·배포·과금 (과금 완료. 도메인·배포 남음)
 
-## P3 (2026-10-01)
-- fork: `daemon/src/fork.ts` + `fork` 명령 + `sessions_meta` 대장 등록. 실측 6세션(`CLIAgentsDev (fork #1)`) 확인済み.
-- 새 지시: outbox `message` 타입 + 상세 입력창. 종단 검증済み (웹 전송 → poll `message done` → 에이전트 응답 확인).
-- 상세 307 해소済み. 원인은 손 복사 id 오기 (db 행 `...8ph...I41` vs 입력 `...Bph...I4i`). 목록 제목 링크화로 재발 방지. 코드 정상이었음.
-- 남은 것: 예약 실행 ("PC 켜지면 실행" 경고 + 부팅 catch-up).
-
-## 1줄 설치 (2026-10-03 설계)
-- 목표: `npx localagents login` 1줄에 설치·OAuth·등록·서버기동·주기실행까지. 붙여넣기 0건.
-- 데몬이 서버 직접 기동済み (`daemon/src/serve.ts`: 기존 탐색 → 없으면 자식으로 기동, 비번 랜덤 32B 상태 보관, 포트 4096~4105 폴백, 종료 시 kill).
-- 비번은 상태 파일 일원화. 명시 명령도 env 없이 됨. OS unit은 `EnvironmentFile` 1개 (`DATABASE_URL`만).
-- 남은 것: 없음 (토큰 API 전환済み, loopback済み, OS 등록済み). 1줄 설치 remaining: 플러그인 자동 설치.
-
-## 브랜드 확정 (2026-10-03)
-- 상호 `LocalAgentsLink`, 도메인 구입済み. `cliagents.dev`는 리다이렉트용 유지.
-- 개명 검토 기록: `CLI`는 CLI·GUI 병행 현실과 어긋남 (OpenCode·Claude 데스크톱 존재). `overlord` 전멸. `agentsync` 계열 사용 금지 (AGENTSYNC 미국 등록상표 6836288호, 권리자 소송 전적. `agenticsync`·`localagentsync` 포함).
-- `remote*`는 부속을 본체로 오해시킴. `.tech` 갱신 함정 (`remoteagent.tech` $9.99→$49.20) 주의.
-
-## 네이밍 원칙 (2026-10-25 확정)
-- 사용자 접점 전부 `LocalAgents` (단수형): 명령어·npm·env(`LOCALAGENTS_*`)·UI 헤더·Dodo 브랜드·카드 명세. 근거: 타이핑 비용, 도메인 `localagents.link`가 Link 역할 대행, 결제 신뢰는 URL·descriptor가 담당.
-- `LocalAgentsLink`는 상호·법적 명칭만 유지. npm 발행 전에 확정해 재개명 없음.
-- Dodo 브랜드 생성済み (사장 직접): `brnd_0NqSDEWhhRh98FCCuDWhy` (LocalAgents, url `https://localagents.link`, support `support@localagents.link`, descriptor `DODOPAY_LOCALAGENTS`, 인증 Success). 기존 TailoredAd 상품 3개는 기본 브랜드(Jaeho Lee) 소속으로 손대지 않음.
-- PLAN-BILLING.md 작성 (2026-10-24, `1de1101`로 §3·§6 Polar→Dodo 정정) + 가격 $9/월·$90/연 조정 (`bec4908`): 30일 no-card 트라이얼, 31일 hard cutoff, 데이터 보관 후 복원.
-
-## Dodo 상품 생성 (2026-10-25 완료)
-- LocalAgents 브랜드(`brnd_0NqSDEWhhRh98FCCuDWhy`)에 구독 상품 2개 생성. `products.create`가 `brand_id`를 생성 시 직접 받아 별도 지정 단계 불필요 확인.
-- 월간: `pdt_0NqSIczhD3rElCnCCxUB1` — $9.00/mo, recurring 1개월 주기
-- 연간: `pdt_0NqSId35FkZiLVrZaYNp3` — $90.00/yr, recurring 1년 주기
-- `trial_type: none` — 30일 트라이얼은 우리 DB로 강제 (no-card)라 Dodo 트라이얼 미사용
-- `tax_category: saas`, `tax_inclusive: false`, metadata `{plan, interval}` (웹훅에서 상품 식별용)
-- 상품명 접두사 제거 (사장 지시): LocalAgents 제외 → `Pro (Monthly)` / `Pro (Annual)`. 체크아웃 화면에 브랜드(LocalAgents)가 찍히므로 중복 제거.
-- 남음: 웹훅 → 구독 상태 동기화, 도메인 연결·배포. 체크아웃 링크 2종은 동적 세션 API로 대체되어 보류 (사장 결정).
-
-## 과금 UI·체크아웃 (2026-10-25, 이 PC)
-- 스택 결정: Dodo SDK 미도입. `lib/dodo.ts`가 REST를 fetch로 직접 호출 — 의존성 0 (npm install 불필요).
-- 구현: `POST /api/dodo/checkout` (브라우저 → 게이트웨이 → 내부 헤더 신뢰, commands 패턴 준용). body `{interval, origin}` → Dodo `/checkouts` 세션 생성 → `checkout_url` 반환. metadata에 `user_id`·`interval` 심음 (웹훅 매핑용). return_url = 클라이언트 origin + `/sessions` (dev 3002/3003 분리 대응. return_url에 토큰 없어 변조 위험 낮음).
-- 게이트웨이: ROUTE_ENTRIES에 `["api","dodo","checkout"]` 등록. 미로그인 401 실측 확인 (`login required`).
-- 랜딩 pricing 섹션: `components/page/landing/pricing-section/` (기존 `[~]-section` 규칙). Monthly $9/mo + Yearly $90/year (`$7.50/mo · billed annually` + `2 months free` 배지). Subscribe 클릭 → 체크아웃 리다이렉트, 미로그인 클릭 시 `/auth/sign-in` (401 판정은 postFetch 에러 메시지 문자열 포함 — 임시).
-- 구조: Dodo 관련 API는 `app/api/dodo/` 하위로 모음 (사장 지시. 이후 웹훅도 `app/api/dodo/webhook`).
-- `.env.example` 신규 5개: `DODO_PAYMENTS_API_KEY` · `DODO_API_BASE_URL` (test/live 구분) · `DODO_PRODUCT_MONTHLY` · `DODO_PRODUCT_ANNUAL` · `DODO_PAYMENTS_WEBHOOK_KEY`.
-- 미확인: (1) 3002 랜딩 렌더·Subscribe 플로우 (서버 꺼져 있어 미검증. 게이트웨이 재기동 후 필요) (2) 상품 생성에 쓴 API 키의 test/live 모드 — env에 넣을 때 API 키와 같은 모드의 상품 ID 필수, 다르면 해당 모드에서 상품 재생성.
-- 커밋: `dbe3686` (구현) + `3c5ea40` (api/dodo 이동).
-
-## Neon 조회·스토리지 정리 (2026-10-25, 이 PC)
-- MCP로 Neon 테이블·Storage 조회 가능 확인. production 브랜치는 `devices`·`sessions_meta`만 있고 0행 — 앱 테이블 전무. 배포 때 마이그레이션 필요.
-- development 브랜치 조회 시 archived에서 자동 wake (`ready` 복귀). 실사용 DB는 development.
-- 중복 판정: 로컬 DB 세션 8개 = Mac 원본 4 + Arch pull 사본 4 (제목 중복 3쌍: TailoredAd·LocalAgentsLink·jaeholee.xyz). 서로 다른 ID라 정상 동작의 흔적. 스크린샷의 탭 중복도 같은 구조.
-- handoffs 7행 = 4탭 버전 이력 (중복 행 아님). LocalAgentsLink 최신 1건·테스트 1건 미수신.
-- Storage 고아 정리: 26개 중 handoffs 미참조 19개 (구 `dump/` 3 + 구버전 blob 16) 삭제, ~89MB 확보. 잔여 7개 = handoffs 포인터 1:1.
-- 구분 근거: `handoffs.device_id`가 출처 (이 Mac `01a11781…` / Arch `68049b59…`. 전부 Arch → 이 PC push 0건 확인). 단 로컬에 pull 표식이 없어 Neon 대조 필요 — `pulled_from` 표식 검토.
-- 실측 버그 2건 (미수정): `cloud_tabs.title`이 세션 ID로 저장 (웹 목록에 ID 노출), `sessions_meta` Mac 4행 msg 수 0으로 정체.
-
-## Dodo 가입 (2026-10-03 진행 중)
-- 후보 1순위 등극. 4%+40¢(美내)+1.5% 해외+0.5% 구독. 한국 merchant·KRW·카카오/네이버/페이코 가능. SaaS·AI 환영 명시.
-- 출금은 Local (국내망). 국민은행 코드 004. 이름 여권 영문, 예금주 은행 기록 그대로, 주소 영문 로마자, 우편 5자리.
-- 개인 자격 가능. 계좌개설확인서 영문 권장 (없으면 한글 + 영문명 로마자 표기).
-- 주소 영문 예시: `302-ho, A-dong, 41, Seongan-ro 3-gil, Gangdong-gu, Seoul`, City `Seoul`.
-
-## 토큰 API (2026-10-03, heartbeat 완료 → 2026-10-06 정리)
-- `device_tokens` (해시·만료·revoke) + `lib/auth/device.ts` 검증 + `POST /api/heartbeat`.
-- heartbeat API 경유 확인. 웹 online 표시 확인.
-- sync·messages·commands/next 전환済み. `register`·`token` 명령은 삭제 (`login`이 대체).
-- `whoami` 확장: 이메일(`neon_auth.user`) + 플랜. `status`에는 안 넣음.
-- `GET /api/commands/pending` (읽기 전용 count. `next`는 delivered 부작용이라 `status`에서 사용 금지).
-
-## loopback 로그인 (2026-10-05 완료 → 2026-10-06 봉투화, 이 PC)
-- 흐름: 데몬 `login` → pack 사전 포장 → 브라우저 OAuth → Connect → 콜백 토큰 → whoami → 상태 파일. `logged in` 확인.
-- URL 평문 0: `begin?data=` → sign-in(`callbackURL=/r/<blob>`) → consume → `authorize?data=`. 쿠키 폴백 유지.
-- 교훈: dev 서버 구코드 주의 (재시작 후 시험). Neon 수면 시 첫 연결 실패 가능 (재시도).
-
-## 플러그인 통지 (2026-10-06 완료)
-- 구현: `daemon/plugin/localagents-sync.js` + `daemon/src/spool.ts` (`drainSpool`, `poll`에 연결済み).
-- v2 모양 `export default { id, server, setup }` + 종류별 키 (generic `event` 키 미발화, `gk-hooks.js` 대조로 확정).
-- KEEP: tool/permission/session + 텍스트 완성 신호(`text.ended`·`step.ended`). reasoning은 제외 (PC 밖 반출 금지).
-- 2층 루프 (2026-10-06): 10초 빠른 층(스풀+drain+명령) + 플랜 주기 느린 층. 467건 3틱 drain 실측.
-- drain 상한 20 → 200. 커서가 중복을 걸러 해롭지 않음.
-
-## 메시지 동기화 B안 (2026-10-05~06 완료)
-- PK `(tab_id, seq)` → `(tab_id, message_id)` (`0008`, dev 적용). upsert 멱등 + `createdAt, seq` 정렬.
-- 커서 증분 (`daemon/src/cursors.ts`, PC 로컬): `(createdAt, messageId)` 쌍 비교. 1회차 213행 → 2회차 0행 실측.
-- 조건부 backfill (`daemon/src/localdb.ts`, `backfillMissing`): 로컬 DB 읽기 전용으로 마지막 compaction까지 거슬러 올라가 현재 세션 전부. 클라우드 탭 목록(`GET /api/sync`) 대조 후 없는 탭만. 실측 316행→382행.
-- API 한계 실측: `limit` 최대 200, `offset` 무시. 현재 세션 310행 사례로 DB 직독 필수 확정.
-- compaction 실측: `session_message` `type='compaction'`, `reason=manual` 9건 (4개 탭), 자동 0건. 키 `status·reason·summary·recent·time`. 주체는 `reason` 1개로만 구분.
-- compaction 전용 UI: `kind=compaction` + 접힌 박스 (`Session compacted. Show summary.`, 영어). 구 `summary`행도 같이 그림.
-
-## 실시간 폴링 (2026-10-06 완료)
-- Ably/Pusher 기각: 종단 latency가 daemon 10초에 묶여 푸시 이득 4초뿐. Neon 읽기 1방은 푼돈.
-- `GET /api/messages?tabId=` + `lib/neon/live.ts` (`useLiveThread`, 5초, 탭 숨김 시 정지).
-- 터미널식 레이아웃: 입력 하단 고정, 대화만 스크롤, 바닥 근처 자동 추적. Agent·승인은 접이식.
-
-## 기기 연결 암호 봉투 (2026-10-06 완료)
-- `lib/auth/packet.ts` (AES-256-GCM, 키 `DEVICE_PACKET_KEY` 64hex, `.env.local`のみ).
-- 이중 봉투: 안쪽 기기 파라미터 → 바깥쪽 복귀 경로 문자열 통째. URL엔 암호문만 (`/r/[blob]` 관문, allowlist).
-- 데몬은 `POST /api/device/pack`으로 사전 포장 후 `begin?data=` 오픈. 첫 주소창부터 평문 없음.
-- `login` 직후 첫 동기화 (heartbeat+세션+조건부 backfill). 1회성 명령 종료 hang 수정 (`killOwned`).
-
-## UI 개선 (2026-10-07 진행 중, 최우선)
-- 스킬: `design-taste-frontend` (audit-first) + `ui-ux-pro-max` 검색 (대시보드 규칙: 본문 65~75자) + `ui-styling` (토큰 일관). `impeccable`은 문서のみ 미설치.
-- 세션 통계 실데이터 (`0009`, `eeed0cd`): `sessions_meta`에 cost·last 호출 토큰 5종·누적 횟수·생성시각. 마지막 assistant 행 tokens = 패널 수치와 일치 실측. 횟수는 누적이라 패널 live-window와 다름 (명시).
-- 표시명·제한은 카탈로그에서 해결 (모델명·`limit.context`, `/api/provider` 추가 수집). 사용률 = 합계/제한.
-- presence 점 (● 초록/빨강) + 5초 폴링에 포함. 하트비트 10초 분리. `never synced` 수정 (쓰는 코드가 없었음).
-- 레이아웃: 7:3 2열 (대화·우레일), 입력 하단 고정 컴포저 (선택 즉시 적용, Enter 전송), 제목 레일로 이동, 전체 스크롤 제거 (`100dvh-헤더`).
-- tool: edit diff 표시 (+A/-B 초록빨강, 0 흰색) + 펼침 diff 색상. 요약 경로 전체 유지.
-- 스크롤바 slim (핸들만 6px) + 대화창 우패딩. 점프 버튼 가운데.
-- 미커밋 UI batch 커밋済み (`d52a72d`). synced 실시간 포함.
-- 대형 edit diff 생략 (`2713738`) + envelope 필드 단위 절단 (`f3d8352`).
-- 교훈: 데몬 빌드 뒤 반드시 재시작. 구 dist가 30분마다 null로 덮음 실측.
-
-## 인계 모델 확정 (2026-10-07)
-- 본질: 웹 원격조작 아님 (그럴 거면 SSH). 다른 PC에서 원 PC 세션을 '그대로' 이어받기.
-- 역할 분리: 웹↔클라이언트는 Neon DB (거울+outbox, 열람·명령용). 클라이언트↔클라이언트는 Storage 세션 파일 (운반용).
-- 파일: 탭당 현재 세션만 (message+part+session 3종, events 제외). 덮어쓰기 금지 → push마다 버전 파일 1개 + DB에 최신 포인터 1개. 만료+수신확인 후 삭제 (즉삭 금지).
-- 키: `<userId>/<tabId>/<epoch>/<version>.bin.gz` (버킷 바로 아래, `handoffs/` 접두사 없음 — 구 문서 정정). 스코프 크리덴셜로 격리. 탭당 용량 상한.
-- pull 적용: 같은 id 있으면 upsert, `project_id`·`directory`는 B 기준 재매핑. 삭제 행은 tombstone 필요.
-- 방송 (안, 미확정): 웹→복수 PC는 기기 수만큼 행 (설계 변경 1개). 실행 주인은 1대 (세션 affinity), 다른 PC 화면은 읽기 거울까지만. 양쪽 실행 주입은 중복 실행·승인 혼선으로 금지.
-- 자동 동기화 (안, 미확정): 기본=수동 push/pull, 유료=dirty+디바운스 자동 (신호 오면 표시만, idle 1~2분·종료 때 1번 업로드). 보는 탭은 배지+확인 후 적용. 주기 차등 아님, 방식 차등.
-- DB diff: 행 단위로 이미 하는 중. 삭제·스키마·충돌만 별도 처리.
-
-## Mac 실태 + 버전 정정 (2026-10-07, 이 PC)
-- 설치 (10-08 변경): `~/.local/bin/localagents` + `login`済み + 신 플러그인 복사. 구 `cliagent` 잔재는 유지 (손대지 않음).
-- serve 1.18뿐 (2.x 번들 없음). v2 플러그인 미발화 실측済み → 즉시 통지 불가, 10초 폴링층으로 동작. 거울/heartbeat/push는 버전 무관.
-- 정정: 이 Mac 데스크톱은 1.18.25 (v2 아님). v1 라인(1.18.x, 09-28에 1.18.33)이 현역, v2(2.0.20)는 별도 라인 공존. CLI 1.18.2 + 데스크톱 1.18.25 = 둘 다 v1.
-- DB 세션 7개 전부 1.18 (1.18.2×3, 1.18.25×4), archived 0, 포크 자식 0. 최신은 이 세션 (10-06 03:30).
-
-## 세션 정리 2차 (2026-10-07 완료, 이 PC)
-- 삭제 3개 + 연관 전부 (9 테이블 고아 0 확인): API 테스트 2개 + 회귀수선전. 백업 `opencode-backup-20261006.db` 855MB.
-- 개명 4개: jaeholee.xyz / ShortReal AI / TailoredAd / LocalAgentsLink.
-- 용량: 폴더 995MB, event 441MB + part 371MB + message 6.7MB. 대화 본체는 그대로 가벼움.
-
-## 서명 URL 인계 (2026-10-08 완료, 이 PC)
-- 방식 확정: 데몬 `AWS_*` 삭제. `POST /api/handoffs/url`이 서버 `NEON_API_KEY` 1개로 서명 발급 → 데몬 직행. 업로드·다운로드 왕복 실측済み.
-- 근거: Neon presign endpoint (`.../buckets/{b}/objects/{k}/presign`, Beta) + S3 `getSignedUrl` 둘 다 문서상 지원. 실측은 전자.
-- 키 보관: 서버 `.env.local`のみ (`NEON_API_KEY` + `NEON_PROJECT_ID` + `NEON_BRANCH_ID`). PC별 발급 불필요 (키=유저 식별, 접두사로 격리). endpoint는 key가 본인 userId/ 시작 강제.
-- 구 버전 5건은 title NULL → 목록에 id 표시. 새로 push하면 이름 뜸.
-- Storage 탐침 파일 3개 잔류 (`probe-*.bin`, 수십 바이트).
-
-## Mac 첫 동기화 (2026-10-08 완료, 이 PC)
-- 설치: `~/.local/bin/localagents` 래퍼 + 플러그인 복사 (구 `cliagents-sync.js` 유지). `login` 성공 (heartbeat via api).
-- 장애 1: 첫 동기화 4개 전부 실패. 원인 = `localdb.ts` darwin 경로 단정 (`~/Library/...`에 파일 없음, 이 Mac은 XDG). 양쪽 probe로 수정.
-- 장애 2: `session_message` 0행 — 1.18은 `message`+`part` 사용. v1 리더/라이터 추가 + 맛보기 자동 선택. 크로스버전(v2→v1)은 id 유지·그릇 변환.
-- pull upsert 실측: 272행 버전 → 새 탭 생성, 메시지 52+파트 214, 내용 원형. 있으면 병합·없으면 생성. 삭제 행은 미동기화 (tombstone 다음).
-- `b5ef5f6` 푸시済み.
-
-## pull 목록·upsert (2026-10-08 완료, 이 PC)
-- 목록이 버전 나열 → 탭별 최신 묶음 (수정일 내림차순). 받은 건(내 기기) 숨김. 구 포인터 5행 삭제済み.
-- 새개수 표시: push 때 역할 합계(`user_msgs`·`ai_msgs`, `0012`) 저장 → 목록에 `유저 +N · AI +M`. 추가만 되면 정확, 삭제·수정은 미반영.
-- pull upsert: 있으면 병합·없으면 생성. v1 리더/라이터 + 맛보기 자동. 272행 실측 (새 탭, 52+214).
-- 서명 URL: 데몬 `AWS_*` 삭제, 서버 `NEON_API_KEY` 1개로 수렴. 왕복 실측済み.
-- `5427df1` + `748c3c4` 푸시済み.
-
-## 탭 프로젝트 경로 문제 (미결, 2026-10-08)
-- 가져온 탭의 `directory`는 원 PC 절대경로 (예: Arch `/home/jaeho/...`)라 B에 없음. project_id도 B에 매칭 안 됨.
-- 실측: 폴백(daemon cwd)으로 넣었더니 엉뚱한 프로젝트에 붙어 GUI에서 안 보임. `short_real`로 수동 정정済み.
-- 결정 필요: (a) pack에 프로젝트명+상대경로 포함 → pull 때 동명 매칭, 없으면 생성·확인. (b) 가져온 탭 격리 프로젝트에 두고 사용자 지정. (c) 절대경로 그대로 + 경고만.
-
-## v1v2 변환기 (2026-10-08~11, 이 PC)
-- 근거: 본가 GitHub 직접 대조. v2 `session-message.ts`·`model.ts`·`session/sql.ts`·`v1-migration.bun.ts` + v1 태그 `1.18.33` `message.ts`. 본가 이관은 v1→v2 단방향만 (역방향 없음).
-- `daemon/src/convert.ts`: 양방향. v2→v1 full 매핑 (parentID=user 체인·연속 assistant 병합·agent/modelID/mode/variant/finish·tool 결과·reasoning time). v1→v2는 본가 축소판.
-- 크래시 체인 (1.18 검증이 1개씩 뱉음): messageID → modelID → mode → 부모user → agent → reasoning time → tool title/metadata. 전부 수정済み.
-- 208% 원인: 병합 시 토큰 합산 버그 (실측 435K 5개 합산). 마지막 호출 덮기로 수정. 패널=마지막 호출 1건 (네이티브 대조済み).
-- 843 파트 정상: 패키지 인라인 404개 합성. 중복 아님.
-- v1 쓰기 게이트: 필수 키 전수 검사 후 기록, 빠지면 필드명 뱉고 중단. 시험 대신 대조.
-- pull UX: 체크박스 선택·진행률 바·탭 이름·`AI +M · User +N` 순서. 지운 탭 재표시 (`received` + 로컬 부재 시 표시).
-- V1Migration 통째 이식 기각: 단방향 손실 변환이라 역산 불가 + Effect/bun 결합. 해당 함수만 포팅 방침.
-- 버전 정정2: npm `latest` = 1.18.35 (v1이 기본 채널). v2는 별도 BETA. 이 Mac CLI 1.18.2 + 데스크톱 1.18.35 = 둘 다 v1. v1 대응은 제품 차원 필수.
-- 주의: `:3000`은 tailored-ad 서버. 우리 데몬 `baseUrl` 기본값이라 남의 집에 명령감. 우리 웹은 딴 포트 + `LOCALAGENTS_BASE_URL`.
-- 미검증: GUI 확인. 포인터 0건이라 재pull 불가. Arch 재push 대기 중 (`8f7aa88` 푸시済み).
-
-## OS 등록 (2026-10-03 완료 → 2026-10-06 개명, Arch)
-- `~/.local/bin/localagents` 래퍼 + `~/.config/localagents/env` (DATABASE_URL 1개, 600) + systemd user unit `localagents.service`.
-- `enable --now`済み. `active (running)` 확인. 재부팅 테스트 미실시.
-
-## 데몬 종단 검증 (2026-09-29, 이 PC)
-- 명령: `daemon/`에서 build 후 자체 serve(번들 CLI 2.0.18, 4096, 비번) → `status`·`sessions` 성공. 세션 5개 제목 출력 확인.
-- 교훈 3개: (1) 데스크톱 v2 API는 `/api/*` 아래 + 인증 필수. HTML 폴백에 속지 말 것. (2) health 엔드포인트 없음. 탐색 기준은 `/api/session` 목록 조회로 변경. 목록 형태 `{data:[...]}` 래퍼 주의. (3) 시스템 CLI 1.18과 데스크톱 번들 2.0.18 버전 꼬임. serve는 번들 CLI로 띄울 것.
-- `daemon/tsconfig.json` 수정 1건 (`lib` DOM + `types` node)._tsbuildinfo 계열은 `.gitignore`済み.
-
-## 승인 종단 (2026-10-01 완료, 이 PC)
-- 흐름: ask 설정 serve(4097) → bash 지시 → pending 포착 → 데몬 `sync` 거울 → 웹 상세 Allow → outbox → 데몬 `poll` 응답 → 에이전트 실행 → 파일 `WEB-APPROVE-OK` 확인. 대기 목록 비움 확인.
-- 테스트 세션·파일·serve 정리済み. `pkill -f` 자기매칭 주의 (PID 지정으로 대체).
-
-## outbox 종단 (2026-09-30 완료, 이 PC)
-- 스키마: `commands`(우체통, pending→delivered→done→expired + 멱등키·만료) + 거울 3종(`cloud_tabs` UPDATE 헤더, `cloud_messages` INSERT-only 복합키, `cloud_folds` epoch 요약). `0001_massive_plazm.sql` → Neon dev 적용, 6 테이블 실측 확인.
-- 데몬: `daemon/src/db.ts`(Neon 직결) + `commands.ts` + `poll` 1회 수행. 의존성 `@neondatabase/serverless 1.1.0` 추가. env는 `DATABASE_URL` + `LOCALAGENTS_DEVICE_ID` (pairing 미구현이라 수동).
-- 웹: `POST /api/commands`(outbox INSERT) + `lib/utils/getNextBaseResponse.ts`. curl 201 → 데몬 `poll`이 같은 행 `done` 회수. 웹→PC 종단 완성.
-- 잡음 정리: `drizzle.config.ts`가 `.env.local`을 안 읽어서 generate 실패 → 2줄 로딩으로 수정. `.env.example` 실값 유출未遂 → 플레이스홀더로 복구 (`.env.local`은 무시됨 확인). `next-env.d.ts` 추적 해제 + gitignore. `AGENTS.md`의 nextjs-agent-rules 블록은 `next dev`가 자동 추가한 것이라 커밋.
-- dev DB 테스트 행: `devices/test-pc-1`, `commands/cmd-ping-1` + 웹 ping 1건. 전부 `done`. 둬도 됨.
-
-## push/pull 마감 + CLI 정리 (2026-10-12~18 보충, 기록 누락분)
-- push/pull UX 확정: TTY 체크박스 목록 (최신순, `push.json` 워터마크로 dirty 계산) + 진행 바. push는 Storage 업로드 + 거울 DB backfill을 한 바에 합침 (`syncOneTab`, 0→50→100. 채널 분리 표시 없음).
-- 폴더 연결: 원격 탭 프로젝트를 OpenCode `project` 테이블 `git remote get-url`로 매칭 → 새/기존 폴더 선택 → OS 폴더 선택기 (`sysdialog.ts`) → clone 또는 검증 → `setTabDirectory`. push 중 변경 방지 epoch 가드.
-- `handoffs` 포인터 테이블 (마이그레이션 0010~0013): 탭별 최신 버전 포인터. 받은 건(내 기기)은 목록에서 숨김.
-- v1 쓰기 게이트 수정 (user model 필수, upstream 스키마 요구). 왕복 실측 불량 0.
-- CLI: `status`(주소 없음)·`whoami`(이메일+플랜)·`dump`(진단 업로드 `<userId>/dump/`). 미로그인 push/pull은 선두 개행 + `not logged in. run \`localagents login\` first` (`ensureAuth()`).
-- login 중복 실행 가드: 이미 로그인이면 이메일 표시 + `logout` 안내로 차단. 첫 backfill 목록: 미동기만 기본 체크, `(synced)` 라벨, "Not now" 마지막 항목, 힌트 `space: toggle, a: all, n: none, Esc: cancel`.
-- 게이트웨이 리팩터: `lib/api/client/baseFetch.ts` (30초 타임아웃·credentials include·게이트웨이 래핑) + `messagesClientAPI`/`commandsClientAPI`. SessionDetailClient 원시 fetch 4건 + `live.ts` 폴링 교체. 클라 컴포넌트 userId prop 제거.
-- 인증 분리: 게이트웨이가 세션 확인 후 `x-internal-secret` + `x-user-id` 주입. `/api/commands`는 내부 헤더 전용 신뢰 (바디 userId 폐기), `/api/messages`는 내부 우선 + 세션 폴백. `lib/auth/internal.ts` = `timingSafeEqual` 대조 `INTERNAL_FIRE_AND_FORGET_API_SECRET` (256bit hex, `.env.local`).
-
-## 포트 분리·CORS·env 컨벤션 (2026-10-18~19, 이 PC)
-- 포트 분리: 클라 3002 (`npm run dev`) / API 컨테이너 3003:3000 (`npm run dev:api`, Dockerfile CMD `dev:api`). 데몬 `baseUrl` 기본값 `http://localhost:3003`. `:3000`은 tailored-ad 보호.
-- CORS (게이트웨이에만): `CORS_ALLOWED_ORIGINS` (쉼표 구분, dev 미설정 시 `http://localhost:3002`) + OPTIONS preflight (preflight엔 쿠키 안 실림 → 인증 없이 204) + 모든 응답에 Allow-Origin·Allow-Credentials·메서드·헤더·`Vary: Origin`. 허용 목록 밖 origin엔 헤더 미부착 (브라우저가 알아서 거부). prod는 같은 origin이라 CORS가 개입하지 않아 미부착. 근거: dev 브라우저(3002)가 `credentials: include`로 3003을 크로스 오리진 호출.
-- env 컨벤션 (tailored-ad 준용, 확정): `NEXT_PUBLIC_BASE_URL`=브라우저가 API 부를 주소 (dev `http://localhost:3003`, **ngrok 아님**) / `BASE_URL`=서버가 외부에 알릴 자기 주소 (dev ngrok. 웹훅 등 외부 콜백용 — 현재 서버 코드 소비처 없음) / `LOCALAGENTS_BASE_URL`=데몬 전용. prod는 전부 사이트 URL. `baseFetch`는 prod에서 prefix를 안 붙이므로 prod 값은 무해. `.env.example` 갱신 + `CORS_ALLOWED_ORIGINS` 항목 추가.
-- ngrok 로그인 깨짐 정리: 세션 쿠키는 도메인 귀속 (쿠키는 포트 무시 → 3002↔3003 공유, ngrok 도메인은 별개). Neon Auth OAuth 콜백이 `NEON_AUTH_BASE_URL`(localhost) 기준으로 만들어져 ngrok 탭엔 세션이 끝내 안 생김. → **ngrok은 데몬 전용** (Bearer 기기 토큰, 쿠키 불필요). 브라우저 로그인용 주소 분리 (`LOCALAGENTS_WEB_URL`)는 보류.
-- OpenCode v2 Pairing 조사 (2026-10-19): `opencode pair` = 서버 URL+username+password 출력 → 웹 UI 접속. 서버당 1회선, 기본 주소 127.0.0.1이라 LAN/Tailscale/터널은 유저 몫. QR 페어링 이슈 #35943 완료 (10-01, `service qr` + connection-details 엔드포인트), `serve --qr` 제안 #47241, 모바일 페어링 #20087. 영향 판정: 본체(PC↔PC 복원)·통합 inbox·이력 미러는 무관. 웹 리모컨 슬라이스만 부분 경쟁 → 리모컨은 "Claude 포함 통합함" 포지션으로 조정. 미확인: v2 pair 웹 UI 실범위 (세션 생성·승인·파일 뷰 어디까지).
+## 아키텍처 요약 (상세는 이전 기록 참조)
+- 로컬 데몬 + 클라우드 제어서버 (Next.js + Neon) + 웹 UI. 데몬은 아웃바운드 폴링 (10초 빠른 층 + 플랜 주기 느린 층).
+- Neon 역할 2개: 세션 거울 저장소 + 명령 outbox. PC↔PC 인계는 Neon Storage (서명 URL, `NEON_API_KEY` 서버 1개로 발급).
+- OpenCode v1(1.18.x)/v2(2.x) 양쪽 대응: `daemon/src/convert.ts` 양방향 변환기. v1이 npm 기본 채널.
+- CLI 표면: `login`·`status`·`whoami`·`push` (+숨김 진단 다수). 데몬 단일 설치 `npx localagents login`.
+- 인계 모델: 웹↔클라이언트는 Neon DB (거울+outbox), 클라이언트↔클라이언트는 Storage 세션 파일 (push마다 버전 1개 + DB 포인터).
+- 토큰 API: `device_tokens` (해시·revoke) + `lib/auth/device.ts`. 게이트웨이가 세션 확인 후 `x-internal-secret`+`x-user-id` 주입 (`lib/auth/internal.ts`, timingSafeEqual).
+- 개명 이력: localagents (2026-10-06). 상표 주의: agentsync 계열 사용 금지 (AGENTSYNC 6836288호).
