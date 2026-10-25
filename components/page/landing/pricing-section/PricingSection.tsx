@@ -94,8 +94,8 @@ export default function PricingSection() {
                                 disabled={busy !== null}
                                 className={
                                     plan.highlight
-                                        ? "mt-6 rounded bg-go px-4 py-2 font-mono text-sm font-bold text-ink disabled:opacity-60"
-                                        : "mt-6 rounded border border-line px-4 py-2 font-mono text-sm text-fog disabled:opacity-60"
+                                        ? "mt-6 rounded bg-go px-4 py-2 font-mono text-sm font-bold text-ink transition-opacity hover:opacity-85 disabled:opacity-60"
+                                        : "mt-6 rounded border border-line px-4 py-2 font-mono text-sm text-fog transition-colors hover:bg-black disabled:opacity-60"
                                 }
                             >
                                 {busy === plan.interval ? "Opening checkout..." : plan.button}
