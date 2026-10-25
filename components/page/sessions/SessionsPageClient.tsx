@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import SessionsEmptyState from "./SessionsEmptyState";
 
 export interface SessionRow {
     id: string;
@@ -40,7 +41,11 @@ export default function SessionsPageClient({ items }: { items: SessionRow[] }) {
     return (
         <main className="mx-auto max-w-5xl px-6 py-10">
             <h1 className="font-mono text-xl font-bold">Sessions</h1>
-            {rows.length === 0 && <p className="mt-4 text-dim">No sessions yet.</p>}
+            {rows.length === 0 && (
+                <div className="mt-4">
+                    <SessionsEmptyState />
+                </div>
+            )}
             <ul className="mt-4 space-y-2">
                 {rows.map((row) => (
                     <li key={row.id} className="rounded border border-line bg-panel p-4">
