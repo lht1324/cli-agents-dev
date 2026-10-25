@@ -15,17 +15,20 @@ const ROUTE_ENTRIES: RouteEntry[] = [
     { method: "GET", pattern: ["api", "messages"], load: () => import("@/app/api/messages/route") },
     { method: "POST", pattern: ["api", "commands"], load: () => import("@/app/api/commands/route") },
     { method: "POST", pattern: ["api", "dodo", "checkout"], load: () => import("@/app/api/dodo/checkout/route") },
+    { method: "POST", pattern: ["api", "dodo", "cancel"], load: () => import("@/app/api/dodo/cancel/route") },
+    { method: "POST", pattern: ["api", "dodo", "resume"], load: () => import("@/app/api/dodo/resume/route") },
+    // 웹훅은 Dodo 서버가 외부에서 직접 부른다. 게이트웨이에 넣지 않는다 (세션 인증 자체가 성립 안 함).
 ];
 
 // 비로그인 허용 경로. 랜딩에서 공개 데이터를 부를 때만 추가한다.
 const PUBLIC_ROUTES: { method: string; path: string }[] = [];
 
-// CORS. dev에서 브라우저(클라 3002)가 API 컨테이너(3003)를 크로스 오리진으로 부른다.
+// CORS. dev에서 브라우저(클라 3004)가 API 컨테이너(3005)를 크로스 오리진으로 부른다.
 // credentials: include라 와일드카드(*)를 못 쓰고, 허용 목록에 있는 origin만 골라 반영한다.
 // prod는 같은 origin이라 fetch에 CORS가 개입하지 않으므로 헤더를 안 붙인다.
 function corsHeaders(request: Request): Record<string, string> | null {
     const raw = process.env.CORS_ALLOWED_ORIGINS
-        ?? (process.env.NODE_ENV === "production" ? "" : "http://localhost:3002");
+        ?? (process.env.NODE_ENV === "production" ? "" : "http://localhost:3004");
     const allowed = raw.split(",").map((s) => s.trim()).filter((s) => s.length > 0);
     const origin = request.headers.get("origin");
     if (!origin || !allowed.includes(origin)) {

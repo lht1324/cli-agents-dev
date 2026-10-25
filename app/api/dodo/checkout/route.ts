@@ -25,7 +25,7 @@ export async function POST(request: Request): Promise<Response> {
     if (body.interval !== "monthly" && body.interval !== "annual") {
         return getNextBaseResponse(400).json({ success: false, status: 400, error: "interval must be monthly or annual" });
     }
-    // 되돌아올 페이지 origin. dev에서 웹(3002)·API(3003)가 갈려 있으므로 클라이언트 origin을 믿고 쓴다.
+    // 되돌아올 페이지 origin. dev에서 웹(3004)·API(3005)가 갈려 있으므로 클라이언트 origin을 믿고 쓴다.
     // return_url에는 토큰이 실리지 않으므로 변조 위험이 낮다.
     const origin =
         typeof body.origin === "string" && body.origin.startsWith("http")
