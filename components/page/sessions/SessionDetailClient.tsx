@@ -719,6 +719,19 @@ export default function SessionDetailClient({
                 ))}
             </ul>
             </details>
+            <details>
+                <summary className="cursor-pointer font-mono text-sm font-bold text-dim">Move to another PC</summary>
+                <div className="mt-2 space-y-2">
+                    <p className="text-xs text-dim">This tab was mirrored from a PC. To continue it elsewhere:</p>
+                    <div className="rounded border border-line bg-black px-3 py-1.5">
+                        <span className="font-mono text-xs">
+                            <span className="text-go">$ </span>
+                            <span className="text-fog">localagents push</span>
+                        </span>
+                    </div>
+                    <p className="font-mono text-[10px] text-dim">Run on the PC that has this tab. Then `localagents pull` on the other PC.</p>
+                </div>
+            </details>
         </aside>
         </div>
             {showJump && (

@@ -36,11 +36,35 @@ function statusColor(status: string): string {
     return "text-dim";
 }
 
-export default function SessionsPageClient({ items }: { items: SessionRow[] }) {
+export default function SessionsPageClient({
+    items,
+    waiting,
+}: {
+    items: SessionRow[];
+    waiting: { newTabs: number; updatedTabs: number } | null;
+}) {
     const rows = useMemo(() => items, [items]);
     return (
         <main className="mx-auto max-w-5xl px-6 py-10">
             <h1 className="font-mono text-xl font-bold">Sessions</h1>
+            {waiting && (
+                <div className="mt-4 rounded border border-line bg-panel p-4">
+                    <p className="text-sm">
+                        {waiting.newTabs > 0 && waiting.updatedTabs === 0
+                            ? `${waiting.newTabs} new ${waiting.newTabs === 1 ? "session" : "sessions"} from your other PC.`
+                            : waiting.newTabs === 0 && waiting.updatedTabs > 0
+                              ? `${waiting.updatedTabs} ${waiting.updatedTabs === 1 ? "session has" : "sessions have"} newer versions from your other PC.`
+                              : `Updates waiting from your other PC: ${waiting.newTabs} new, ${waiting.updatedTabs} newer versions.`}
+                    </p>
+                    <div className="mt-3 inline-flex items-center gap-3 rounded border border-line bg-black px-3 py-1.5">
+                        <span className="font-mono text-xs">
+                            <span className="text-go">$ </span>
+                            <span className="text-fog">localagents pull</span>
+                        </span>
+                    </div>
+                    <p className="mt-2 font-mono text-xs text-dim">Run this on the PC you want the sessions on.</p>
+                </div>
+            )}
             {rows.length === 0 && (
                 <div className="mt-4">
                     <SessionsEmptyState />
