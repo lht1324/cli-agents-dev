@@ -1,6 +1,20 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { postFetch } from "@/lib/api/client/baseFetch";
+
+function platformLabel(platform: string): string {
+    if (platform === "darwin") {
+        return "macOS";
+    }
+    if (platform === "linux") {
+        return "Linux";
+    }
+    if (platform === "win32") {
+        return "Windows";
+    }
+    return platform || "-";
+}
 
 export default function DeviceAuthorizeClient({
     deviceId,
@@ -19,19 +33,17 @@ export default function DeviceAuthorizeClient({
 }) {
     const [busy, setBusy] = useState(false);
     const [failed, setFailed] = useState(false);
+
     const onClickConnect = useCallback(async () => {
         setBusy(true);
         setFailed(false);
         try {
-            const res = await fetch("/api/device/authorize", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ deviceId, label, platform, hostname }),
+            const res = await postFetch("/api/device/authorize", {
+                deviceId,
+                label,
+                platform,
+                hostname,
             });
-            if (!res.ok) {
-                setFailed(true);
-                return;
-            }
             const body = (await res.json()) as { data?: { token?: string } };
             const token = body.data?.token;
             if (!token) {
@@ -39,24 +51,53 @@ export default function DeviceAuthorizeClient({
                 return;
             }
             window.location.href = `http://127.0.0.1:${port}/callback?token=${encodeURIComponent(token)}&state=${encodeURIComponent(state)}`;
+        } catch {
+            setFailed(true);
         } finally {
             setBusy(false);
         }
     }, [deviceId, port, state, label, platform, hostname]);
+
     return (
         <main className="mx-auto max-w-3xl px-4 py-10">
-            <h1 className="text-2xl font-bold">Connect this device?</h1>
-            <p className="mt-2 text-dim">
-                {label} will sync with your account.
+            <p className="font-mono text-sm text-go">$ localagents login</p>
+            <h1 className="mt-4 text-2xl font-bold tracking-tight">Connect this device?</h1>
+            <p className="mt-2 max-w-[60ch] text-sm text-dim">
+                The device below will sync its OpenCode tabs with your account.
             </p>
-            <button
-                onClick={onClickConnect}
-                disabled={busy}
-                className="mt-4 rounded bg-go px-4 py-2 font-mono text-sm font-bold text-ink disabled:opacity-50"
-            >
-                Connect
-            </button>
-            {failed && <p className="mt-2 text-stop">Failed. Try again.</p>}
+
+            <dl className="mt-6 rounded border border-line bg-panel p-4 text-sm">
+                <Row label="Name" value={label || hostname || deviceId} />
+                <Row label="Platform" value={platformLabel(platform)} />
+                <Row label="Hostname" value={hostname || "-"} />
+            </dl>
+
+            <div className="mt-6 flex gap-3">
+                <button
+                    type="button"
+                    onClick={onClickConnect}
+                    disabled={busy}
+                    className="rounded bg-go px-4 py-2 font-mono text-sm font-bold text-ink transition-opacity hover:opacity-85 disabled:opacity-50"
+                >
+                    {busy ? "Connecting..." : "Connect"}
+                </button>
+                <a
+                    href="/sessions"
+                    className="rounded border border-line px-4 py-2 font-mono text-sm text-fog transition-colors hover:bg-black"
+                >
+                    Cancel
+                </a>
+            </div>
+            {failed && <p className="mt-3 font-mono text-sm text-stop">Failed. Try again.</p>}
         </main>
+    );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+    return (
+        <div className="flex items-center justify-between border-b border-line py-2 last:border-b-0">
+            <dt className="text-dim">{label}</dt>
+            <dd className="truncate font-mono text-xs">{value}</dd>
+        </div>
     );
 }
