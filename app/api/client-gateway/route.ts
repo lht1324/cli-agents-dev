@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth/server";
+import { getAuth } from "@/lib/auth/server";
 import { getNextBaseResponse } from "@/lib/utils/getNextBaseResponse";
 
 type RouteHandler = (request: Request) => Promise<Response>;
@@ -107,7 +107,7 @@ async function dispatchGateway(request: Request): Promise<Response> {
     const isPublic = PUBLIC_ROUTES.some((r) => r.method === method && r.path === targetPath);
     let userId = "";
     if (!isPublic) {
-        const { data: session } = await auth.getSession();
+        const { data: session } = await getAuth().getSession();
         if (!session?.user) {
             return getNextBaseResponse(401).json({ success: false, status: 401, error: "login required" });
         }

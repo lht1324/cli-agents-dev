@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { auth } from "@/lib/auth/server";
+import { getAuth } from "@/lib/auth/server";
 import { checkBillingGate } from "@/lib/billing";
 import { getDb } from "@/lib/neon/client";
 import { devices, deviceTokens } from "@/lib/neon/schema";
@@ -14,7 +14,7 @@ interface AuthorizeBody {
 
 // loopback 로그인 확정. 웹 세션 주인으로 기기 행 + 토큰 발급.
 export async function POST(request: Request): Promise<Response> {
-    const { data: session } = await auth.getSession();
+    const { data: session } = await getAuth().getSession();
     if (!session?.user) {
         return getNextBaseResponse(401).json({ success: false, status: 401, error: "login required" });
     }

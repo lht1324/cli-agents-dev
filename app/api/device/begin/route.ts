@@ -1,6 +1,6 @@
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth/server";
+import { getAuth } from "@/lib/auth/server";
 import { sealConnect, unsealConnect } from "@/lib/auth/packet";
 
 // 로그인 전 기기 연결 진입. data(봉투) 우선, 평문 폴백.
@@ -41,7 +41,7 @@ export async function GET(request: Request): Promise<Response> {
             // 키 미설정. 평문 폴백.
         }
     }
-    const { data: session } = await auth.getSession();
+    const { data: session } = await getAuth().getSession();
     if (session?.user) {
         if (inner) {
             redirect(`/device/authorize?data=${encodeURIComponent(inner)}`);

@@ -1,13 +1,13 @@
 import { desc, eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { sql } from "drizzle-orm";
-import { auth } from "@/lib/auth/server";
+import { getAuth } from "@/lib/auth/server";
 import { checkBillingGate, trialDaysLeft } from "@/lib/billing";
 import { devices, getDb, sessionsMeta, subscriptions } from "@/lib/neon";
 import ProfilePageClient, { type ProfileData } from "./ProfilePageClient";
 
 export default async function ProfilePageServer() {
-    const { data: session } = await auth.getSession();
+    const { data: session } = await getAuth().getSession();
     if (!session?.user) {
         redirect("/auth/sign-in");
     }

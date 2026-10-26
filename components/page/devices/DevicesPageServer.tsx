@@ -1,12 +1,12 @@
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth/server";
+import { getAuth } from "@/lib/auth/server";
 import { devices, getDb } from "@/lib/neon";
 import { checkBillingGate } from "@/lib/billing";
 import DevicesPageClient, { type DeviceRow } from "./DevicesPageClient";
 
 export default async function DevicesPageServer() {
-    const { data: session } = await auth.getSession();
+    const { data: session } = await getAuth().getSession();
     if (!session?.user) {
         redirect("/auth/sign-in");
     }

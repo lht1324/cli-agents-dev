@@ -9,6 +9,9 @@ node_modules/
 out/
 build/
 dist/
+.open-next/
+.wrangler/
+cloudflare-env.d.ts
 
 # Env
 .env

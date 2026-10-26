@@ -1,12 +1,12 @@
 import { and, desc, eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth/server";
+import { getAuth } from "@/lib/auth/server";
 import { devices, cloudMessages, cloudTabs, getDb, modelCatalog, pendingApprovals, sessionsMeta } from "@/lib/neon";
 import { checkBillingGate } from "@/lib/billing";
 import SessionDetailClient, { type ApprovalRow, type SessionInfo, type ThreadRow } from "./SessionDetailClient";
 
 export default async function SessionDetailServer({ id }: { id: string }) {
-    const { data: session } = await auth.getSession();
+    const { data: session } = await getAuth().getSession();
     if (!session?.user) {
         redirect("/auth/sign-in");
     }

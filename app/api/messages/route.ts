@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import { auth } from "@/lib/auth/server";
+import { getAuth } from "@/lib/auth/server";
 import { readInternalUser } from "@/lib/auth/internal";
 import { verifyDeviceToken } from "@/lib/auth/device";
 import { checkBillingGate } from "@/lib/billing";
@@ -91,7 +91,7 @@ export async function POST(request: Request): Promise<Response> {    const authe
 // 웹 실시간 폴링용 스레드 조회. 본인 탭만. 5초 폴링 1회가 이 쿼리 1방이다.
 export async function GET(request: Request): Promise<Response> {
     const internalUser = readInternalUser(request);
-    const { data: session } = internalUser ? { data: null } : await auth.getSession();
+    const { data: session } = internalUser ? { data: null } : await getAuth().getSession();
     const viewerId = internalUser ?? session?.user?.id;
     if (!viewerId) {
         return getNextBaseResponse(401).json({ success: false, status: 401, error: "login required" });

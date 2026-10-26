@@ -1,15 +1,13 @@
-import { auth } from "@/lib/auth/server";
+import { getAuth } from "@/lib/auth/server";
 import type { NextRequest } from "next/server";
 
-const authMiddleware = auth.middleware({
-    loginUrl: "/auth/sign-in",
-});
-
+// 미들웨어도 요청 시점에 만든다. proxy.ts는 워커 엔트리의 정적 import라
+// 모듈 평가 시점에는 process.env가 아직 비어 있을 수 있다 (getAuth 주석 참조).
 export default function proxy(request: NextRequest) {
     if (request.headers.has("Next-Action")) {
         return;
     }
-    return authMiddleware(request);
+    return getAuth().middleware({ loginUrl: "/auth/sign-in" })(request);
 }
 
 export const config = {

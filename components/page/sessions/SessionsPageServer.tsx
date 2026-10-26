@@ -1,6 +1,6 @@
 import { desc, eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth/server";
+import { getAuth } from "@/lib/auth/server";
 import { cloudTabs, devices, getDb, handoffs, sessionsMeta } from "@/lib/neon";
 import { checkBillingGate } from "@/lib/billing";
 import SessionsPageClient, { type SessionRow } from "./SessionsPageClient";
@@ -10,7 +10,7 @@ export default async function SessionsPageServer({
 }: {
     searchParams: Promise<Record<string, string | undefined>>;
 }) {
-    const { data: session } = await auth.getSession();
+    const { data: session } = await getAuth().getSession();
     if (!session?.user) {
         redirect("/auth/sign-in");
     }
