@@ -33,7 +33,7 @@ function OgCard({ innerRef }: { innerRef: React.Ref<HTMLDivElement> }) {
             </h1>
 
             <p className="absolute left-14 top-[424px] font-mono text-[19px] text-dim">
-                Session sync for OpenCode and Claude Code
+                Session sync for OpenCode
             </p>
 
             <div className="absolute right-12 top-[168px] w-[380px] rounded border border-line bg-panel px-6 py-5">
