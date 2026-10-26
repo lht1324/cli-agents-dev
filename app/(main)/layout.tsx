@@ -3,6 +3,7 @@ import { UserIcon } from "lucide-react";
 import { auth } from "@/lib/auth/server";
 import { trialDaysLeft } from "@/lib/billing";
 import UserMenuButton from "@/components/page/auth/UserMenuButton";
+import BrandMark from "@/components/public/BrandMark";
 
 export default async function MainLayout({ children }: { children: React.ReactNode }) {
     const { data: session } = await auth.getSession();
@@ -12,7 +13,8 @@ export default async function MainLayout({ children }: { children: React.ReactNo
         <>
             <header className="border-b border-line">
                 <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between px-4">
-                    <Link href="/" className="font-mono font-bold">
+                    <Link href="/" className="flex items-center gap-2 font-mono font-bold">
+                        <BrandMark size={24} />
                         localagents
                     </Link>
                     {session?.user ? (

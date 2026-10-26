@@ -15,6 +15,7 @@
     "@neondatabase/auth-ui": "0.3.0-beta",
     "@neondatabase/serverless": "1.1.0",
     "drizzle-orm": "0.45.3",
+    "html-to-image": "^1.11.13",
     "next": "16.3.6",
     "react": "19.3.0",
     "react-dom": "19.3.0",
