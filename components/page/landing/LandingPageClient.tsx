@@ -185,11 +185,22 @@ export default function LandingPageClient() {
                 </div>
             </section>
 
-            <section className="border-t border-line">
-                <div className="mx-auto w-full max-w-6xl px-4 py-5">
+            <section className="border-t border-line" aria-label="Footer">
+                <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 px-4 py-5 md:flex-row md:items-center md:justify-between">
                     <p className="font-mono text-xs text-dim">
                         $ sync: periodic + manual · $ approve: allow | deny · $ status: online | stale | offline
                     </p>
+                    <nav className="flex gap-4">
+                        <Link href="/legal/terms" className="font-mono text-xs text-dim transition-colors hover:text-fog">
+                            Terms
+                        </Link>
+                        <Link href="/legal/privacy" className="font-mono text-xs text-dim transition-colors hover:text-fog">
+                            Privacy
+                        </Link>
+                        <Link href="/legal/refunds" className="font-mono text-xs text-dim transition-colors hover:text-fog">
+                            Refunds
+                        </Link>
+                    </nav>
                 </div>
             </section>
         </main>

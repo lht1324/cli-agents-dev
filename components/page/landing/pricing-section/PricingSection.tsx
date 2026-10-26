@@ -66,7 +66,9 @@ export default function PricingSection() {
         <section id="pricing" className="scroll-mt-14 border-t border-line">
             <div className="mx-auto w-full max-w-6xl px-4 py-16">
                 <h2 className="text-2xl font-bold tracking-tight">Pricing</h2>
-                <p className="mt-2 font-mono text-sm text-go">30-day free trial. No card required.</p>
+                <p className="mt-2 font-mono text-sm text-go">
+                    30-day free trial. No card required. Nothing auto-starts after the trial.
+                </p>
                 <div className="mt-8 grid gap-6 md:grid-cols-2">
                     {PLANS.map((plan) => (
                         <div key={plan.interval} className="flex flex-col rounded border border-line bg-ink p-6">
