@@ -98,7 +98,7 @@ export default function OgCardPageClient() {
     return (
         <main className="mx-auto flex max-w-[1280px] flex-col gap-6 px-4 py-10">
             <header className="flex flex-col gap-1">
-                <h1 className="text-2xl font-bold tracking-tight">OG card — 1200×630</h1>
+                <h1 className="text-2xl font-bold tracking-tight">OG card 1200×630</h1>
                 <p className="text-sm text-dim">
                     Download and save as <span className="font-mono text-fog">public/og/og.png</span>. Export is
                     2× (2400×1260), declared as 1200×630.

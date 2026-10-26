@@ -1,18 +1,18 @@
 import type { Metadata } from "next";
 import { authClient } from "@/lib/auth/client";
 import { NeonAuthUIProvider } from "@neondatabase/auth-ui";
+import { SITE_DESCRIPTION, SITE_NAME, SITE_TITLE, SITE_URL } from "@/lib/site";
 import "./globals.css";
 
 export const metadata: Metadata = {
-    // canonical·OG URL은 환경과 무관하게 운영 도메인으로 고정한다. dev의 localhost가 메타에 새면 안 된다.
-    metadataBase: new URL("https://localagents.link"),
+    // canonical·OG URL은 환경과 무관하게 운영 도메인으로 고정한다.
+    metadataBase: new URL(SITE_URL),
     title: {
-        default: "LocalAgents — Session sync for OpenCode and Claude Code",
-        template: "%s · LocalAgents",
+        default: SITE_TITLE,
+        template: `%s · ${SITE_NAME}`,
     },
-    description:
-        "Start a session on one PC and continue it on another. LocalAgents syncs OpenCode and Claude Code sessions between your machines, with an inbox for approvals on your phone.",
-    applicationName: "LocalAgents",
+    description: SITE_DESCRIPTION,
+    applicationName: SITE_NAME,
     icons: {
         icon: [
             { url: "/logo/logo.svg", type: "image/svg+xml" },
@@ -24,21 +24,21 @@ export const metadata: Metadata = {
     openGraph: {
         type: "website",
         url: "/",
-        siteName: "LocalAgents",
-        title: "LocalAgents — Session sync for OpenCode and Claude Code",
+        siteName: SITE_NAME,
+        title: SITE_TITLE,
         description: "Start a session on one PC and continue it on another.",
         images: [
             {
                 url: "/og/og.png",
                 width: 1200,
                 height: 630,
-                alt: "LocalAgents — start on one PC, continue everywhere.",
+                alt: "LocalAgents: start on one PC, continue everywhere.",
             },
         ],
     },
     twitter: {
         card: "summary_large_image",
-        title: "LocalAgents — Session sync for OpenCode and Claude Code",
+        title: SITE_TITLE,
         description: "Start a session on one PC and continue it on another.",
         images: ["/og/og.png"],
     },
