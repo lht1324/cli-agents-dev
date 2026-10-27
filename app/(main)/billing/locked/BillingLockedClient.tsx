@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { postFetch } from "@/lib/api/client/baseFetch";
+import { dodoClientAPI } from "@/lib/api/client/dodoClientAPI";
 
 // 트라이얼 종료 화면. Subscribe는 랜딩 pricing 섹션과 같은 체크아웃 API를 쓴다.
 export default function BillingLockedClient() {
@@ -11,10 +11,9 @@ export default function BillingLockedClient() {
         () => async (interval: "monthly" | "annual") => {
             setLoading(interval);
             try {
-                const res = await postCheckout(interval);
-                if (res.checkoutUrl) {
-                    window.location.href = res.checkoutUrl;
-                    return;
+                const result = await dodoClientAPI.createCheckout(interval, window.location.origin);
+                if (result.ok) {
+                    window.location.href = result.data.checkoutUrl;
                 }
             } finally {
                 setLoading(null);
@@ -50,11 +49,4 @@ export default function BillingLockedClient() {
             <p className="mt-4 font-mono text-xs text-dim">$7.50/mo with annual billing · 2 months free</p>
         </main>
     );
-}
-
-// PricingSection과 같은 체크아웃 API. baseFetch 래퍼 경유 (dev에서 3005 게이트웨이로 나간다).
-async function postCheckout(interval: "monthly" | "annual"): Promise<{ checkoutUrl: string | null }> {
-    const res = await postFetch("/api/dodo/checkout", { interval, origin: window.location.origin });
-    const json = (await res.json()) as { data?: { checkoutUrl?: string } };
-    return { checkoutUrl: json.data?.checkoutUrl ?? null };
 }
