@@ -4,10 +4,6 @@ import { NOINDEX_METADATA } from "@/lib/site";
 
 export const metadata: Metadata = NOINDEX_METADATA;
 
-export default function SessionsPage({
-    searchParams,
-}: {
-    searchParams: Promise<Record<string, string | undefined>>;
-}) {
-    return <SessionsPageServer searchParams={searchParams} />;
+export default function SessionsPage() {
+    return <SessionsPageServer />;
 }
