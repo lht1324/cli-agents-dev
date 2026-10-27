@@ -103,7 +103,7 @@ export async function pushOneTab(
     show(0.3);
     await putBytes(key, packed.bytes);
     show(0.7);
-    await cloudPost("/api/handoffs", {
+    await cloudPost("/api/daemon/handoffs", {
         tabId: sid,
         title,
         userMsgs,
@@ -155,7 +155,7 @@ export async function syncOneTab(
 export async function dumpTab(server: DiscoveredServer, userId: string, sid: string): Promise<{ key: string; bytes: number }> {
     const packed = packTab(sid);
     const key = `${userId}/dump/${sid}-${Date.now()}.bin.gz`;
-    const res = await fetch(`${baseUrl()}/api/handoffs/url`, {
+    const res = await fetch(`${baseUrl()}/api/daemon/handoffs/url`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${readState()?.token ?? ""}` },
         body: JSON.stringify({ operation: "upload", key }),
@@ -189,14 +189,14 @@ export async function pullVersion(version: HandoffVersion): Promise<{ created: b
     const pkg = unpackTab(raw, version.sha256);
     putProgress(name, 80);
     const applied = applyTabPackageUpsert(pkg, version.title);
-    await cloudPost("/api/handoffs", { receivedVersion: version.version });
+    await cloudPost("/api/daemon/handoffs", { receivedVersion: version.version });
     putProgress(name, 100);
     process.stdout.write("\n");
     return { ...applied, title: pkg.title ?? version.title ?? version.tabId };
 }
 
 export async function listVersions(): Promise<HandoffVersion[]> {
-    const body = (await cloudGet("/api/handoffs")) as { data?: { versions?: HandoffVersion[] } };
+    const body = (await cloudGet("/api/daemon/handoffs")) as { data?: { versions?: HandoffVersion[] } };
     return body.data?.versions ?? [];
 }
 

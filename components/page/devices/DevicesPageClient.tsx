@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { Unlink } from "lucide-react";
-import { deleteFetch } from "@/lib/api/client/baseFetch";
+import { devicesClientAPI } from "@/lib/api/client/devicesClientAPI";
 
 export interface DeviceRow {
     id: string;
@@ -87,16 +87,13 @@ export default function DevicesPageClient({ items }: { items: DeviceRow[] }) {
         }
         setIsUnlinking(true);
         try {
-            const res = await deleteFetch(`/api/devices?deviceId=${encodeURIComponent(unlinkTarget.id)}`);
-            const body = (await res.json()) as { success?: boolean; error?: string };
-            if (body.success) {
+            const result = await devicesClientAPI.unlink(unlinkTarget.id);
+            if (result.ok) {
                 setUnlinkTarget(null);
                 window.location.reload();
-            } else {
-                setError(body.error ?? "Failed to unlink device.");
+                return;
             }
-        } catch {
-            setError("Failed to unlink device. Please try again later.");
+            setError(result.error ?? "Failed to unlink device.");
         } finally {
             setIsUnlinking(false);
         }

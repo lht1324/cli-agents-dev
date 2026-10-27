@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { postFetch } from "@/lib/api/client/baseFetch";
+import { deviceClientAPI } from "@/lib/api/client/deviceClientAPI";
 
 function platformLabel(platform: string): string {
     if (platform === "darwin") {
@@ -38,21 +38,12 @@ export default function DeviceAuthorizeClient({
         setBusy(true);
         setFailed(false);
         try {
-            const res = await postFetch("/api/device/authorize", {
-                deviceId,
-                label,
-                platform,
-                hostname,
-            });
-            const body = (await res.json()) as { data?: { token?: string } };
-            const token = body.data?.token;
-            if (!token) {
+            const result = await deviceClientAPI.authorize({ deviceId, label, platform, hostname });
+            if (!result.ok) {
                 setFailed(true);
                 return;
             }
-            window.location.href = `http://127.0.0.1:${port}/callback?token=${encodeURIComponent(token)}&state=${encodeURIComponent(state)}`;
-        } catch {
-            setFailed(true);
+            window.location.href = `http://127.0.0.1:${port}/callback?token=${encodeURIComponent(result.data.token)}&state=${encodeURIComponent(state)}`;
         } finally {
             setBusy(false);
         }

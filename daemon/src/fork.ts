@@ -29,7 +29,7 @@ async function sourceTitle(server: DiscoveredServer, sessionID: string): Promise
 export async function forkAndRegister(server: DiscoveredServer, sessionID: string): Promise<string> {
     const forked = await forkSession(server, sessionID);
     const title = (await sourceTitle(server, sessionID)) ?? `fork of ${sessionID.slice(4, 12)}`;
-    await cloudPost("/api/sync", {
+    await cloudPost("/api/daemon/sync", {
         sessions: [{ id: forked.id, title, status: "active", provider: "opencode" }],
     });
     return forked.id;

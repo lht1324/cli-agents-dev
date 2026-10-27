@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import Link from "next/link";
 import { CreditCard, Mail, Monitor, ScrollText } from "lucide-react";
-import { postFetch } from "@/lib/api/client/baseFetch";
+import { dodoClientAPI } from "@/lib/api/client/dodoClientAPI";
 
 export interface ProfileData {
     email: string | null;
@@ -49,19 +49,15 @@ export default function ProfilePageClient({ data }: { data: ProfileData }) {
     const onConfirmCancel = useCallback(async () => {
         setIsCanceling(true);
         try {
-            const res = await postFetch("/api/dodo/cancel", {});
-            const body = (await res.json()) as { success?: boolean; error?: string };
-            if (!body.success) {
-                setError(body.error ?? "Failed to cancel subscription.");
+            const result = await dodoClientAPI.cancelSubscription();
+            if (!result.ok) {
+                setError(result.error ?? "Failed to cancel subscription.");
                 setShowCancelModal(false);
                 return;
             }
             // 서버에서 이미 반영됐다. 최신 구독 상태로 화면을 다시 그린다.
             setShowCancelModal(false);
             window.location.reload();
-        } catch {
-            setError("Failed to cancel subscription. Please try again later.");
-            setShowCancelModal(false);
         } finally {
             setIsCanceling(false);
         }
@@ -69,17 +65,12 @@ export default function ProfilePageClient({ data }: { data: ProfileData }) {
 
     const onClickResume = useCallback(async () => {
         setError(null);
-        try {
-            const res = await postFetch("/api/dodo/resume", {});
-            const body = (await res.json()) as { success?: boolean; error?: string };
-            if (body.success) {
-                window.location.reload();
-                return;
-            }
-            setError(body.error ?? "Failed to resume subscription.");
-        } catch {
-            setError("Failed to resume subscription. Please try again later.");
+        const result = await dodoClientAPI.resumeSubscription();
+        if (result.ok) {
+            window.location.reload();
+            return;
         }
+        setError(result.error ?? "Failed to resume subscription.");
     }, []);
 
     const onClickCloseModal = useCallback(() => {

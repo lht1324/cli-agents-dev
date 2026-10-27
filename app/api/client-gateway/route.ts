@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAuth } from "@/lib/auth/server";
+import { getIsValidRequestC2S } from "@/lib/utils/getIsValidRequest";
 import { getNextBaseResponse } from "@/lib/utils/getNextBaseResponse";
 
 type RouteHandler = (request: Request) => Promise<Response>;
@@ -11,14 +11,16 @@ interface RouteEntry {
 }
 
 // 웹(브라우저)이 호출하는 API만 둔다. 데몬 전용(기기 토큰) 라우트는 넣지 않는다.
+// 전부 /api/web/** 이다 — 게이트웨이는 web 채널 전용 진입점이라는 규칙을 경로로 강제한다.
 const ROUTE_ENTRIES: RouteEntry[] = [
-    { method: "GET", pattern: ["api", "messages"], load: () => import("@/app/api/messages/route") },
-    { method: "POST", pattern: ["api", "commands"], load: () => import("@/app/api/commands/route") },
-    { method: "DELETE", pattern: ["api", "devices"], load: () => import("@/app/api/devices/route") },
-    { method: "POST", pattern: ["api", "dodo", "checkout"], load: () => import("@/app/api/dodo/checkout/route") },
-    { method: "POST", pattern: ["api", "dodo", "cancel"], load: () => import("@/app/api/dodo/cancel/route") },
-    { method: "POST", pattern: ["api", "dodo", "resume"], load: () => import("@/app/api/dodo/resume/route") },
-    // 웹훅은 Dodo 서버가 외부에서 직접 부른다. 게이트웨이에 넣지 않는다 (세션 인증 자체가 성립 안 함).
+    { method: "GET", pattern: ["api", "web", "messages"], load: () => import("@/app/api/web/messages/route") },
+    { method: "POST", pattern: ["api", "web", "commands"], load: () => import("@/app/api/web/commands/route") },
+    { method: "DELETE", pattern: ["api", "web", "devices"], load: () => import("@/app/api/web/devices/route") },
+    { method: "POST", pattern: ["api", "web", "device", "authorize"], load: () => import("@/app/api/web/device/authorize/route") },
+    { method: "POST", pattern: ["api", "web", "dodo", "checkout"], load: () => import("@/app/api/web/dodo/checkout/route") },
+    { method: "POST", pattern: ["api", "web", "dodo", "cancel"], load: () => import("@/app/api/web/dodo/cancel/route") },
+    { method: "POST", pattern: ["api", "web", "dodo", "resume"], load: () => import("@/app/api/web/dodo/resume/route") },
+    // 웹훅은 Dodo 서버가 /api/webhook/dodo로 직접 부른다. 게이트웨이에 넣지 않는다 (세션 인증 자체가 성립 안 함).
 ];
 
 // 비로그인 허용 경로. 랜딩에서 공개 데이터를 부를 때만 추가한다.
@@ -100,18 +102,23 @@ async function dispatchGateway(request: Request): Promise<Response> {
     if (!targetPath) {
         return getNextBaseResponse(400).json({ success: false, status: 400, error: "missing 'path' param" });
     }
-    if (!targetPath.startsWith("/api/")) {
-        return getNextBaseResponse(400).json({ success: false, status: 400, error: "'path' must start with /api/" });
+    if (!targetPath.startsWith("/api/web/")) {
+        return getNextBaseResponse(400).json({
+            success: false,
+            status: 400,
+            error: "'path' must start with /api/web/",
+        });
     }
 
     const isPublic = PUBLIC_ROUTES.some((r) => r.method === method && r.path === targetPath);
     let userId = "";
     if (!isPublic) {
-        const { data: session } = await getAuth().getSession();
-        if (!session?.user) {
+        // C2S 판정은 여기서 한 번. 이후 라우트는 S2S로만 신뢰한다.
+        const c2sUser = await getIsValidRequestC2S();
+        if (!c2sUser) {
             return getNextBaseResponse(401).json({ success: false, status: 401, error: "login required" });
         }
-        userId = session.user.id;
+        userId = c2sUser;
     }
 
     const matched = matchRoute(method, targetPath);

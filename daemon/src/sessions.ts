@@ -88,6 +88,6 @@ export async function syncSessions(server: DiscoveredServer, progress = false): 
     if (progress) {
         process.stdout.write("\n");
     }
-    const result = (await cloudPost("/api/sync", { sessions })) as { data?: { sessions?: number } };
+    const result = (await cloudPost("/api/daemon/sync", { sessions })) as { data?: { sessions?: number } };
     return { sessions: result.data?.sessions ?? sessions.length };
 }

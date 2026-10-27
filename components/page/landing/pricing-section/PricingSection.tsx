@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { postFetch } from "@/lib/api/client/baseFetch";
+import { dodoClientAPI } from "@/lib/api/client/dodoClientAPI";
 
 type Interval = "monthly" | "annual";
 
@@ -42,17 +42,13 @@ export default function PricingSection() {
         setBusy(interval);
         setError(null);
         try {
-            const res = await postFetch("/api/dodo/checkout", { interval, origin: window.location.origin });
-            const data = (await res.json()) as { success: boolean; data?: { checkoutUrl?: string } };
-            const url = data.data?.checkoutUrl;
-            if (data.success && url) {
-                window.location.href = url;
+            const result = await dodoClientAPI.createCheckout(interval, window.location.origin);
+            if (result.ok) {
+                window.location.href = result.data.checkoutUrl;
                 return;
             }
-            setError("Could not open checkout. Try again.");
-        } catch (err) {
             // 로그인 전이면 401. 가입 흐름으로 보낸다.
-            if (String(err).includes("401")) {
+            if (result.status === 401) {
                 window.location.href = "/auth/sign-in";
                 return;
             }

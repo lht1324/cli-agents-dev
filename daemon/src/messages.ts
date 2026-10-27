@@ -127,7 +127,7 @@ export async function syncMessages(server: DiscoveredServer, sessionID: string):
     if (fresh.length === 0) {
         return { rows: 0 };
     }
-    const result = (await cloudPost("/api/messages", {
+    const result = (await cloudPost("/api/daemon/messages", {
         messages: fresh.map((r) => ({
             sessionID,
             messageId: r.id,
@@ -179,7 +179,7 @@ export async function backfillSession(
     }
     for (let i = 0; i < rows.length; i += 10) {
         const part = rows.slice(i, i + 10);
-        await cloudPost("/api/messages", {
+        await cloudPost("/api/daemon/messages", {
             messages: part.map((r, k) => ({
                 sessionID,
                 messageId: r.id,
@@ -214,7 +214,7 @@ export async function backfillSession(
 
 // 조건부 backfill. 클라우드에 없는 탭만 채운다. session_id 대조.
 export async function backfillMissing(server: DiscoveredServer, only?: string[]): Promise<{ checked: number; filled: number; rows: number }> {
-    const listed = (await cloudGet("/api/sync")) as { data?: { tabIds?: string[] } };
+    const listed = (await cloudGet("/api/daemon/sync")) as { data?: { tabIds?: string[] } };
     const have = new Set(Array.isArray(listed.data?.tabIds) ? listed.data.tabIds : []);
     const body = (await apiGet(server, "/session")) as { data?: { id: string }[] } | { id: string }[];
     const list = Array.isArray(body) ? body : (body.data ?? []);

@@ -9,7 +9,7 @@ export default async function DeviceAuthorizeServer({ params }: { params: Record
         const query = new URLSearchParams(
             Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined) as [string, string][]),
         ).toString();
-        redirect(`/api/device/begin?${query}`);
+        redirect(`/api/pairing/begin?${query}`);
     }
     // 봉투 우선. 코드는 복호화 뒤 파싱해서 쓴다. URL에는 암호문만 남는다.
     const data = params.data;

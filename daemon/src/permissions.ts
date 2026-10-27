@@ -31,7 +31,7 @@ export async function reply(server: DiscoveredServer, sessionID: string, request
 // 로컬 pending을 클라우드 거울에 올린다. 사라진 건 서버가 resolved로 표시.
 export async function pushPending(server: DiscoveredServer): Promise<{ open: number }> {
     const pending = await listPending(server);
-    const result = (await cloudPost("/api/sync", {
+    const result = (await cloudPost("/api/daemon/sync", {
         approvals: pending.map((p) => ({
             id: p.id,
             sessionID: p.sessionID,
