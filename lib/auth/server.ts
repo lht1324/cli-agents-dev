@@ -21,7 +21,13 @@ export function getAuth(): NeonAuth {
         }
         cached = createNeonAuth({
             baseUrl,
-            cookies: { secret },
+            cookies: {
+                secret,
+                // 세션 데이터 쿠키 캐시 TTL. 기본 5분은 너무 짧아서, 새로고침이 잦거나
+                // 워커 isolate가 자주 바뀌면 upstream /get-session을 반복 호출해 429를 맞는다.
+                // 한 번 429가 나면 쿠키가 안 생겨 재시도가 계속되는 악순환이 된다.
+                sessionDataTtl: 900,
+            },
         });
     }
     return cached;

@@ -54,7 +54,7 @@ async function onLogout(): Promise<void> {
     }
     // revoke 먼저. 실패하면 상태 유지 (살아있는 토큰 고아 방지).
     // 단 401은 서버에 세션이 없다는 뜻이라 로컬만 비운다.
-    const res = await fetch(`${baseUrl()}/api/device/revoke`, {
+    const res = await fetch(`${baseUrl()}/api/daemon/device/revoke`, {
         method: "POST",
         headers: { Authorization: `Bearer ${state.token}` },
         signal: AbortSignal.timeout(10000),
@@ -80,7 +80,7 @@ async function ensureAuth(): Promise<{ deviceId: string; userId: string; token: 
     }
     let res: Response;
     try {
-        res = await fetch(`${baseUrl()}/api/auth/whoami`, {
+        res = await fetch(`${baseUrl()}/api/daemon/whoami`, {
             headers: { Authorization: `Bearer ${state.token}` },
             signal: AbortSignal.timeout(10000),
         });
@@ -280,7 +280,7 @@ async function onWhoami(): Promise<void> {
     if (!state?.token) {
         throw new Error("not logged in. run `localagents login` first");
     }
-    const res = await fetch(`${baseUrl()}/api/auth/whoami`, {
+    const res = await fetch(`${baseUrl()}/api/daemon/whoami`, {
         headers: { Authorization: `Bearer ${state.token}` },
         signal: AbortSignal.timeout(10000),
     });
@@ -314,28 +314,41 @@ async function onStatus(): Promise<void> {
         console.log("pending: unknown (no token)");
         return;
     }
+    // 401이면 로컬 상태에 죽은 토큰이 남아 있다는 뜻이다 (해제·회전). 안내를 위해 기억한다.
+    let unauthorized = false;
     try {
-        const res = await fetch(`${baseUrl()}/api/commands/pending`, {
+        const res = await fetch(`${baseUrl()}/api/daemon/commands/pending`, {
             headers: { Authorization: `Bearer ${state.token}` },
             signal: AbortSignal.timeout(10000),
         });
-        if (!res.ok) {
-            throw new Error(`pending rejected: ${res.status}`);
+        if (res.status === 401) {
+            unauthorized = true;
+            console.log("pending: unknown (not logged in)");
+        } else if (res.status === 403) {
+            console.log("pending: unknown (subscription required)");
+        } else if (!res.ok) {
+            console.log(`pending: unknown (http ${res.status})`);
+        } else {
+            const body = (await res.json()) as { data?: { pending?: number } };
+            console.log(`pending: ${body.data?.pending ?? "?"} commands`);
         }
-        const body = (await res.json()) as { data?: { pending?: number } };
-        console.log(`pending: ${body.data?.pending ?? "?"} commands`);
     } catch {
         console.log("pending: unknown (cloud unreachable)");
     }
     // 과금 상태. 403이면 트라이얼 종료 — 구독 안내를 붙인다.
     try {
-        const res = await fetch(`${baseUrl()}/api/billing/status`, {
+        const res = await fetch(`${baseUrl()}/api/daemon/billing/status`, {
             headers: { Authorization: `Bearer ${state.token}` },
             signal: AbortSignal.timeout(10000),
         });
-        if (res.status === 403) {
+        if (res.status === 401) {
+            unauthorized = true;
+            console.log("billing: unknown (not logged in)");
+        } else if (res.status === 403) {
             console.log("billing: Subscription ended. Subscribe at localagents.link");
-        } else if (res.ok) {
+        } else if (!res.ok) {
+            console.log(`billing: unknown (http ${res.status})`);
+        } else {
             const body = (await res.json()) as {
                 data?: { active?: boolean; daysLeft?: number | null; cancelAtPeriodEnd?: boolean; currentPeriodEnd?: string | null };
             };
@@ -354,7 +367,10 @@ async function onStatus(): Promise<void> {
             }
         }
     } catch {
-        // 도달 실패는 server 줄이 이미 말한다.
+        console.log("billing: unknown (cloud unreachable)");
+    }
+    if (unauthorized) {
+        console.log("hint: this device is no longer signed in. run `localagents login` to reconnect.");
     }
 }
 
@@ -376,7 +392,7 @@ async function onLogin(): Promise<void> {
     const existing = readState();
     if (existing?.token) {
         try {
-            const check = await fetch(`${baseUrl()}/api/auth/whoami`, {
+            const check = await fetch(`${baseUrl()}/api/daemon/whoami`, {
                 headers: { Authorization: `Bearer ${existing.token}` },
                 signal: AbortSignal.timeout(10000),
             });
@@ -430,7 +446,7 @@ async function onLogin(): Promise<void> {
                 hostname: host.hostname,
             });
             // 사전 포장. 브라우저 주소창에 평문이 일순도 안 뜨게 한다. 실패하면 평문 폴백.
-            fetch(`${base}/api/device/pack`, {
+            fetch(`${base}/api/pairing/pack`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -453,8 +469,8 @@ async function onLogin(): Promise<void> {
                 .catch(() => null)
                 .then((data) => {
                     const target = data
-                        ? `${base}/api/device/begin?data=${encodeURIComponent(data)}`
-                        : `${base}/api/device/begin?${params.toString()}`;
+                        ? `${base}/api/pairing/begin?data=${encodeURIComponent(data)}`
+                        : `${base}/api/pairing/begin?${params.toString()}`;
                     const opener =
                         platform() === "darwin" ? "open" : platform() === "win32" ? "start" : "xdg-open";
                     exec(`${opener} "${target}"`);
@@ -469,7 +485,7 @@ async function onLogin(): Promise<void> {
     }).catch((err: unknown) => {
         throw err;
     });
-    const who = await fetch(`${baseUrl()}/api/auth/whoami`, {
+    const who = await fetch(`${baseUrl()}/api/daemon/whoami`, {
         headers: { Authorization: `Bearer ${received.token}` },
         signal: AbortSignal.timeout(10000),
     });
@@ -489,7 +505,7 @@ async function onLogin(): Promise<void> {
         const syncedServer = await ensureServer();
         const sessions = await syncSessions(syncedServer, true);
         // 조건부 backfill. 전부 보여주고 없는 것만 기본 체크. DB 유무는 표시만.
-        const listed = (await cloudGet("/api/sync")) as { data?: { tabIds?: string[] } };
+        const listed = (await cloudGet("/api/daemon/sync")) as { data?: { tabIds?: string[] } };
         const have = new Set(Array.isArray(listed.data?.tabIds) ? listed.data.tabIds : []);
         const body = (await apiGet(syncedServer, "/session")) as { data?: { id: string }[] } | { id: string }[];
         const all = (Array.isArray(body) ? body : (body.data ?? [])).filter((s) => typeof s.id === "string");
@@ -625,7 +641,7 @@ async function onDoctor(): Promise<void> {
         if (!state?.token) {
             lines.push("cloud: FAIL (no device token)");
         } else {
-            const res = await fetch(`${baseUrl()}/api/heartbeat`, {
+            const res = await fetch(`${baseUrl()}/api/daemon/heartbeat`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${state.token}` },
                 body: JSON.stringify({}),
@@ -649,7 +665,7 @@ async function onHeartbeat(quiet = false): Promise<number> {
         throw new Error("no device token. run `localagents login` again");
     }
     const host = hostInfo();
-    const res = await fetch(`${baseUrl()}/api/heartbeat`, {
+    const res = await fetch(`${baseUrl()}/api/daemon/heartbeat`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${state.token}` },
         body: JSON.stringify({ platform: host.platform, hostname: host.hostname, label: host.label }),
