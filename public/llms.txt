@@ -1,0 +1,21 @@
+# LocalAgents
+
+> LocalAgents syncs OpenCode sessions between your computers. Start a session on one PC, push it, and pull it on another. A web inbox lists every session and lets you approve tool calls from your phone.
+
+Install: npx localagents login
+
+## Product
+
+- [Home](https://localagents.link): What LocalAgents does, how it works, and pricing.
+- Pricing: Pro is $9 per month or $90 per year. The first 30 days are free and require no card.
+
+## Legal
+
+- [Terms of Service](https://localagents.link/legal/terms)
+- [Privacy Policy](https://localagents.link/legal/privacy)
+- [Refund Policy](https://localagents.link/legal/refunds)
+
+## Notes
+
+- Supported agent: OpenCode. Session files from v1 and v2 are both read.
+- The web inbox does not run a terminal. Approvals and instructions are relayed to the PC, which executes them.

@@ -1,10 +1,17 @@
+# IDE
+.idea
+
 # Dependencies
 node_modules/
 
-# Next.js
+# Build output
 .next/
 out/
 build/
+dist/
+.open-next/
+.wrangler/
+cloudflare-env.d.ts
 
 # Env
 .env
@@ -14,6 +21,10 @@ build/
 # Logs
 *.log
 npm-debug.log*
+
+# TS build info
+tsconfig.tsbuildinfo
+next-env.d.ts
 
 # OS
 .DS_Store

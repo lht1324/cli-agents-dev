@@ -1,0 +1,27 @@
+{
+    "$schema": "./node_modules/wrangler/config-schema.json",
+    "name": "localagents",
+    "main": ".open-next/worker.js",
+    "compatibility_date": "2026-09-01",
+    "compatibility_flags": ["nodejs_compat"],
+    // 비밀이 아닌 값만 여기에 둔다 (git 추적됨). 키·토큰류는 대시보드 Secrets 전용.
+    // 주의: 배포 시 이 파일의 vars가 대시보드의 plain Variables를 덮어쓴다. Secrets는 건드리지 않는다.
+    // 대시보드에서 값을 바꿨다면 여기에도 반영할 것.
+    //
+    // 지금 비어 있는 이유: 이 앱은 런타임 설정을 전부 Secrets로 받는다.
+    // BASE_URL·NEXT_PUBLIC_BASE_URL은 코드에 소비처가 없다 (웹과 API가 같은 origin이라
+    // baseFetch가 prod에서 상대 경로를 쓴다). 나중에 필요한 값이 생기면 여기에 추가한다.
+    "vars": {},
+    "assets": {
+        "directory": ".open-next/assets",
+        "binding": "ASSETS"
+    },
+    "observability": {
+        "logs": {
+            "enabled": true,
+            "head_sampling_rate": 1,
+            "invocation_logs": true,
+            "persist": true
+        }
+    }
+}

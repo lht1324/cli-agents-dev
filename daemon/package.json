@@ -1,0 +1,20 @@
+{
+  "name": "localagents",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Resident daemon for localagents session sync",
+  "bin": {
+    "localagents": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "1.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.3",
+    "typescript": "7.0.2"
+  }
+}
