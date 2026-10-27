@@ -1,5 +1,7 @@
+import { sql } from "drizzle-orm";
 import { readInternalUser } from "@/lib/auth/internal";
 import { createDodoCheckout, dodoConfigured, type BillingInterval } from "@/lib/dodo";
+import { getDb } from "@/lib/neon";
 import { getNextBaseResponse } from "@/lib/utils/getNextBaseResponse";
 
 interface CheckoutBody {
@@ -32,7 +34,26 @@ export async function POST(request: Request): Promise<Response> {
             ? body.origin
             : new URL(request.url).origin;
     try {
-        const checkout = await createDodoCheckout(body.interval as BillingInterval, userId, `${origin}/sessions`);
+        // 체크아웃 연락처 프리필. 계정 이메일은 잠그고 이름은 열어 둔다 (lib/dodo.ts 참조).
+        // 조회 실패는 치명적이지 않다 — 프리필 없이 체크아웃은 그대로 진행된다.
+        let customer: { email: string; name: string | null } | undefined;
+        try {
+            const rows = await getDb().execute<{ email: string | null; name: string | null }>(
+                sql`SELECT email, name FROM neon_auth."user" WHERE id = ${userId} LIMIT 1`,
+            );
+            const row = rows.rows[0];
+            if (row?.email) {
+                customer = { email: row.email, name: row.name ?? null };
+            }
+        } catch (error) {
+            console.error("[checkout] customer prefill skipped:", error);
+        }
+        const checkout = await createDodoCheckout(
+            body.interval as BillingInterval,
+            userId,
+            `${origin}/sessions`,
+            customer,
+        );
         if (!checkout.checkoutUrl) {
             return getNextBaseResponse(502).json({ success: false, status: 502, error: "checkout url missing" });
         }

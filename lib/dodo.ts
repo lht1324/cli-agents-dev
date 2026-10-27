@@ -72,10 +72,13 @@ export function dodoConfigured(): boolean {
 }
 
 // 체크아웃 세션 생성. metadata의 user_id는 웹훅으로 구독 상태를 유저에 매핑할 때 쓴다.
+// customer로 이름·이메일을 미리 채운다. 이메일은 계정 소유 확인의 기준이라 수정 불가로 고정하고
+// (다른 이메일로 결제하면 웹훅 user_id 매핑과 고객 레코드가 어긋난다), 이름은 오타 정정 여지를 남긴다.
 export async function createDodoCheckout(
     interval: BillingInterval,
     userId: string,
     returnUrl: string,
+    customer?: { email: string; name: string | null },
 ): Promise<{ sessionId: string; checkoutUrl: string | null }> {
     const mapping = await resolveMapping();
     const productId = mapping[interval];
@@ -90,6 +93,20 @@ export async function createDodoCheckout(
             product_cart: [{ product_id: productId, quantity: 1 }],
             return_url: returnUrl,
             metadata: { user_id: userId, interval },
+            ...(customer
+                ? {
+                      customer: {
+                          email: customer.email,
+                          ...(customer.name ? { name: customer.name } : {}),
+                      },
+                  }
+                : {}),
+            // 이메일을 미리 넣었을 때만 잠근다. 없으면 잠글 칸이 없어 결제가 막힌다.
+            // 이름은 오타 정정 여지를 남긴다.
+            feature_flags: {
+                allow_customer_editing_name: true,
+                allow_customer_editing_email: !customer,
+            },
         }),
         signal: AbortSignal.timeout(30_000),
     });
