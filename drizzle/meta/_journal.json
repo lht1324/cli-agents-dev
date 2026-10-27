@@ -113,6 +113,20 @@
       "when": 1792938866128,
       "tag": "0015_lowly_sir_ram",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1793119572032,
+      "tag": "0016_session_owner_and_locations",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1793119665870,
+      "tag": "0017_device_unlink",
+      "breakpoints": true
     }
   ]
 }

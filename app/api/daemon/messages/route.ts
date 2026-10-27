@@ -1,10 +1,8 @@
-import { and, eq } from "drizzle-orm";
-import { getAuth } from "@/lib/auth/server";
-import { readInternalUser } from "@/lib/auth/internal";
-import { verifyDeviceToken } from "@/lib/auth/device";
+import { eq } from "drizzle-orm";
+import { getIsValidRequestDevice } from "@/lib/utils/getIsValidRequest";
 import { checkBillingGate } from "@/lib/billing";
 import { getDb } from "@/lib/neon/client";
-import { cloudMessages, cloudTabs, devices, sessionsMeta } from "@/lib/neon/schema";
+import { cloudMessages, cloudTabs, sessionsMeta } from "@/lib/neon/schema";
 import { getNextBaseResponse } from "@/lib/utils/getNextBaseResponse";
 
 interface MessageRow {
@@ -23,7 +21,9 @@ interface MessagesBody {
 }
 
 // 데몬 대화 행 수신. INSERT-only. 탭 거울 행 없으면 함께 만든다.
-export async function POST(request: Request): Promise<Response> {    const authed = await verifyDeviceToken(request);
+// 채널: daemon (기기 토큰). 웹 조회는 /api/web/messages 소관이다.
+export async function POST(request: Request): Promise<Response> {
+    const authed = await getIsValidRequestDevice(request);
     if (!authed) {
         return getNextBaseResponse(401).json({ success: false, status: 401, error: "unauthorized" });
     }
@@ -86,48 +86,4 @@ export async function POST(request: Request): Promise<Response> {    const authe
         inserted++;
     }
     return getNextBaseResponse(200).json({ success: true, status: 200, data: { rows: inserted } });
-}
-
-// 웹 실시간 폴링용 스레드 조회. 본인 탭만. 5초 폴링 1회가 이 쿼리 1방이다.
-export async function GET(request: Request): Promise<Response> {
-    const internalUser = readInternalUser(request);
-    const { data: session } = internalUser ? { data: null } : await getAuth().getSession();
-    const viewerId = internalUser ?? session?.user?.id;
-    if (!viewerId) {
-        return getNextBaseResponse(401).json({ success: false, status: 401, error: "login required" });
-    }
-    const tabId = new URL(request.url).searchParams.get("tabId");
-    if (!tabId) {
-        return getNextBaseResponse(400).json({ success: false, status: 400, error: "tabId is required" });
-    }
-    const db = getDb();
-    const thread = await db
-        .select({
-            id: cloudMessages.messageId,
-            seq: cloudMessages.seq,
-            role: cloudMessages.role,
-            kind: cloudMessages.kind,
-            body: cloudMessages.body,
-            createdAt: cloudMessages.createdAt,
-        })
-        .from(cloudMessages)
-        .innerJoin(cloudTabs, eq(cloudMessages.tabId, cloudTabs.id))
-        .where(and(eq(cloudMessages.tabId, tabId), eq(cloudTabs.userId, viewerId)))
-        .orderBy(cloudMessages.createdAt, cloudMessages.seq);
-    const seen = await db
-        .select({ lastSeenAt: devices.lastSeenAt, lastSyncAt: sessionsMeta.lastSyncAt })
-        .from(devices)
-        .innerJoin(cloudTabs, eq(cloudTabs.deviceId, devices.id))
-        .innerJoin(sessionsMeta, eq(sessionsMeta.id, cloudTabs.id))
-        .where(and(eq(cloudTabs.id, tabId), eq(cloudTabs.userId, viewerId)))
-        .limit(1);
-    return getNextBaseResponse(200).json({
-        success: true,
-        status: 200,
-        data: {
-            messages: thread.map((m) => ({ ...m, createdAt: m.createdAt?.toISOString() ?? null })),
-            deviceLastSeenAt: seen[0]?.lastSeenAt?.toISOString() ?? null,
-            lastSyncAt: seen[0]?.lastSyncAt?.toISOString() ?? null,
-        },
-    });
 }

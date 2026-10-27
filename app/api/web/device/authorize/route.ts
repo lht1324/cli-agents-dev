@@ -1,8 +1,6 @@
-import { createHash, randomUUID } from "node:crypto";
-import { getAuth } from "@/lib/auth/server";
+import { getIsValidRequestS2S } from "@/lib/utils/getIsValidRequest";
 import { checkBillingGate } from "@/lib/billing";
-import { getDb } from "@/lib/neon/client";
-import { devices, deviceTokens } from "@/lib/neon/schema";
+import { linkDevice } from "@/lib/device/link";
 import { getNextBaseResponse } from "@/lib/utils/getNextBaseResponse";
 
 interface AuthorizeBody {
@@ -12,13 +10,14 @@ interface AuthorizeBody {
     hostname?: unknown;
 }
 
-// loopback 로그인 확정. 웹 세션 주인으로 기기 행 + 토큰 발급.
+// loopback 로그인 확정. 게이트웨이가 세션을 검증하고 userId를 주입한다 (S2S 전용).
+// 브라우저가 직접 부르면 내부 secret이 없어 401이다.
 export async function POST(request: Request): Promise<Response> {
-    const { data: session } = await getAuth().getSession();
-    if (!session?.user) {
-        return getNextBaseResponse(401).json({ success: false, status: 401, error: "login required" });
+    const userId = getIsValidRequestS2S(request);
+    if (!userId) {
+        return getNextBaseResponse(401).json({ success: false, status: 401, error: "unauthorized" });
     }
-    const gate = await checkBillingGate(session.user.id);
+    const gate = await checkBillingGate(userId);
     if (!gate.allowed) {
         return getNextBaseResponse(403).json({ success: false, status: 403, error: "trial_ended" });
     }
@@ -31,24 +30,12 @@ export async function POST(request: Request): Promise<Response> {
     if (typeof body.deviceId !== "string" || body.deviceId.length === 0) {
         return getNextBaseResponse(400).json({ success: false, status: 400, error: "deviceId is required" });
     }
-    const label = typeof body.label === "string" && body.label.length > 0 ? body.label : "My PC";
-    const platform = typeof body.platform === "string" ? body.platform : null;
-    const hostname = typeof body.hostname === "string" ? body.hostname : null;
-    const db = getDb();
-    await db
-        .insert(devices)
-        .values({ id: body.deviceId, userId: session.user.id, label, platform, hostname })
-        .onConflictDoUpdate({
-            target: devices.id,
-            set: { userId: session.user.id, label, platform, hostname },
-        });
-    const token = `loa_${randomUUID().replace(/-/g, "")}`;
-    const tokenHash = createHash("sha256").update(token).digest("hex");
-    await db.insert(deviceTokens).values({
-        id: randomUUID(),
+    const token = await linkDevice({
+        userId,
         deviceId: body.deviceId,
-        tokenHash,
-        expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+        label: typeof body.label === "string" && body.label.length > 0 ? body.label : "My PC",
+        platform: typeof body.platform === "string" ? body.platform : null,
+        hostname: typeof body.hostname === "string" ? body.hostname : null,
     });
     return getNextBaseResponse(201).json({ success: true, status: 201, data: { token } });
 }

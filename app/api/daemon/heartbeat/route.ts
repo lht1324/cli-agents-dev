@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { verifyDeviceToken } from "@/lib/auth/device";
+import { getIsValidRequestDevice } from "@/lib/utils/getIsValidRequest";
 import { getDb } from "@/lib/neon/client";
 import { devices, subscriptions } from "@/lib/neon/schema";
 import { getNextBaseResponse } from "@/lib/utils/getNextBaseResponse";
@@ -13,7 +13,7 @@ interface HeartbeatBody {
 
 // 데몬 heartbeat 수신. 토큰에서 기기·주인을 푼다.
 export async function POST(request: Request): Promise<Response> {
-    const authed = await verifyDeviceToken(request);
+    const authed = await getIsValidRequestDevice(request);
     if (!authed) {
         return getNextBaseResponse(401).json({ success: false, status: 401, error: "unauthorized" });
     }
@@ -39,7 +39,13 @@ export async function POST(request: Request): Promise<Response> {
         })
         .onConflictDoUpdate({
             target: devices.id,
-            set: { lastSeenAt: new Date(), platform, hostname, ...(label ? { label } : {}) },
+            set: {
+                lastSeenAt: new Date(),
+                platform,
+                hostname,
+                unlinkedAt: null,
+                ...(label ? { label } : {}),
+            },
         });
     const sub = await db
         .select({ interval: subscriptions.syncIntervalSec, plan: subscriptions.planId })

@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { sql } from "drizzle-orm";
 import { getAuth } from "@/lib/auth/server";
@@ -38,17 +38,16 @@ export default async function ProfilePageServer() {
         .where(eq(subscriptions.userId, userId))
         .limit(1);
 
-    // 기기·세션 수
-    const deviceRows = await db.select({ id: devices.id }).from(devices).where(eq(devices.userId, userId));
+    // 기기·세션 수. 세션은 계정 소유라 기기 유무와 무관하게 센다.
+    const deviceRows = await db
+        .select({ id: devices.id })
+        .from(devices)
+        .where(and(eq(devices.userId, userId), isNull(devices.unlinkedAt)));
     const deviceCount = deviceRows.length;
-    const sessionRows = deviceRows.length > 0
-        ? await db
-              .select({ id: sessionsMeta.id })
-              .from(sessionsMeta)
-              .innerJoin(devices, eq(sessionsMeta.deviceId, devices.id))
-              .where(eq(devices.userId, userId))
-              .orderBy(desc(sessionsMeta.updatedAt))
-        : [];
+    const sessionRows = await db
+        .select({ id: sessionsMeta.id })
+        .from(sessionsMeta)
+        .where(eq(sessionsMeta.userId, userId));
     const sessionCount = sessionRows.length;
 
     const daysLeft = await trialDaysLeft(userId);

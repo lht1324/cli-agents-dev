@@ -1,8 +1,8 @@
 import { and, eq, notInArray } from "drizzle-orm";
-import { verifyDeviceToken } from "@/lib/auth/device";
+import { getIsValidRequestDevice } from "@/lib/utils/getIsValidRequest";
 import { checkBillingGate } from "@/lib/billing";
 import { getDb } from "@/lib/neon/client";
-import { cloudTabs, modelCatalog, pendingApprovals, sessionsMeta } from "@/lib/neon/schema";
+import { cloudTabs, modelCatalog, pendingApprovals, sessionLocations, sessionsMeta } from "@/lib/neon/schema";
 import { getNextBaseResponse } from "@/lib/utils/getNextBaseResponse";
 
 interface SyncSession {
@@ -67,7 +67,7 @@ function stamp(value: unknown): Date | null {
 
 // 데몬 조건부 backfill용. 이 기기가 올린 탭 id 목록. 기기 토큰 전용.
 export async function GET(request: Request): Promise<Response> {
-    const authed = await verifyDeviceToken(request);
+    const authed = await getIsValidRequestDevice(request);
     if (!authed) {
         return getNextBaseResponse(401).json({ success: false, status: 401, error: "unauthorized" });
     }
@@ -86,7 +86,7 @@ export async function GET(request: Request): Promise<Response> {
 
 // 데몬 동기화 푸시 수신. 세션 헤더·승인 거울·카탈로그 upsert.
 export async function POST(request: Request): Promise<Response> {
-    const authed = await verifyDeviceToken(request);
+    const authed = await getIsValidRequestDevice(request);
     if (!authed) {
         return getNextBaseResponse(401).json({ success: false, status: 401, error: "unauthorized" });
     }
@@ -103,6 +103,7 @@ export async function POST(request: Request): Promise<Response> {
     }
     const db = getDb();
     const sessions = Array.isArray(body.sessions) ? (body.sessions as SyncSession[]) : [];
+    const reportedTabs: string[] = [];
     for (const s of sessions) {
         if (typeof s.id !== "string") {
             continue;
@@ -113,6 +114,7 @@ export async function POST(request: Request): Promise<Response> {
             .insert(sessionsMeta)
             .values({
                 id: s.id,
+                userId: authed.userId,
                 deviceId: authed.deviceId,
                 provider: str(detail.provider) ?? "opencode",
                 title: str(detail.title) ?? s.id,
@@ -134,6 +136,8 @@ export async function POST(request: Request): Promise<Response> {
             .onConflictDoUpdate({
                 target: sessionsMeta.id,
                 set: {
+                    userId: authed.userId,
+                    deviceId: authed.deviceId,
                     agent: str(detail.agent),
                     model: detail.model ? JSON.stringify(detail.model) : null,
                     status: str(detail.status) ?? "active",
@@ -150,6 +154,26 @@ export async function POST(request: Request): Promise<Response> {
                     updatedAt: new Date(),
                 },
             });
+        // 이 기기가 지금 이 세션을 갖고 있다는 표시. 명령 대상 선택의 근거가 된다.
+        await db
+            .insert(sessionLocations)
+            .values({ tabId: s.id, deviceId: authed.deviceId, lastSeenAt: new Date() })
+            .onConflictDoUpdate({
+                target: [sessionLocations.tabId, sessionLocations.deviceId],
+                set: { lastSeenAt: new Date() },
+            });
+        reportedTabs.push(s.id);
+    }
+    // 이 기기에서 사라진 세션의 위치 표시를 지운다 (다른 기기 행은 건드리지 않는다).
+    if (reportedTabs.length > 0) {
+        await db
+            .delete(sessionLocations)
+            .where(
+                and(
+                    eq(sessionLocations.deviceId, authed.deviceId),
+                    notInArray(sessionLocations.tabId, reportedTabs),
+                ),
+            );
     }
     const approvals = Array.isArray(body.approvals) ? (body.approvals as SyncApproval[]) : [];
     const seen: string[] = [];

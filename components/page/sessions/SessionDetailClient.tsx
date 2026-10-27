@@ -18,10 +18,19 @@ export interface SessionInfo {
 }
 
 export interface ApprovalRow {
+    deviceId: string;
     id: string;
     action: string;
     resources: string;
     message: string | null;
+}
+
+// 명령 대상 후보. 활성(heartbeat 2분 이내) 기기만 서버가 내려준다.
+export interface DeviceTarget {
+    deviceId: string;
+    label: string;
+    lastSeenAt: string | null;
+    active: boolean;
 }
 
 function formatStamp(iso: string | null): string | null {
@@ -217,7 +226,7 @@ async function onDecide(
             type: "approve",
             payload: { sessionID, requestID, decision },
         });
-        if (!queued) {
+        if (!queued.ok) {
             setDone("failed to queue");
             return;
         }
@@ -245,16 +254,21 @@ export default function SessionDetailClient({
     messages,
     catalogJson,
     stats,
+    targets,
+    defaultTarget,
 }: {
     info: SessionInfo;
     approvals: ApprovalRow[];
     messages: ThreadRow[];
     catalogJson: string | null;
     stats: StatsInput;
+    targets: DeviceTarget[];
+    defaultTarget: string | null;
 }) {
     const [busy, setBusy] = useState<string | null>(null);
     const [done, setDone] = useState<string | null>(null);
     const [draft, setDraft] = useState("");
+    const [target, setTarget] = useState<string | null>(defaultTarget);
     const [showJump, setShowJump] = useState(false);
     const scrollRef = useRef<HTMLDivElement | null>(null);
     const scrollToEnd = useCallback((smooth = true) => {
@@ -279,7 +293,14 @@ export default function SessionDetailClient({
         }
         return () => el?.removeEventListener("scroll", onScrollPage);
     }, [onScrollPage]);
-    const { thread, deviceLastSeenAt, lastSyncAt } = useLiveThread(info.id, messages, info.deviceLastSeenAt, info.lastSyncAt);
+    const { thread, deviceLastSeenAt, lastSyncAt, lastCommand } = useLiveThread(
+        info.id,
+        messages,
+        info.deviceLastSeenAt,
+        info.lastSyncAt,
+    );
+    // 활성 기기가 없으면 쓰기를 전부 막는다 (읽기는 허용).
+    const canWrite = target !== null;
     // 새 메시지 추적. 바닥 근처에 있을 때만 따라간다.
     useEffect(() => {
         const el = scrollRef.current;
@@ -326,10 +347,24 @@ export default function SessionDetailClient({
         };
     }, [catalog, currentModel, info, lastSyncAt, stats]);
     const [agent, setAgent] = useState(info.agent ?? "");
-    const [modelId, setModelId] = useState(
-        currentModel ? `${currentModel.providerID}/${currentModel.id}` : "",
-    );
-    const [variant, setVariant] = useState(currentModel?.variant ?? "");
+    // OpenCode와 동일하게 "모델 미지정"이 정상 상태다. 카탈로그에 없는 모델(내려간 모델)도
+    // 미지정으로 본다 — 목록에 없는 값을 선택된 것처럼 보여주면 거짓 표시가 된다.
+    const [modelId, setModelId] = useState(() => {
+        if (!currentModel) {
+            return "";
+        }
+        const key = `${currentModel.providerID}/${currentModel.id}`;
+        return catalog.models.some((m) => `${m.providerID}/${m.id}` === key) ? key : "";
+    });
+    const [variant, setVariant] = useState(() => {
+        if (!currentModel?.variant) {
+            return "";
+        }
+        const found = catalog.models.find(
+            (m) => m.providerID === currentModel.providerID && m.id === currentModel.id,
+        );
+        return found?.variants?.some((v) => v.id === currentModel.variant) ? currentModel.variant : "";
+    });
     const providers = useMemo(() => {
         const groups = new Map<string, CatalogModel[]>();
         const sorted = [...catalog.models].sort(
@@ -355,17 +390,21 @@ export default function SessionDetailClient({
             setBusy("agent");
             setDone(null);
             try {
+                if (!target) {
+                    setDone("no active device");
+                    return;
+                }
                 const queued = await commandsClientAPI.queue({
-                    deviceId: info.deviceId,
+                    deviceId: target,
                     type: "set-agent",
                     payload: { sessionID: info.id, agent: value },
                 });
-                setDone(queued ? `agent -> ${value} queued.` : "failed to queue");
+                setDone(queued.ok ? `agent -> ${value} queued.` : "failed to queue");
             } finally {
                 setBusy(null);
             }
         },
-        [info],
+        [info, target],
     );
     const queueModel = useCallback(
         async (modelValue: string, variantValue: string) => {
@@ -376,8 +415,12 @@ export default function SessionDetailClient({
             setBusy("model");
             setDone(null);
             try {
+                if (!target) {
+                    setDone("no active device");
+                    return;
+                }
                 const queued = await commandsClientAPI.queue({
-                    deviceId: info.deviceId,
+                    deviceId: target,
                     type: "set-model",
                     payload: {
                         sessionID: info.id,
@@ -385,13 +428,13 @@ export default function SessionDetailClient({
                     },
                 });
                 setDone(
-                    queued ? `model -> ${modelValue}${variantValue ? `#${variantValue}` : ""} queued.` : "failed to queue",
+                    queued.ok ? `model -> ${modelValue}${variantValue ? `#${variantValue}` : ""} queued.` : "failed to queue",
                 );
             } finally {
                 setBusy(null);
             }
         },
-        [info],
+        [info, target],
     );
     const onSelectAgent = useCallback(
         (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -423,11 +466,13 @@ export default function SessionDetailClient({
         const minutes = (Date.now() - new Date(deviceLastSeenAt).getTime()) / 60000;
         return minutes >= 2 ? "Runs when the PC is back online." : null;
     }, [deviceLastSeenAt]);
+    // 승인은 그 프롬프트를 띄운 기기에 귀속된다. 대상 선택과 무관.
     const onClickDecide = useCallback(
-        (requestID: string, decision: "once" | "reject") =>
-            onDecide(info.deviceId, info.id, requestID, decision, setBusy, setDone),
+        (requestID: string, deviceId: string, decision: "once" | "reject") =>
+            onDecide(deviceId, info.id, requestID, decision, setBusy, setDone),
         [info],
     );
+    const activeDeviceIds = useMemo(() => new Set(targets.map((t) => t.deviceId)), [targets]);
     const onClickSend = useCallback(async () => {
         const text = draft.trim();
         if (text.length === 0) {
@@ -436,12 +481,16 @@ export default function SessionDetailClient({
         setBusy("send");
         setDone(null);
         try {
+            if (!target) {
+                setDone("no active device");
+                return;
+            }
             const queued = await commandsClientAPI.queue({
-                deviceId: info.deviceId,
+                deviceId: target,
                 type: "message",
                 payload: { sessionID: info.id, text },
             });
-            if (!queued) {
+            if (!queued.ok) {
                 setDone("failed to queue");
                 return;
             }
@@ -450,9 +499,13 @@ export default function SessionDetailClient({
         } finally {
             setBusy(null);
         }
-    }, [draft, info]);
+    }, [draft, info, target]);
     const onChangeDraft = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
         setDraft(e.target.value);
+    }, []);
+    const onChangeTarget = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+        setTarget(e.target.value);
+        setDone(null);
     }, []);
     const onKeyDownDraft = useCallback(
         (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -589,15 +642,44 @@ export default function SessionDetailClient({
             </div>
             <div className="shrink-0 border-t border-line pt-3">
             {done && <p className="mt-1 font-mono text-xs text-go">{done}</p>}
-            {offlineNote && <p className="mt-1 font-mono text-xs text-warn">{offlineNote}</p>}
+            {!canWrite && (
+                <p className="mt-1 font-mono text-xs text-warn">No active device. Turn the PC on to send instructions.</p>
+            )}
+            {lastCommand && (
+                <p className="mt-1 font-mono text-xs text-dim">
+                    last {lastCommand.type}: {lastCommand.status}
+                    {lastCommand.result ? ` · ${lastCommand.result.slice(0, 120)}` : ""}
+                </p>
+            )}
             <div className="mt-2 rounded-2xl border border-line bg-panel p-3">
+                {targets.length > 0 && (
+                    <div className="mb-1 flex items-center gap-2">
+                        <label htmlFor="command-target" className="font-mono text-xs text-dim">
+                            Send to
+                        </label>
+                        <select
+                            id="command-target"
+                            value={target ?? ""}
+                            onChange={onChangeTarget}
+                            disabled={busy !== null}
+                            className="rounded border border-line bg-ink p-1 font-mono text-xs disabled:opacity-50"
+                        >
+                            {targets.map((t) => (
+                                <option key={t.deviceId} value={t.deviceId}>
+                                    {t.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                )}
                 <textarea
                     value={draft}
                     onChange={onChangeDraft}
                     onKeyDown={onKeyDownDraft}
                     rows={2}
-                    placeholder="Type a message... (Enter to send, Shift+Enter for new line)"
-                    className="w-full resize-none bg-transparent font-mono text-sm outline-none placeholder:text-dim"
+                    disabled={!canWrite}
+                    placeholder={canWrite ? "Type a message... (Enter to send, Shift+Enter for new line)" : "No active device"}
+                    className="w-full resize-none bg-transparent font-mono text-sm outline-none placeholder:text-dim disabled:opacity-50"
                 />
                 <div className="mt-1 flex items-center gap-2">
                     {catalog.models.length === 0 && catalog.agents.length === 0 ? (
@@ -607,7 +689,7 @@ export default function SessionDetailClient({
                             <select
                                 value={agent}
                                 onChange={onSelectAgent}
-                                disabled={busy !== null}
+                                disabled={busy !== null || !canWrite}
                                 aria-label="Agent"
                                 className="max-w-28 rounded border border-line bg-ink p-1.5 font-mono text-xs disabled:opacity-50"
                             >
@@ -621,11 +703,13 @@ export default function SessionDetailClient({
                             <select
                                 value={modelId}
                                 onChange={onSelectModel}
-                                disabled={busy !== null}
+                                disabled={busy !== null || !canWrite}
                                 aria-label="Model"
                                 className="max-w-44 rounded border border-line bg-ink p-1.5 font-mono text-xs disabled:opacity-50"
                             >
-                                {modelId.length === 0 && <option value="">Model…</option>}
+                                <option value="" disabled>
+                                    (none)
+                                </option>
                                 {providers.map(([providerID, models]) => (
                                     <optgroup key={providerID} label={providerID}>
                                         {models.map((m) => (
@@ -636,28 +720,26 @@ export default function SessionDetailClient({
                                     </optgroup>
                                 ))}
                             </select>
-                            {variants.length > 0 && (
-                                <select
-                                    value={variant}
-                                    onChange={onSelectVariant}
-                                    disabled={busy !== null}
-                                    aria-label="Variant"
-                                    className="max-w-28 rounded border border-line bg-ink p-1.5 font-mono text-xs disabled:opacity-50"
-                                >
-                                    {variant.length === 0 && <option value="">Variant…</option>}
-                                    {variants.map((v) => (
-                                        <option key={v.id} value={v.id}>
-                                            {v.id}
-                                        </option>
-                                    ))}
-                                </select>
-                            )}
+                            <select
+                                value={variant}
+                                onChange={onSelectVariant}
+                                disabled={busy !== null || !canWrite || modelId.length === 0}
+                                aria-label="Variant"
+                                className="max-w-28 rounded border border-line bg-ink p-1.5 font-mono text-xs disabled:opacity-50"
+                            >
+                                <option value="">(none)</option>
+                                {variants.map((v) => (
+                                    <option key={v.id} value={v.id}>
+                                        {v.id}
+                                    </option>
+                                ))}
+                            </select>
                         </>
                     )}
                     <div className="flex-1" />
                     <button
                         onClick={onClickSend}
-                        disabled={busy !== null || draft.trim().length === 0}
+                        disabled={busy !== null || !canWrite || draft.trim().length === 0}
                         aria-label="Send message"
                         className="rounded-full bg-go px-3.5 py-1.5 font-mono text-base font-bold text-ink disabled:opacity-50"
                     >
@@ -701,15 +783,15 @@ export default function SessionDetailClient({
                         )}
                         <div className="mt-3 flex gap-2">
                             <button
-                                onClick={() => onClickDecide(row.id, "once")}
-                                disabled={busy === row.id}
+                                onClick={() => onClickDecide(row.id, row.deviceId, "once")}
+                                disabled={busy === row.id || !activeDeviceIds.has(row.deviceId)}
                                 className="rounded bg-go px-3 py-1 font-mono text-xs font-bold text-ink disabled:opacity-50"
                             >
                                 Allow
                             </button>
                             <button
-                                onClick={() => onClickDecide(row.id, "reject")}
-                                disabled={busy === row.id}
+                                onClick={() => onClickDecide(row.id, row.deviceId, "reject")}
+                                disabled={busy === row.id || !activeDeviceIds.has(row.deviceId)}
                                 className="rounded border border-line px-3 py-1 font-mono text-xs text-fog disabled:opacity-50"
                             >
                                 Deny

@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { getAuth } from "@/lib/auth/server";
 import { cloudTabs, devices, getDb, handoffs, sessionsMeta } from "@/lib/neon";
@@ -25,8 +25,7 @@ export default async function SessionsPageServer() {
             updatedAt: sessionsMeta.updatedAt,
         })
         .from(sessionsMeta)
-        .innerJoin(devices, eq(sessionsMeta.deviceId, devices.id))
-        .where(eq(devices.userId, session.user.id))
+        .where(eq(sessionsMeta.userId, session.user.id))
         .orderBy(desc(sessionsMeta.updatedAt));
     const items: SessionRow[] = rows.map((r) => ({
         ...r,
@@ -49,11 +48,11 @@ export default async function SessionsPageServer() {
         .where(eq(handoffs.userId, session.user.id))
         .orderBy(desc(handoffs.createdAt))
         .limit(50);
-    // 내 기기 목록 (받았는지 판정용)
+    // 내 기기 목록 (받았는지 판정용). 해제한 기기는 제외한다.
     const myDevices = await db
         .select({ id: devices.id })
         .from(devices)
-        .where(eq(devices.userId, session.user.id));
+        .where(and(eq(devices.userId, session.user.id), isNull(devices.unlinkedAt)));
     const myDeviceIds = new Set(myDevices.map((d) => d.id));
     // 탭별 최신 1건 (CLI와 동일 규칙)
     const latest = new Map<string, { title: string | null; createdAt: Date; receivedBy: string | null }>();

@@ -1,0 +1,1 @@
+ALTER TABLE "devices" ADD COLUMN "unlinked_at" timestamp with time zone;

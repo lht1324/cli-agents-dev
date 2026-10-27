@@ -1,7 +1,7 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { getAuth } from "@/lib/auth/server";
-import { devices, cloudMessages, cloudTabs, getDb, modelCatalog, pendingApprovals, sessionsMeta } from "@/lib/neon";
+import { devices, cloudMessages, cloudTabs, getDb, modelCatalog, pendingApprovals, sessionLocations, sessionsMeta } from "@/lib/neon";
 import { checkBillingGate } from "@/lib/billing";
 import SessionDetailClient, { type ApprovalRow, type SessionInfo, type ThreadRow } from "./SessionDetailClient";
 
@@ -55,16 +55,48 @@ export default async function SessionDetailServer({ id }: { id: string }) {
         })
         .from(sessionsMeta)
         .innerJoin(devices, eq(sessionsMeta.deviceId, devices.id))
-        .where(and(eq(sessionsMeta.id, id), eq(devices.userId, session.user.id)));
-    const deviceId = rows.length > 0 ? rows[0].deviceId : (meta[0]?.deviceId ?? null);
-    if (!deviceId) {
+        .where(and(eq(sessionsMeta.id, id), eq(sessionsMeta.userId, session.user.id)));
+    if (meta.length === 0) {
         redirect("/sessions");
     }
+
+    // 이 세션을 실제로 갖고 있는 내 기기들. 명령 대상 후보는 여기서만 나온다.
+    // 활성 판정: heartbeat가 2분 안에 온 기기.
+    const locationRows = await db
+        .select({
+            deviceId: sessionLocations.deviceId,
+            label: devices.label,
+            lastSeenAt: devices.lastSeenAt,
+        })
+        .from(sessionLocations)
+        .innerJoin(devices, eq(sessionLocations.deviceId, devices.id))
+        .where(and(eq(sessionLocations.tabId, id), eq(devices.userId, session.user.id), isNull(devices.unlinkedAt)));
+    const ACTIVE_MS = 120_000;
+    const now = Date.now();
+    const targets = locationRows
+        .map((r) => ({
+            deviceId: r.deviceId,
+            label: r.label,
+            lastSeenAt: r.lastSeenAt?.toISOString() ?? null,
+            active: r.lastSeenAt ? now - r.lastSeenAt.getTime() < ACTIVE_MS : false,
+        }))
+        // 활성 먼저, 그다음 최근 접속 순.
+        .sort((a, b) => {
+            if (a.active !== b.active) {
+                return a.active ? -1 : 1;
+            }
+            return (b.lastSeenAt ?? "").localeCompare(a.lastSeenAt ?? "");
+        });
+    // 기본 대상: 현재 호스트(device_id)가 활성이면 그것, 아니면 가장 최근 활성 기기.
+    const activeTargets = targets.filter((t) => t.active);
+    const defaultTarget =
+        activeTargets.find((t) => t.deviceId === meta[0].deviceId)?.deviceId ?? activeTargets[0]?.deviceId ?? null;
+    const deviceId = defaultTarget;
     const info: SessionInfo = {
         id,
         title: meta[0]?.title ?? id,
         status: meta[0]?.status ?? "unknown",
-        deviceId,
+        deviceId: deviceId ?? meta[0].deviceId,
         agent: meta[0]?.agent ?? null,
         model: meta[0]?.model ?? null,
         lastSyncAt: meta[0]?.lastSyncAt?.toISOString() ?? null,
@@ -72,6 +104,7 @@ export default async function SessionDetailServer({ id }: { id: string }) {
     };
     const approvals: ApprovalRow[] = rows.map((r) => ({
         id: r.id,
+        deviceId: r.deviceId,
         action: r.action,
         resources: r.resources,
         message: r.message ?? null,
@@ -98,7 +131,7 @@ export default async function SessionDetailServer({ id }: { id: string }) {
     const catalog = await db
         .select({ payload: modelCatalog.payload })
         .from(modelCatalog)
-        .where(eq(modelCatalog.deviceId, deviceId));
+        .where(eq(modelCatalog.deviceId, deviceId ?? meta[0].deviceId));
     return (
         <SessionDetailClient
             info={info}
@@ -106,6 +139,8 @@ export default async function SessionDetailServer({ id }: { id: string }) {
             messages={messages}
             catalogJson={catalog[0]?.payload ?? null}
             stats={stats}
+            targets={targets.filter((t) => t.active)}
+            defaultTarget={defaultTarget}
         />
     );
 }

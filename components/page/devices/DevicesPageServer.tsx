@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { getAuth } from "@/lib/auth/server";
 import { devices, getDb } from "@/lib/neon";
@@ -25,7 +25,7 @@ export default async function DevicesPageServer() {
             lastSeenAt: devices.lastSeenAt,
         })
         .from(devices)
-        .where(eq(devices.userId, session.user.id));
+        .where(and(eq(devices.userId, session.user.id), isNull(devices.unlinkedAt)));
     const items: DeviceRow[] = rows.map((r) => ({
         ...r,
         lastSeenAt: r.lastSeenAt?.toISOString() ?? null,
