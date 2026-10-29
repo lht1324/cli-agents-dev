@@ -6,7 +6,7 @@ export const SITE_URL = "https://localagents.link";
 export const SITE_NAME = "LocalAgents";
 export const SITE_TITLE = "LocalAgents | Session sync for OpenCode";
 export const SITE_DESCRIPTION =
-    "Start a session on one PC and continue it on another. LocalAgents syncs OpenCode sessions between machines so you can approve tool calls from your phone.";
+    "Start a session on one PC and continue it on another. LocalAgents syncs OpenCode sessions between machines, with an optional web inbox for approving tool calls from your phone.";
 
 const OG_IMAGE = {
     url: "/og/og.png",

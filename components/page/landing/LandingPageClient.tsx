@@ -4,29 +4,29 @@ import Link from "next/link";
 import FeaturesSection from "./features-section/FeaturesSection";
 import PricingSection from "./pricing-section/PricingSection";
 
-const WEB_STEPS = [
+const SETUP_STEPS = [
     {
-        code: "$ npx localagents login",
-        title: "Pair this PC",
-        body: "One command. After this the daemon syncs on its own schedule.",
+        code: "$ npx localagents@latest login",
+        title: "Connect this PC",
+        body: "Approve once in the browser. Syncing keeps running in the background.",
     },
-    {
-        code: "https://localagents.link/sessions",
-        title: "Steer from your phone",
-        body: "The inbox stays current by itself. Watch, send instructions, answer Allow / Deny.",
-    },
-] as const;
-
-const PC_STEPS = [
     {
         code: "$ localagents push",
-        title: "Push the tabs you pick",
-        body: "Moving to another machine? Only the current session travels.",
+        title: "Push the tab you need",
+        body: "Pick the tabs. History and context travel with them.",
     },
     {
         code: "$ localagents pull",
-        title: "Continue on another PC",
-        body: "Pick a tab from the list. It lands as a real session, ready to continue.",
+        title: "Pick it up on the other PC",
+        body: "It lands as a real session, ready to continue.",
+    },
+] as const;
+
+const PHONE_STEPS = [
+    {
+        code: "https://localagents.link/sessions",
+        title: "Check in from your phone",
+        body: "Watch the thread, send instructions, answer Allow / Deny.",
     },
 ] as const;
 
@@ -35,12 +35,12 @@ const TRANSCRIPT = [
     { text: "  TailoredAd (AI +12 · User +3)  [####################] 100%", tone: "out" },
     { text: "  Done: 1 tab pushed.", tone: "out" },
     { text: "", tone: "out" },
-    { text: "# on your phone, in the inbox:", tone: "dim" },
-    { text: "#   bash  npm run build        [Allow]  [Deny]", tone: "dim" },
-    { text: "", tone: "out" },
     { text: "$ localagents pull", tone: "prompt" },
     { text: "  Updated local tab TailoredAd.", tone: "out" },
     { text: "  Done: 106 messages applied.", tone: "out" },
+    { text: "", tone: "out" },
+    { text: "# optional, from your phone:", tone: "dim" },
+    { text: "#   bash  npm run build        [Allow]  [Deny]", tone: "dim" },
 ] as const;
 
 type Step = {
@@ -93,15 +93,15 @@ export default function LandingPageClient() {
                             Start a session on one PC. Continue it on every PC.
                         </h1>
                         <p className="mt-4 max-w-[65ch] text-dim">
-                            Your tabs follow you from desktop to laptop to phone. No SSH. No lost
-                            sessions. Check in from anywhere.
+                            Your tabs follow you from desktop to laptop. No SSH, no re-explaining
+                            what you were doing. Check in from your phone when you want.
                         </p>
                         <div className="mt-6 flex gap-3">
                             <Link
                                 href="/auth/sign-in"
                                 className="rounded bg-go px-4 py-2 font-mono text-sm font-bold text-ink"
                             >
-                                Get started
+                                Start free
                             </Link>
                             <Link
                                 href="#how"
@@ -151,17 +151,14 @@ export default function LandingPageClient() {
             <section id="how" className="scroll-mt-14 border-t border-line">
                 <div className="mx-auto w-full max-w-6xl px-4 py-16">
                     <h2 className="text-2xl font-bold tracking-tight">How it works</h2>
-                    <div className="mt-8 grid gap-12 md:grid-cols-2">
-                        <div>
-                            <h3 className="text-lg font-bold">PC ↔ Phone</h3>
-                            <p className="mt-1 text-sm text-dim">Just leave your PC on.</p>
-                            <StepList steps={WEB_STEPS} />
-                        </div>
-                        <div>
-                            <h3 className="text-lg font-bold">PC ↔ PC</h3>
-                            <p className="mt-1 text-sm text-dim">You drive, or ask your agent to.</p>
-                            <StepList steps={PC_STEPS} />
-                        </div>
+                    <p className="mt-2 max-w-[65ch] text-sm text-dim">
+                        One daemon per PC. No SSH, no copying transcripts between machines.
+                    </p>
+                    <StepList steps={SETUP_STEPS} />
+                    <div className="border-t border-line pt-6">
+                        <h3 className="text-lg font-bold">Your phone is optional</h3>
+                        <p className="mt-1 text-sm text-dim">Same sessions, when you are away from the desk.</p>
+                        <StepList steps={PHONE_STEPS} />
                     </div>
                 </div>
             </section>
@@ -180,7 +177,7 @@ export default function LandingPageClient() {
                         href="/auth/sign-in"
                         className="inline-block shrink-0 rounded bg-go px-5 py-2.5 font-mono text-sm font-bold text-ink"
                     >
-                        Get started
+                        Start free
                     </Link>
                 </div>
             </section>

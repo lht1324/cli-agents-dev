@@ -9,12 +9,12 @@ type Method = "npx" | "npm";
 const METHODS: Record<Method, { label: string; hint: string; steps: { command: string | null; title: string; body: string }[] }> = {
     npx: {
         label: "npx",
-        hint: "One command. Nothing left behind.",
+        hint: "One command. No global install.",
         steps: [
             {
                 command: "npx localagents@latest login",
                 title: "Connect your PC",
-                body: "It installs the daemon, opens your browser to sign in, and starts syncing automatically.",
+                body: "It installs the daemon, opens your browser to sign in, and keeps syncing in the background.",
             },
             {
                 command: null,
@@ -35,7 +35,7 @@ const METHODS: Record<Method, { label: string; hint: string; steps: { command: s
             {
                 command: "localagents login",
                 title: "Connect your PC",
-                body: "Opens your browser to sign in and starts the daemon. Future runs pick it up from PATH.",
+                body: "Opens your browser to sign in and registers the background service.",
             },
             {
                 command: null,
@@ -51,7 +51,9 @@ export default function SessionsEmptyState() {
     const [copied, setCopied] = useState<string | null>(null);
 
     const active = METHODS[method];
-    const SECOND_PC_HINT = "Working on a second PC? Push a tab from there and it appears here.";
+    const SECOND_PC_HINT = "Working on a second PC? Push a tab there, then pull it here.";
+    const REQUIREMENTS = "Requires Node 22.13 or newer.";
+    const REMOVAL = "To stop background sync: npx localagents@latest uninstall";
 
     const onClickCopy = useMemo(
         () => async (command: string) => {
@@ -126,6 +128,8 @@ export default function SessionsEmptyState() {
                 ))}
             </ol>
             <p className="mt-6 font-mono text-xs text-dim">{SECOND_PC_HINT}</p>
+            <p className="mt-1 font-mono text-xs text-dim">{REQUIREMENTS}</p>
+            <p className="mt-1 font-mono text-xs text-dim">{REMOVAL}</p>
         </div>
     );
 }

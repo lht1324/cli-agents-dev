@@ -29,9 +29,9 @@ const PLANS = [
 ];
 
 const FEATURES = [
+    "$ cross-PC push / pull",
     "$ unlimited sessions · all devices",
     "$ approve & steer from anywhere",
-    "$ cross-PC push / pull",
 ];
 
 export default function PricingSection() {

@@ -76,6 +76,16 @@ function writeShim(): void {
     chmodSync(bin, 0o755);
 }
 
+// shim 디렉토리가 PATH에 없으면 `localagents push`가 "command not found"가 된다.
+function pathHint(): string | null {
+    const dir = dirname(shimPath());
+    const parts = (process.env.PATH ?? "").split(":");
+    if (parts.includes(dir)) {
+        return null;
+    }
+    return `add to your shell profile to use the short commands: export PATH="${dir}:$PATH"`;
+}
+
 function systemdUnit(): string {
     // EnvironmentFile은 앞에 '-'를 붙여 없어도 실패하지 않게 한다.
     return `[Unit]
@@ -139,7 +149,8 @@ export function installService(): ServiceResult {
         if (!loaded.ok) {
             return { ok: false, message: `launchctl bootstrap failed: ${loaded.out}` };
         }
-        return { ok: true, message: "background service installed (launchd)" };
+        const hint = pathHint();
+        return { ok: true, message: `background service installed (launchd)${hint ? `. ${hint}` : ""}` };
     }
 
     mkdirSync(dirname(unitPath()), { recursive: true });
@@ -152,7 +163,8 @@ export function installService(): ServiceResult {
     if (!enabled.ok) {
         return { ok: false, message: `systemctl --user enable failed: ${enabled.out}` };
     }
-    return { ok: true, message: "background service installed (systemd user)" };
+    const hint = pathHint();
+    return { ok: true, message: `background service installed (systemd user)${hint ? `. ${hint}` : ""}` };
 }
 
 // 로그아웃용. 유닛은 남겨두고 프로세스만 멈춘다 (재로그인하면 다시 켜진다).
