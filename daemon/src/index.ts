@@ -770,7 +770,25 @@ async function onRun(): Promise<void> {
     console.log("run: stopped");
 }
 
+// Node 22.13 미만은 node:sqlite를 쓸 수 없다. 명령을 실행하기 전에 한 번에 알려준다
+// (명령마다 다른 에러로 죽는 것보다 낫다).
+function checkNodeVersion(): boolean {
+    const [major, minor] = process.versions.node.split(".").map((n) => Number(n));
+    if (major > 22 || (major === 22 && minor >= 13)) {
+        return true;
+    }
+    console.error(
+        `localagents requires Node 22.13 or newer (found ${process.version}).\n` +
+            "Node 20 and older are end-of-life. Install Node 22 LTS or newer: https://nodejs.org",
+    );
+    return false;
+}
+
 async function main(): Promise<void> {
+    if (!checkNodeVersion()) {
+        process.exitCode = 1;
+        return;
+    }
     const args = process.argv.slice(2).filter((a) => a !== "--jaeholee");
     const cmd = args[0];
     const advanced = new Set([

@@ -2,7 +2,7 @@ import { execSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import { openSqlite, type SqliteDatabase } from "./sqlite";
 import type { ServerMessage } from "./types";
 import { pkgFlavor, toV1, toV2, v1MessageProblems, v1PartProblems } from "./convert";
 
@@ -58,7 +58,7 @@ export function localRoleCounts(sessionID: string): { user: number; ai: number }
     if (!path) {
         return { user: 0, ai: 0 };
     }
-    const db = new DatabaseSync(path, { readOnly: true });
+    const db = openSqlite(path, { readOnly: true });
     try {
         const probe = db.prepare("SELECT COUNT(*) AS n FROM session_message").get() as { n: number };
         if (probe.n > 0) {
@@ -105,7 +105,7 @@ export function epochOf(sessionID: string): number {
     if (!path) {
         return 0;
     }
-    const db = new DatabaseSync(path, { readOnly: true });
+    const db = openSqlite(path, { readOnly: true });
     try {
         const row = db
             .prepare("SELECT COUNT(*) AS n FROM session_message WHERE session_id = ? AND type = 'compaction'")
@@ -123,7 +123,7 @@ export function countNewer(sessionID: string, createdAt: number | null, messageI
     if (!path) {
         return 0;
     }
-    const db = new DatabaseSync(path, { readOnly: true });
+    const db = openSqlite(path, { readOnly: true });
     try {
         const at = createdAt ?? 0;
         const mid = messageId ?? "";
@@ -151,7 +151,7 @@ export function latestOf(sessionID: string): { at: number; id: string } | null {
     if (!path) {
         return null;
     }
-    const db = new DatabaseSync(path, { readOnly: true });
+    const db = openSqlite(path, { readOnly: true });
     try {
         const row = db
             .prepare("SELECT time_created AS at, id FROM session_message WHERE session_id = ? ORDER BY time_created DESC, id DESC LIMIT 1")
@@ -173,7 +173,7 @@ export function countAll(sessionID: string): number {
     if (!path) {
         return 0;
     }
-    const db = new DatabaseSync(path, { readOnly: true });
+    const db = openSqlite(path, { readOnly: true });
     try {
         const msgs = db.prepare("SELECT COUNT(*) AS n FROM session_message WHERE session_id = ?").get(sessionID) as {
             n: number;
@@ -236,7 +236,7 @@ function dbFlavor(): "v1" | "v2" {
     if (!path) {
         return "v1";
     }
-    const db = new DatabaseSync(path, { readOnly: true });
+    const db = openSqlite(path, { readOnly: true });
     try {
         const row = db.prepare("SELECT COUNT(*) AS n FROM session_message").get() as { n: number };
         return row.n > 0 ? "v2" : "v1";
@@ -252,7 +252,7 @@ export function sessionExists(sessionID: string): boolean {
     if (!path) {
         return false;
     }
-    const db = new DatabaseSync(path, { readOnly: true });
+    const db = openSqlite(path, { readOnly: true });
     try {
         const row = db.prepare("SELECT id FROM session WHERE id = ?").get(sessionID) as { id: string } | undefined;
         return !!row;
@@ -264,7 +264,7 @@ export function sessionExists(sessionID: string): boolean {
 }
 
 // v1 읽기. message 테이블 role을 type으로, 순서를 seq로 쓴다. compaction 절단 없음.
-function readTabPackageV1(db: InstanceType<typeof DatabaseSync>, sessionID: string): { messages: TabMessage[]; parts: TabPart[] } {
+function readTabPackageV1(db: SqliteDatabase, sessionID: string): { messages: TabMessage[]; parts: TabPart[] } {
     const msgs = db
         .prepare("SELECT id, time_created AS createdAt, time_updated AS updatedAt, data FROM message WHERE session_id = ? ORDER BY time_created ASC, id ASC")
         .all(sessionID) as { id: string; createdAt: number | null; updatedAt: number | null; data: string }[];
@@ -298,7 +298,7 @@ export function tabRepoInfo(sessionID: string): TabRepo {
     if (!path) {
         return { directory: null, remote: null, branch: null };
     }
-    const db = new DatabaseSync(path, { readOnly: true });
+    const db = openSqlite(path, { readOnly: true });
     try {
         const row = db.prepare("SELECT directory FROM session_v2 WHERE id = ?").get(sessionID) as
             | { directory: string | null }
@@ -341,7 +341,7 @@ export function setTabDirectory(tabId: string, directory: string): void {
     if (!path) {
         throw new Error("opencode db not found");
     }
-    const db = new DatabaseSync(path);
+    const db = openSqlite(path);
     try {
         const cols = db.prepare("SELECT name FROM pragma_table_info('session_v2')").all() as { name: string }[];
         const names = new Set(cols.map((c) => c.name));
@@ -387,7 +387,7 @@ export function localProjectDirs(): string[] {
     if (!path) {
         return [];
     }
-    const db = new DatabaseSync(path, { readOnly: true });
+    const db = openSqlite(path, { readOnly: true });
     try {
         const rows = db.prepare("SELECT worktree FROM project WHERE worktree IS NOT NULL AND worktree != ''").all() as {
             worktree: string;
@@ -405,7 +405,7 @@ export function readTabPackage(sessionID: string): TabPackage {
     if (!path) {
         throw new Error("opencode db not found");
     }
-    const db = new DatabaseSync(path, { readOnly: true });
+    const db = openSqlite(path, { readOnly: true });
     try {
         const meta = db.prepare("SELECT title, directory, version, agent, model FROM session WHERE id = ?").get(sessionID) as
             | { title: string; directory: string; version: string; agent: string | null; model: string | null }
@@ -478,7 +478,7 @@ export function applyTabPackageUpsert(pkg: TabPackage, fallbackTitle?: string | 
     if (!path) {
         throw new Error("opencode db not found");
     }
-    const db = new DatabaseSync(path);
+    const db = openSqlite(path);
     try {
         const exists = db.prepare("SELECT id FROM session WHERE id = ?").get(pkg.tabId) as { id: string } | undefined;
         let created = false;
@@ -670,7 +670,7 @@ export function sessionUsage(sessionID: string): SessionUsage {
     if (!path) {
         return empty;
     }
-    const db = new DatabaseSync(path, { readOnly: true });
+    const db = openSqlite(path, { readOnly: true });
     try {
         const counts = db
             .prepare("SELECT type, COUNT(*) AS n FROM session_message WHERE session_id = ? GROUP BY type")
@@ -711,7 +711,7 @@ export function readEpochRows(sessionID: string): ServerMessage[] {
     if (!path) {
         throw new Error("opencode db not found");
     }
-    const db = new DatabaseSync(path, { readOnly: true });
+    const db = openSqlite(path, { readOnly: true });
     try {
         const rows = db
             .prepare("SELECT id, type, time_created AS createdAt, data FROM session_message WHERE session_id = ? ORDER BY seq ASC")
