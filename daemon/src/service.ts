@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, chmodSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, platform } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -77,13 +77,69 @@ function writeShim(): void {
 }
 
 // shim 디렉토리가 PATH에 없으면 `localagents push`가 "command not found"가 된다.
-function pathHint(): string | null {
+// 유저에게 설정을 떠넘기지 않고 셸 프로필에 한 줄 추가한다 (표식이 있어 중복 추가는 안 된다).
+const PATH_MARKER = "# localagents";
+
+function rcPath(): { file: string; fish: boolean } {
+    const home = homedir();
+    const shell = process.env.SHELL ?? "";
+    if (shell.endsWith("zsh")) {
+        return { file: join(home, ".zshrc"), fish: false };
+    }
+    if (shell.endsWith("fish")) {
+        return { file: join(home, ".config", "fish", "config.fish"), fish: true };
+    }
+    if (shell.endsWith("bash")) {
+        const profile = join(home, ".bash_profile");
+        if (platform() === "darwin" && existsSync(profile)) {
+            return { file: profile, fish: false };
+        }
+        return { file: join(home, ".bashrc"), fish: false };
+    }
+    return { file: join(home, ".profile"), fish: false };
+}
+
+export function ensureShellPath(): string | null {
     const dir = dirname(shimPath());
-    const parts = (process.env.PATH ?? "").split(":");
-    if (parts.includes(dir)) {
+    if ((process.env.PATH ?? "").split(":").includes(dir)) {
         return null;
     }
-    return `add to your shell profile to use the short commands: export PATH="${dir}:$PATH"`;
+    const { file, fish } = rcPath();
+    try {
+        mkdirSync(dirname(file), { recursive: true });
+        const existing = existsSync(file) ? readFileSync(file, "utf8") : "";
+        if (existing.includes(PATH_MARKER)) {
+            return `PATH already configured in ${file} (open a new terminal to use the short commands)`;
+        }
+        const block = fish
+            ? `\n${PATH_MARKER}\nfish_add_path "${dir}"\n`
+            : `\n${PATH_MARKER}\nexport PATH="${dir}:$PATH"\n`;
+        appendFileSync(file, block);
+        return `added ${dir} to PATH in ${file} (open a new terminal to use the short commands)`;
+    } catch {
+        return `add to your shell profile to use the short commands: export PATH="${dir}:$PATH"`;
+    }
+}
+
+export function removeShellPath(): void {
+    const dir = dirname(shimPath());
+    const { file, fish } = rcPath();
+    if (!existsSync(file)) {
+        return;
+    }
+    try {
+        const text = readFileSync(file, "utf8");
+        if (!text.includes(PATH_MARKER)) {
+            return;
+        }
+        const block = fish
+            ? `${PATH_MARKER}\nfish_add_path "${dir}"\n`
+            : `${PATH_MARKER}\nexport PATH="${dir}:$PATH"\n`;
+        const cleaned = text.split(block).join("").replace(/\n{3,}/g, "\n\n");
+        writeFileSync(file, cleaned);
+    } catch {
+        // 무시
+    }
 }
 
 function systemdUnit(): string {
@@ -149,7 +205,7 @@ export function installService(): ServiceResult {
         if (!loaded.ok) {
             return { ok: false, message: `launchctl bootstrap failed: ${loaded.out}` };
         }
-        const hint = pathHint();
+        const hint = ensureShellPath();
         return { ok: true, message: `background service installed (launchd)${hint ? `. ${hint}` : ""}` };
     }
 
@@ -163,7 +219,7 @@ export function installService(): ServiceResult {
     if (!enabled.ok) {
         return { ok: false, message: `systemctl --user enable failed: ${enabled.out}` };
     }
-    const hint = pathHint();
+    const hint = ensureShellPath();
     return { ok: true, message: `background service installed (systemd user)${hint ? `. ${hint}` : ""}` };
 }
 
@@ -205,6 +261,7 @@ export function uninstallService(): ServiceResult {
     } catch {
         // 무시
     }
+    removeShellPath();
     rmSync(appDir(), { recursive: true, force: true });
     return { ok: true, message: "background service and installed files removed" };
 }
