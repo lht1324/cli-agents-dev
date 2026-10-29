@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { apiGet, apiPost, discoverServer, type DiscoveredServer } from "./server";
 import { cloudGet } from "./cloud";
-import { hostInfo, readState, writeState, baseUrl } from "./device";
+import { hostInfo, readState, writeState, baseUrl, clearState } from "./device";
+import { installService, stopService, uninstallService } from "./service";
 import { forkAndRegister } from "./fork";
 import { ensureServer, killOwned, type ManagedServer } from "./serve";
 import { syncSessions } from "./sessions";
@@ -70,6 +71,39 @@ async function onLogout(): Promise<void> {
     }
     clearState();
     console.log("logged out.");
+    // 토큰이 없는 데몬이 계속 돌면 401만 반복한다. 유닛은 남기고 프로세스만 멈춘다.
+    const stopped = stopService();
+    if (stopped.ok) {
+        console.log("background service stopped. run `localagents login` to start it again.");
+    }
+}
+
+// 프로그램 제거. 서비스·복사본·상태를 모두 지운다 (logout과 다르다).
+async function onUninstall(): Promise<void> {
+    const state = readState();
+    if (state?.token) {
+        try {
+            await fetch(`${baseUrl()}/api/daemon/device/revoke`, {
+                method: "POST",
+                headers: { Authorization: `Bearer ${state.token}` },
+                signal: AbortSignal.timeout(10000),
+            });
+        } catch {
+            // 오프라인이어도 제거는 진행한다.
+        }
+    }
+    const service = uninstallService();
+    clearState();
+    console.log(service.message);
+    console.log("localagents is no longer running on this machine.");
+}
+
+async function onServiceInstall(): Promise<void> {
+    const res = installService();
+    console.log(res.message);
+    if (!res.ok) {
+        process.exitCode = 1;
+    }
 }
 
 // 토큰 사전 검증. 죽은 토큰이면 작업 전에 로그인 메시지로 끝낸다.
@@ -578,6 +612,19 @@ async function onLogin(): Promise<void> {
     } catch (err) {
         console.error(`initial sync failed: ${err instanceof Error ? err.message : err}`);
     }
+    // 백그라운드 상주 등록. 실패해도 로그인은 유효하다 (초기 sync는 이미 끝났다).
+    if (process.argv.includes("--no-service")) {
+        console.log("background service skipped (--no-service).");
+        return;
+    }
+    const service = installService();
+    if (service.ok) {
+        console.log(`${service.message}. keeps syncing after you close the terminal.`);
+        console.log("to remove: localagents uninstall");
+    } else {
+        console.log(`background service was not installed: ${service.message}`);
+        console.log("fix later with: localagents service install");
+    }
 }
 
 async function onFork(sessionID: string | undefined): Promise<void> {
@@ -805,7 +852,7 @@ async function main(): Promise<void> {
     // 숨김 진단 명령. 플래그 없이 치면 없는 명령으로 보인다. run은 unit이 쓰니 예외.
     if (cmd && advanced.has(cmd) && !process.argv.includes("--jaeholee")) {
         console.log(`unknown command: ${cmd}`);
-        console.log("usage: localagents <login|logout|status|whoami|push|pull>");
+        console.log("usage: localagents <login|logout|status|whoami|push|pull|uninstall>");
         process.exitCode = 1;
         return;
     }
@@ -813,6 +860,16 @@ async function main(): Promise<void> {
         await onStatus();
     } else if (cmd === "logout") {
         await onLogout();
+    } else if (cmd === "uninstall") {
+        await onUninstall();
+    } else if (cmd === "service") {
+        const sub = args[1];
+        if (sub === "install") {
+            await onServiceInstall();
+        } else {
+            console.log("usage: localagents service install");
+            process.exitCode = 1;
+        }
     } else if (cmd === "whoami") {
         await onWhoami();
     } else if (cmd === "sessions") {
@@ -845,7 +902,7 @@ async function main(): Promise<void> {
         if (cmd) {
             console.log(`unknown command: ${cmd}`);
         }
-        console.log("usage: localagents <login|logout|status|whoami|push|pull>");
+        console.log("usage: localagents <login|logout|status|whoami|push|pull|uninstall>");
         process.exitCode = 1;
     }
     // 1회성 명령이 띄운 서버는 함께 내린다. run은 스스로 관리한다.
