@@ -52,6 +52,7 @@ export default async function SessionDetailServer({ id }: { id: string }) {
             sessionCreatedAt: sessionsMeta.sessionCreatedAt,
             lastSyncAt: sessionsMeta.lastSyncAt,
             deviceLastSeenAt: devices.lastSeenAt,
+            deviceLabel: devices.label,
         })
         .from(sessionsMeta)
         .innerJoin(devices, eq(sessionsMeta.deviceId, devices.id))
@@ -87,6 +88,17 @@ export default async function SessionDetailServer({ id }: { id: string }) {
             }
             return (b.lastSeenAt ?? "").localeCompare(a.lastSeenAt ?? "");
         });
+    // 위치 행이 아직 없는 세션(위치 추적 도입 이전·sync 전)도 현재 호스트가 살아 있으면 후보에 넣는다.
+    const hostSeen = meta[0].deviceLastSeenAt;
+    const hostActive = hostSeen ? now - hostSeen.getTime() < ACTIVE_MS : false;
+    if (hostActive && !targets.some((t) => t.deviceId === meta[0].deviceId)) {
+        targets.unshift({
+            deviceId: meta[0].deviceId,
+            label: meta[0].deviceLabel,
+            lastSeenAt: hostSeen?.toISOString() ?? null,
+            active: true,
+        });
+    }
     // 기본 대상: 현재 호스트(device_id)가 활성이면 그것, 아니면 가장 최근 활성 기기.
     const activeTargets = targets.filter((t) => t.active);
     const defaultTarget =

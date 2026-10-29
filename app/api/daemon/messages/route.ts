@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { getIsValidRequestDevice } from "@/lib/utils/getIsValidRequest";
 import { checkBillingGate } from "@/lib/billing";
 import { getDb } from "@/lib/neon/client";
-import { cloudMessages, cloudTabs, sessionsMeta } from "@/lib/neon/schema";
+import { cloudMessages, cloudTabs, sessionLocations, sessionsMeta } from "@/lib/neon/schema";
 import { getNextBaseResponse } from "@/lib/utils/getNextBaseResponse";
 
 interface MessageRow {
@@ -68,6 +68,15 @@ export async function POST(request: Request): Promise<Response> {
                 .update(sessionsMeta)
                 .set({ lastSyncAt: new Date() })
                 .where(eq(sessionsMeta.id, m.sessionID));
+            // 메시지는 빠른 층에서 자주 오므로 위치 추적도 여기서 갱신한다.
+            // sync(느린 층)만 기다리면 최대 플랜 주기만큼 "세션을 가진 기기"를 모른다.
+            await db
+                .insert(sessionLocations)
+                .values({ tabId: m.sessionID, deviceId: authed.deviceId, lastSeenAt: new Date() })
+                .onConflictDoUpdate({
+                    target: [sessionLocations.tabId, sessionLocations.deviceId],
+                    set: { lastSeenAt: new Date() },
+                });
         }
         const createdAt =
             typeof m.createdAt === "number" ? new Date(m.createdAt) : typeof m.createdAt === "string" ? new Date(m.createdAt) : null;

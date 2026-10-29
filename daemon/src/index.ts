@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { apiGet, apiPost, discoverServer, type DiscoveredServer } from "./server";
 import { cloudGet } from "./cloud";
 import { hostInfo, readState, writeState, baseUrl } from "./device";
