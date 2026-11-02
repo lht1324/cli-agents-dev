@@ -36,7 +36,7 @@ const PLANS: Plan[] = [
 
 const FEATURES = [
     "$ cross-PC push / pull",
-    "$ unlimited sessions · all devices",
+    "$ every open session · all your devices",
     "$ approve & steer from anywhere",
 ];
 

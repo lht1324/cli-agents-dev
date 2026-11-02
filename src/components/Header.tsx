@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { authClient } from "@/lib/auth/client";
+import BrandMark from "./BrandMark";
 
 // 공통 헤더. 유저 메뉴는 직접 만든다 (auth-ui 미사용 — lib/auth/client.ts 주석 참조).
 export default function Header() {
@@ -43,7 +44,8 @@ export default function Header() {
     return (
         <header className="border-b border-line">
             <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between px-4">
-                <Link to="/" className="font-mono font-bold">
+                <Link to="/" className="flex items-center gap-2 font-mono font-bold">
+                    <BrandMark size={24} />
                     localagents
                 </Link>
                 {user ? (

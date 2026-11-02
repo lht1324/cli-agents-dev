@@ -1,4 +1,3 @@
-import { useCallback, useState } from "react";
 import { Route, Routes } from "react-router";
 import Header from "./components/Header";
 import SessionsPage from "./pages/SessionsPage";
@@ -8,8 +7,8 @@ import DevicesPage from "./pages/DevicesPage";
 import ProfilePage from "./pages/ProfilePage";
 import BillingLockedPage from "./pages/BillingLockedPage";
 import LandingPage from "./pages/LandingPage";
+import SignInPage from "./pages/SignInPage";
 import LegalPage from "./pages/LegalPage";
-import { authClient } from "./lib/auth/client";
 
 function Shell({ children }: { children: React.ReactNode }) {
     return (
@@ -20,51 +19,6 @@ function Shell({ children }: { children: React.ReactNode }) {
     );
 }
 
-function SignIn() {
-    const [busy, setBusy] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const redirectTo = new URLSearchParams(window.location.search).get("redirectTo") ?? "/sessions";
-
-    const onSignIn = useCallback(async (provider: "google" | "github") => {
-        setBusy(true);
-        setError(null);
-        const { error: authError } = await authClient.signIn.social({
-            provider,
-            callbackURL: `${window.location.origin}/api/auth/callback`,
-        });
-        if (authError) {
-            setError(authError.message ?? "sign-in failed");
-            setBusy(false);
-        }
-    }, []);
-
-    return (
-        <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-6">
-            <p className="font-mono text-sm text-go">$ localagents login</p>
-            <h1 className="mt-3 text-2xl font-bold tracking-tight">Sign in</h1>
-            <p className="mt-2 text-sm text-dim">Continue to {redirectTo}.</p>
-            <div className="mt-6 flex flex-col gap-2">
-                <button
-                    type="button"
-                    onClick={() => void onSignIn("google")}
-                    disabled={busy}
-                    className="rounded border border-line bg-panel px-4 py-2 font-mono text-sm text-fog transition-colors hover:border-fog disabled:opacity-50"
-                >
-                    Continue with Google
-                </button>
-                <button
-                    type="button"
-                    onClick={() => void onSignIn("github")}
-                    disabled={busy}
-                    className="rounded border border-line bg-panel px-4 py-2 font-mono text-sm text-fog transition-colors hover:border-fog disabled:opacity-50"
-                >
-                    Continue with GitHub
-                </button>
-            </div>
-            {error && <p className="mt-3 font-mono text-xs text-stop">{error}</p>}
-        </main>
-    );
-}
 
 function Stub({ title, body }: { title: string; body: string }) {
     return (
@@ -80,7 +34,7 @@ export default function App() {
     return (
         <Routes>
             <Route path="/" element={<Shell><LandingPage /></Shell>} />
-            <Route path="/auth/sign-in" element={<SignIn />} />
+            <Route path="/auth/sign-in" element={<SignInPage />} />
             <Route
                 path="/sessions"
                 element={

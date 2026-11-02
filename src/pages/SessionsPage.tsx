@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
+import SessionsEmptyState from "@/components/SessionsEmptyState";
 
 interface SessionRow {
     id: string;
@@ -94,12 +95,8 @@ export default function SessionsPage() {
             {error && <p className="mt-4 font-mono text-xs text-stop">{error.message}</p>}
 
             {!isLoading && !error && items.length === 0 && (
-                <div className="mt-4 rounded border border-line bg-panel p-8">
-                    <h2 className="font-mono text-lg font-bold">No sessions yet.</h2>
-                    <p className="mt-2 text-sm text-dim">
-                        Connect a PC with <span className="font-mono text-fog">npx localagents@latest login</span>. Tabs
-                        appear here automatically.
-                    </p>
+                <div className="mt-4">
+                    <SessionsEmptyState />
                 </div>
             )}
 

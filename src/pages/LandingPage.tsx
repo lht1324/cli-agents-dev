@@ -12,8 +12,8 @@ const SETUP_STEPS = [
     },
     {
         code: "$ localagents push",
-        title: "Push the tab you need",
-        body: "Pick the tabs. History and context travel with them.",
+        title: "Push the session you need",
+        body: "Pick the sessions. History and context travel with them.",
     },
     {
         code: "$ localagents pull",
@@ -32,12 +32,12 @@ const PHONE_STEPS = [
 
 const TRANSCRIPT = [
     { text: "$ localagents push", tone: "prompt" },
-    { text: "  TailoredAd (AI +12 · User +3)  [####################] 100%", tone: "out" },
-    { text: "  Done: 1 tab pushed.", tone: "out" },
+    { text: "  TailoredAd (AI +420 · User +69)  [####################] 100%", tone: "out" },
+    { text: "  Done: 1 session pushed.", tone: "out" },
     { text: "", tone: "out" },
     { text: "$ localagents pull", tone: "prompt" },
-    { text: "  Updated local tab TailoredAd.", tone: "out" },
-    { text: "  Done: 106 messages applied.", tone: "out" },
+    { text: "  Updated local session TailoredAd.", tone: "out" },
+    { text: "  Done: 420 messages, 69 parts applied.", tone: "out" },
     { text: "", tone: "out" },
     { text: "# optional, from your phone:", tone: "dim" },
     { text: "#   bash  npm run build        [Allow]  [Deny]", tone: "dim" },
@@ -95,7 +95,7 @@ export default function LandingPage() {
                             Start a session on one PC. Continue it on every PC.
                         </h1>
                         <p className="mt-4 max-w-[65ch] text-dim">
-                            Your tabs follow you from desktop to laptop. No SSH, no re-explaining what you were doing.
+                            Your sessions follow you from desktop to laptop. No SSH, no re-explaining what you were doing.
                             Check in from your phone when you want.
                         </p>
                         <div className="mt-6 flex gap-3">

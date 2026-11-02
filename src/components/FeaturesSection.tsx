@@ -18,7 +18,7 @@ export default function FeaturesSection() {
                 <div className="mt-8 grid gap-10 md:grid-cols-2 md:gap-0 md:divide-x md:divide-line">
                     <div className="md:pr-12">
                         <h3 className="text-lg font-bold">Move between PCs</h3>
-                        <p className="mt-1 text-sm text-dim">Laptop day? Take the tab with you.</p>
+                        <p className="mt-1 text-sm text-dim">Laptop day? Take the session with you.</p>
                         <ul className="mt-4 space-y-2">
                             {PC_POINTS.map((point) => (
                                 <li key={point} className="flex gap-2 text-sm text-fog">
