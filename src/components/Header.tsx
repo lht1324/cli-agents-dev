@@ -7,6 +7,7 @@ export default function Header() {
     const [user, setUser] = useState<{ email: string | null; name: string | null; image: string | null } | null>(
         null,
     );
+    const [daysLeft, setDaysLeft] = useState<number | null>(null);
     const [open, setOpen] = useState(false);
     const navigate = useNavigate();
 
@@ -14,7 +15,19 @@ export default function Header() {
         void (async () => {
             const { data } = await authClient.getSession();
             const u = data?.user;
-            setUser(u ? { email: u.email ?? null, name: u.name ?? null, image: u.image ?? null } : null);
+            if (!u) {
+                setUser(null);
+                return;
+            }
+            setUser({ email: u.email ?? null, name: u.name ?? null, image: u.image ?? null });
+            // 체험 카운트다운. 유료(null)면 표시하지 않는다.
+            try {
+                const res = await fetch("/api/web/me");
+                const body = (await res.json()) as { data?: { daysLeft?: number | null } };
+                setDaysLeft(typeof body.data?.daysLeft === "number" ? body.data.daysLeft : null);
+            } catch {
+                setDaysLeft(null);
+            }
         })();
     }, []);
 
@@ -35,6 +48,11 @@ export default function Header() {
                 </Link>
                 {user ? (
                     <nav className="flex items-center gap-5">
+                        {daysLeft !== null && (
+                            <span className="font-mono text-xs text-warn">
+                                {daysLeft > 0 ? `Trial: ${daysLeft} days left` : "Trial ended"}
+                            </span>
+                        )}
                         <Link to="/sessions" className="text-sm text-dim hover:text-fog">
                             Sessions
                         </Link>

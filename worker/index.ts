@@ -10,8 +10,10 @@ import webPairing from "./routes/web/pairing";
 import webDodo from "./routes/web/dodo";
 import webDeviceUnlink from "./routes/web/devices";
 import webAccount from "./routes/web/account";
+import webMe from "./routes/web/me";
 import pairingRoutes from "./routes/pairing";
 import webhookDodo from "./routes/webhook/dodo";
+import seoRoutes from "./routes/seo";
 import daemonBasic from "./routes/daemon/basic";
 import daemonCommands from "./routes/daemon/commands";
 import daemonHeartbeat from "./routes/daemon/heartbeat";
@@ -36,6 +38,7 @@ app.route("/api/auth", authRoutes);
 app.route("/api/pairing", pairingRoutes);
 // Dodo가 직접 부르는 공개 엔드포인트. 서명 검증이 곧 인증이다.
 app.route("/api/webhook/dodo", webhookDodo);
+app.route("/", seoRoutes);
 app.get("/api/health", (c) => c.json({ success: true, status: 200 }));
 
 // 페이지 가드 (run_worker_first에 등록된 경로만 도달)
@@ -51,6 +54,7 @@ app.route("/api/web/device", webDevice);
 app.route("/api/web/pairing", webPairing);
 app.route("/api/web/dodo", webDodo);
 app.route("/api/web/account", webAccount);
+app.route("/api/web/me", webMe);
 app.route("/api/web/devices", webDeviceUnlink);
 
 // 데몬 채널 (기기 토큰)

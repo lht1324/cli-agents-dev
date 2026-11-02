@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { Route, Routes, useNavigate } from "react-router";
+import { useCallback, useState } from "react";
+import { Route, Routes } from "react-router";
 import Header from "./components/Header";
 import SessionsPage from "./pages/SessionsPage";
 import SessionDetailPage from "./pages/SessionDetailPage";
@@ -7,6 +7,8 @@ import DeviceAuthorizePage from "./pages/DeviceAuthorizePage";
 import DevicesPage from "./pages/DevicesPage";
 import ProfilePage from "./pages/ProfilePage";
 import BillingLockedPage from "./pages/BillingLockedPage";
+import LandingPage from "./pages/LandingPage";
+import LegalPage from "./pages/LegalPage";
 import { authClient } from "./lib/auth/client";
 
 function Shell({ children }: { children: React.ReactNode }) {
@@ -73,43 +75,11 @@ function Stub({ title, body }: { title: string; body: string }) {
     );
 }
 
-function Home() {
-    const [email, setEmail] = useState<string | null>(null);
-    const navigate = useNavigate();
-
-    useEffect(() => {
-        void (async () => {
-            const { data } = await authClient.getSession();
-            setEmail(data?.user?.email ?? null);
-        })();
-    }, []);
-
-    return (
-        <Shell>
-            <main className="mx-auto flex min-h-[70dvh] max-w-3xl flex-col justify-center px-6">
-                <p className="font-mono text-sm text-go">$ localagents</p>
-                <h1 className="mt-3 text-3xl font-bold tracking-tight">Start on one PC. Continue on another.</h1>
-                <p className="mt-2 text-sm text-dim">
-                    {email ? `Signed in as ${email}.` : "Sign in to see your sessions."}
-                </p>
-                <div className="mt-6 flex gap-3">
-                    <button
-                        type="button"
-                        onClick={() => navigate(email ? "/sessions" : "/auth/sign-in")}
-                        className="rounded bg-go px-4 py-2 font-mono text-sm font-bold text-ink"
-                    >
-                        {email ? "Open sessions" : "Sign in"}
-                    </button>
-                </div>
-            </main>
-        </Shell>
-    );
-}
 
 export default function App() {
     return (
         <Routes>
-            <Route path="/" element={<Home />} />
+            <Route path="/" element={<Shell><LandingPage /></Shell>} />
             <Route path="/auth/sign-in" element={<SignIn />} />
             <Route
                 path="/sessions"
@@ -156,6 +126,30 @@ export default function App() {
                 element={
                     <Shell>
                         <ProfilePage />
+                    </Shell>
+                }
+            />
+            <Route
+                path="/legal/terms"
+                element={
+                    <Shell>
+                        <LegalPage kind="terms" />
+                    </Shell>
+                }
+            />
+            <Route
+                path="/legal/privacy"
+                element={
+                    <Shell>
+                        <LegalPage kind="privacy" />
+                    </Shell>
+                }
+            />
+            <Route
+                path="/legal/refunds"
+                element={
+                    <Shell>
+                        <LegalPage kind="refunds" />
                     </Shell>
                 }
             />
