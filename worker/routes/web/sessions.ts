@@ -1,11 +1,12 @@
 import { Hono } from "hono";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { checkBillingGate } from "../../../lib/billing";
 import { getDb } from "../../../lib/neon/client";
 import {
     cloudMessages,
     cloudTabs,
     devices,
+    handoffs,
     modelCatalog,
     pendingApprovals,
     sessionLocations,
@@ -37,15 +38,58 @@ sessions.get("/", async (c) => {
         })
         .from(sessionsMeta)
         .where(and(eq(sessionsMeta.userId, userId), isNull(sessionsMeta.parentId)))
-        .orderBy(desc(sessionsMeta.updatedAt));
+        // 지금 본문이 올라오는 세션이 위로. 나머지는 최근 만들어진 순.
+        .orderBy(sql`${sessionsMeta.lastBodySyncAt} desc nulls last`, desc(sessionsMeta.sessionCreatedAt));
 
     // 최근에 본문이 동기화된 세션 = 지금 돌고 있는 세션(live). 나머지는 기록만 남은 frozen.
     const LIVE_MS = 40 * 60 * 1000;
     const now = Date.now();
+
+    // 다른 PC가 push했지만 이 계정의 기기가 아직 받지 않은 세션. CLI pull과 같은 판정 규칙.
+    const versions = await db
+        .select({
+            tabId: handoffs.tabId,
+            createdAt: handoffs.createdAt,
+            receivedBy: handoffs.receivedBy,
+        })
+        .from(handoffs)
+        .where(eq(handoffs.userId, userId))
+        .orderBy(desc(handoffs.createdAt))
+        .limit(50);
+    const myDevices = await db
+        .select({ id: devices.id })
+        .from(devices)
+        .where(and(eq(devices.userId, userId), isNull(devices.unlinkedAt)));
+    const myDeviceIds = new Set(myDevices.map((d) => d.id));
+    // 세션별 최신 1건만 후보. 내 기기가 이미 받은 것은 제외한다.
+    const latestVersion = new Map<string, { createdAt: Date; receivedBy: string | null }>();
+    for (const v of versions) {
+        const cur = latestVersion.get(v.tabId);
+        if (!cur || v.createdAt > cur.createdAt) {
+            latestVersion.set(v.tabId, { createdAt: v.createdAt, receivedBy: v.receivedBy });
+        }
+    }
+    const pendingHandoffs = [...latestVersion.entries()].filter(
+        ([, v]) => !(v.receivedBy && myDeviceIds.has(v.receivedBy)),
+    );
+    const mirror = await db.select({ id: cloudTabs.id }).from(cloudTabs).where(eq(cloudTabs.userId, userId));
+    const mirrorSet = new Set(mirror.map((t) => t.id));
+    let newTabs = 0;
+    let updatedTabs = 0;
+    for (const [tabId] of pendingHandoffs) {
+        if (mirrorSet.has(tabId)) {
+            updatedTabs += 1;
+        } else {
+            newTabs += 1;
+        }
+    }
+    const waiting = newTabs + updatedTabs > 0 ? { newTabs, updatedTabs } : null;
+
     return c.json({
         success: true,
         status: 200,
         data: {
+            waiting,
             items: rows.map((r) => ({
                 ...r,
                 lastSyncAt: r.lastSyncAt?.toISOString() ?? null,
