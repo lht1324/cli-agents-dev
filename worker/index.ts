@@ -8,6 +8,7 @@ import webCommands from "./routes/web/commands";
 import webDevice from "./routes/web/device";
 import webPairing from "./routes/web/pairing";
 import pairingRoutes from "./routes/pairing";
+import webhookDodo from "./routes/webhook/dodo";
 import daemonBasic from "./routes/daemon/basic";
 import daemonCommands from "./routes/daemon/commands";
 import daemonHeartbeat from "./routes/daemon/heartbeat";
@@ -30,6 +31,8 @@ app.use("*", async (c, next) => {
 // 인증 불필요
 app.route("/api/auth", authRoutes);
 app.route("/api/pairing", pairingRoutes);
+// Dodo가 직접 부르는 공개 엔드포인트. 서명 검증이 곧 인증이다.
+app.route("/api/webhook/dodo", webhookDodo);
 app.get("/api/health", (c) => c.json({ success: true, status: 200 }));
 
 // 페이지 가드 (run_worker_first에 등록된 경로만 도달)
