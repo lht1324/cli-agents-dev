@@ -4,6 +4,8 @@ import Header from "./components/Header";
 import SessionsPage from "./pages/SessionsPage";
 import SessionDetailPage from "./pages/SessionDetailPage";
 import DeviceAuthorizePage from "./pages/DeviceAuthorizePage";
+import DevicesPage from "./pages/DevicesPage";
+import ProfilePage from "./pages/ProfilePage";
 import { authClient } from "./lib/auth/client";
 
 function Shell({ children }: { children: React.ReactNode }) {
@@ -144,7 +146,7 @@ export default function App() {
                 path="/devices"
                 element={
                     <Shell>
-                        <Stub title="Devices" body="Device list comes next." />
+                        <DevicesPage />
                     </Shell>
                 }
             />
@@ -152,7 +154,7 @@ export default function App() {
                 path="/profile"
                 element={
                     <Shell>
-                        <Stub title="Profile" body="Profile screen comes next." />
+                        <ProfilePage />
                     </Shell>
                 }
             />

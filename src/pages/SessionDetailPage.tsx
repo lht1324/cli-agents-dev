@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
 import MarkdownText from "@/components/MarkdownText";
 import { editCounts, parseToolCall, toolDetail, toolSummary, type ToolCall } from "@/lib/toolFormat";
+import { getJson } from "@/lib/api";
 
 interface Info {
     id: string;
@@ -75,15 +76,6 @@ interface ThreadPayload {
     deviceLastSeenAt: string | null;
     lastSyncAt: string | null;
     lastCommand: { type: string; status: string; result: string | null; createdAt: string | null } | null;
-}
-
-async function getJson<T>(url: string): Promise<T> {
-    const res = await fetch(url);
-    const body = (await res.json()) as { success: boolean; data?: T; error?: string };
-    if (!res.ok || !body.success || !body.data) {
-        throw new Error(body.error ?? `${res.status}`);
-    }
-    return body.data;
 }
 
 function stamp(iso: string | null): string | null {

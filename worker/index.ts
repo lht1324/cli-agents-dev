@@ -8,6 +8,8 @@ import webCommands from "./routes/web/commands";
 import webDevice from "./routes/web/device";
 import webPairing from "./routes/web/pairing";
 import webDodo from "./routes/web/dodo";
+import webDeviceUnlink from "./routes/web/devices";
+import webAccount from "./routes/web/account";
 import pairingRoutes from "./routes/pairing";
 import webhookDodo from "./routes/webhook/dodo";
 import daemonBasic from "./routes/daemon/basic";
@@ -48,6 +50,8 @@ app.route("/api/web/commands", webCommands);
 app.route("/api/web/device", webDevice);
 app.route("/api/web/pairing", webPairing);
 app.route("/api/web/dodo", webDodo);
+app.route("/api/web/account", webAccount);
+app.route("/api/web/devices", webDeviceUnlink);
 
 // 데몬 채널 (기기 토큰)
 app.use("/api/daemon/*", requireDevice);
