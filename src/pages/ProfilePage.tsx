@@ -1,7 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
+import { useCallback, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { CreditCard, Mail, Monitor, ScrollText } from "lucide-react";
 import { getJson } from "@/lib/api";
+import { useSubscriptionActions } from "@/lib/billingClient";
 
 interface ProfileData {
     email: string | null;
@@ -37,10 +39,36 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 export default function ProfilePage() {
+    const queryClient = useQueryClient();
+    const { busy, error: actionError, cancel, resume } = useSubscriptionActions();
+    const [showCancelModal, setShowCancelModal] = useState(false);
+
     const { data, isLoading, error } = useQuery({
         queryKey: ["account"],
         queryFn: () => getJson<ProfileData>("/api/web/account"),
     });
+
+    const onClickCloseModal = useCallback(() => {
+        if (busy === null) {
+            setShowCancelModal(false);
+        }
+    }, [busy]);
+
+    const onConfirmCancel = useCallback(async () => {
+        const ok = await cancel();
+        if (ok) {
+            setShowCancelModal(false);
+            // 세션 목록·인박스 판정도 구독 상태를 본다.
+            void queryClient.invalidateQueries({ queryKey: ["sessions"] });
+        }
+    }, [cancel, queryClient]);
+
+    const onClickResume = useCallback(async () => {
+        const ok = await resume();
+        if (ok) {
+            void queryClient.invalidateQueries({ queryKey: ["sessions"] });
+        }
+    }, [resume, queryClient]);
 
     if (isLoading) {
         return <main className="px-6 py-10 font-mono text-xs text-dim">loading…</main>;
@@ -98,6 +126,14 @@ export default function ProfilePage() {
                                     Your subscription will end on {formatDate(data.currentPeriodEnd)}. Your sessions
                                     stay safe.
                                 </p>
+                                <button
+                                    type="button"
+                                    onClick={() => void onClickResume()}
+                                    disabled={busy !== null}
+                                    className="mt-3 rounded border border-warn/40 px-3 py-1.5 font-mono text-xs font-bold text-warn transition-colors hover:bg-warn/10 disabled:opacity-50"
+                                >
+                                    {busy === "resume" ? "Working..." : "Keep subscription"}
+                                </button>
                             </div>
                         )}
                         <dl className="mt-4 space-y-2 text-sm">
@@ -105,6 +141,16 @@ export default function ProfilePage() {
                             <Row label="Billing cycle" value={data.interval === "annual" ? "Annual" : "Monthly"} />
                             <Row label="Next billing" value={formatDate(data.currentPeriodEnd)} />
                         </dl>
+                        {!data.cancelAtPeriodEnd && (
+                            <button
+                                type="button"
+                                onClick={() => setShowCancelModal(true)}
+                                disabled={busy !== null}
+                                className="mt-4 w-full rounded border border-line px-4 py-2 text-sm font-medium text-dim transition-colors hover:bg-black disabled:opacity-50"
+                            >
+                                Cancel Subscription
+                            </button>
+                        )}
                     </>
                 ) : (
                     <div className="mt-4 space-y-2">
@@ -119,12 +165,42 @@ export default function ProfilePage() {
                         </Link>
                     </div>
                 )}
+                {actionError ? <p className="mt-3 font-mono text-xs text-warn">{actionError}</p> : null}
             </div>
 
             <div className="mt-4 rounded border border-line bg-panel p-4">
                 <h3 className="font-mono text-sm font-bold">Member since</h3>
                 <p className="mt-2 text-sm">{formatDate(data.memberSince)}</p>
             </div>
+
+            {showCancelModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+                    <div className="mx-4 rounded border border-line bg-panel p-6">
+                        <h3 className="font-mono text-sm font-bold">Cancel Subscription</h3>
+                        <p className="mt-2 max-w-sm text-sm text-dim">
+                            Your subscription stays active until the end of the current billing period. Your sessions
+                            stay safe.
+                        </p>
+                        <div className="mt-4 flex justify-end gap-3">
+                            <button
+                                type="button"
+                                onClick={onClickCloseModal}
+                                className="rounded border border-line px-4 py-2 text-sm font-medium text-dim transition-colors hover:bg-black"
+                            >
+                                No, keep it
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => void onConfirmCancel()}
+                                disabled={busy !== null}
+                                className="rounded bg-warn px-4 py-2 text-sm font-bold text-ink transition-opacity hover:opacity-85 disabled:opacity-50"
+                            >
+                                {busy === "cancel" ? "Canceling..." : "Yes, cancel"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </main>
     );
 }

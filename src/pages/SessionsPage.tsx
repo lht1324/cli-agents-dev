@@ -58,6 +58,11 @@ export default function SessionsPage() {
         queryFn: async (): Promise<{ items: SessionRow[]; waiting: Waiting | null }> => {
             const res = await fetch("/api/web/sessions");
             const body = (await res.json()) as SessionsResponse;
+            // 체험 종료(107)면 인박스 대신 이용 정지 화면으로 보낸다.
+            if (res.status === 107) {
+                window.location.href = "/billing/locked";
+                throw new Error("trial_ended");
+            }
             if (!res.ok || !body.success) {
                 throw new Error(body.error ?? `sessions ${res.status}`);
             }

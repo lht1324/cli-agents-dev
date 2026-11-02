@@ -6,6 +6,7 @@ import SessionDetailPage from "./pages/SessionDetailPage";
 import DeviceAuthorizePage from "./pages/DeviceAuthorizePage";
 import DevicesPage from "./pages/DevicesPage";
 import ProfilePage from "./pages/ProfilePage";
+import BillingLockedPage from "./pages/BillingLockedPage";
 import { authClient } from "./lib/auth/client";
 
 function Shell({ children }: { children: React.ReactNode }) {
@@ -155,6 +156,14 @@ export default function App() {
                 element={
                     <Shell>
                         <ProfilePage />
+                    </Shell>
+                }
+            />
+            <Route
+                path="/billing/locked"
+                element={
+                    <Shell>
+                        <BillingLockedPage />
                     </Shell>
                 }
             />
