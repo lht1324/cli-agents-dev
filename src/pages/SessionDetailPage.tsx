@@ -82,7 +82,20 @@ function stamp(iso: string | null): string | null {
     if (!iso) {
         return null;
     }
-    return new Date(iso).toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit" });
+    // 오늘은 시각만, 같은 해는 "11월 2일 시각", 그 이전은 연도까지. 원본과 같은 규칙.
+    const at = new Date(iso);
+    const now = new Date();
+    const time = at.toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit" });
+    const sameDay =
+        at.getFullYear() === now.getFullYear() && at.getMonth() === now.getMonth() && at.getDate() === now.getDate();
+    if (sameDay) {
+        return time;
+    }
+    const date = `${at.getMonth() + 1}월 ${at.getDate()}일`;
+    if (at.getFullYear() === now.getFullYear()) {
+        return `${date} ${time}`;
+    }
+    return `${at.getFullYear()}년 ${date} ${time}`;
 }
 
 function num(v: number | null): string {
@@ -200,7 +213,7 @@ function ToolRow({ call, at }: { call: ToolCall; at: string | null }) {
                         </>
                     )}
                 </p>
-                {stampText && <p className="mt-1 font-mono text-[10px] text-dim">{stampText}</p>}
+                {stampText && <p className="mt-1 font-mono text-xs text-dim">{stampText}</p>}
             </div>
         );
     }
@@ -233,7 +246,7 @@ function ToolRow({ call, at }: { call: ToolCall; at: string | null }) {
                             {line}
                         </p>
                     ))}
-                    {stampText && <p className="font-mono text-[10px] text-dim">{stampText}</p>}
+                    {stampText && <p className="font-mono text-xs text-dim">{stampText}</p>}
                 </div>
             </details>
         </div>
@@ -412,9 +425,20 @@ export default function SessionDetailPage() {
             setShowJump(el.scrollHeight - el.scrollTop - el.clientHeight > 400);
         }
     }, []);
+    // 처음 열 때는 맨 아래로. 이후 새 메시지는 바닥 근처에 있을 때만 따라간다.
+    // (위로 올려 과거를 읽는 중에 강제로 끌어내리지 않기 위함)
+    const didInitialScroll = useRef(false);
     useEffect(() => {
         const el = scrollRef.current;
-        if (el && el.scrollHeight - el.scrollTop - el.clientHeight < 400) {
+        if (!el) {
+            return;
+        }
+        if (!didInitialScroll.current) {
+            didInitialScroll.current = true;
+            el.scrollTop = el.scrollHeight;
+            return;
+        }
+        if (el.scrollHeight - el.scrollTop - el.clientHeight < 400) {
             el.scrollTop = el.scrollHeight;
         }
     }, [messages.length]);
@@ -640,7 +664,7 @@ export default function SessionDetailPage() {
                                         >
                                             {m.role === "user" ? m.body : <MarkdownText body={m.body} />}
                                         </div>
-                                        <p className="mt-1 font-mono text-[10px] text-dim">{stamp(m.createdAt)}</p>
+                                        <p className="mt-1 font-mono text-xs text-dim">{stamp(m.createdAt)}</p>
                                     </div>
                                 </li>
                             );
@@ -791,7 +815,7 @@ export default function SessionDetailPage() {
                                         className="flex items-baseline justify-between gap-2 rounded border border-line bg-panel px-2 py-1 hover:border-fog"
                                     >
                                         <span className="truncate text-xs text-fog">{agent.title}</span>
-                                        <span className="shrink-0 font-mono text-[10px] text-dim">
+                                        <span className="shrink-0 font-mono text-xs text-dim">
                                             {agent.synced ? "read →" : "not synced"}
                                         </span>
                                     </Link>
@@ -868,7 +892,7 @@ export default function SessionDetailPage() {
                                     <span className="text-fog">localagents push</span>
                                 </span>
                             </div>
-                            <p className="font-mono text-[10px] text-dim">
+                            <p className="font-mono text-xs text-dim">
                                 Run on the PC that has this session. Then `localagents pull` on the other PC.
                             </p>
                         </div>

@@ -101,17 +101,14 @@ export default function SessionsPage() {
             )}
 
             {items.length > 0 && (
-                <ul className="mt-4 divide-y divide-line rounded border border-line">
+                <ul className="mt-4 space-y-2">
                     {items.map((row) => {
                         const synced = relativeTime(row.lastBodySyncAt);
                         return (
-                            <li key={row.id}>
-                                <Link
-                                    to={`/sessions/${row.id}`}
-                                    className="flex items-center justify-between px-4 py-3 hover:bg-panel"
-                                >
-                                    <span className="min-w-0 truncate text-sm text-fog">{row.title || row.id}</span>
-                                    <span className="ml-4 flex shrink-0 items-center gap-2 font-mono text-xs text-dim">
+                            <li key={row.id} className="rounded border border-line bg-panel p-4">
+                                <Link to={`/sessions/${row.id}`} className="block">
+                                    <span className="font-bold hover:underline">{row.title || row.id}</span>
+                                    <p className="mt-1 flex flex-wrap items-center gap-2 font-mono text-xs">
                                         {row.live ? (
                                             <span className="text-go">● live</span>
                                         ) : row.lastBodySyncAt ? (
@@ -119,11 +116,11 @@ export default function SessionsPage() {
                                         ) : (
                                             <span className="text-warn">not synced</span>
                                         )}
-                                        <span>
-                                            {synced ? `synced ${synced}` : "no messages"}
+                                        <span className={row.status === "active" ? "text-go" : "text-dim"}>
+                                            {row.status}
                                         </span>
-                                        <span className="hidden sm:inline">{row.status}</span>
-                                    </span>
+                                        <span className="text-dim">{synced ? `synced ${synced}` : "no messages"}</span>
+                                    </p>
                                 </Link>
                             </li>
                         );
