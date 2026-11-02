@@ -23,6 +23,7 @@ import daemonHandoffs from "./routes/daemon/handoffs";
 import daemonPresign from "./routes/daemon/presign";
 import { requireDevice } from "./middleware/device";
 import { requireSession, type AuthVariables } from "./middleware/auth";
+import { bodyLimit } from "./middleware/bodyLimit";
 
 // 단일 워커: /api/* 는 여기서, 나머지는 자산(SPA)으로.
 // 등록 순서가 곧 접근 제어다 — requireSession보다 뒤에 등록된 라우트만 인증 대상.
@@ -32,6 +33,8 @@ app.use("*", async (c, next) => {
     bindEnv(c.env);
     await next();
 });
+// 본문 크기 상한. 동기화 행 배치가 커도 2MB면 충분하다.
+app.use("/api/*", bodyLimit());
 
 // 인증 불필요
 app.route("/api/auth", authRoutes);
