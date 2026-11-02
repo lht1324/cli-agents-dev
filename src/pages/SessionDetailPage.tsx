@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
 import MarkdownText from "@/components/MarkdownText";
+import { editCounts, parseToolCall, toolDetail, toolSummary, type ToolCall } from "@/lib/toolFormat";
 
 interface Info {
     id: string;
@@ -93,7 +94,233 @@ function stamp(iso: string | null): string | null {
 }
 
 function num(v: number | null): string {
-    return v === null ? "-" : v.toLocaleString();
+    return v === null ? "-" : v.toLocaleString("en-US");
+}
+
+// OpenCode GUI와 같은 표기: variant/agent id의 첫 글자만 대문자.
+function labelOf(id: string): string {
+    return id.length === 0 ? id : id.charAt(0).toUpperCase() + id.slice(1);
+}
+
+// 명령 실행 결과는 { ok, data } JSON으로 저장된다. 화면에는 사람이 읽을 문장만 보여준다.
+function describeCommandResult(raw: string | null): string {
+    if (!raw) {
+        return "";
+    }
+    try {
+        const parsed = JSON.parse(raw) as { ok?: unknown; data?: unknown; error?: unknown; message?: unknown };
+        if (typeof parsed.error === "string" && parsed.error.length > 0) {
+            return parsed.error;
+        }
+        if (typeof parsed.data === "string" && parsed.data.length > 0) {
+            return parsed.data;
+        }
+        if (typeof parsed.message === "string" && parsed.message.length > 0) {
+            return parsed.message;
+        }
+        if (parsed.ok === true) {
+            return "done";
+        }
+    } catch {
+        // JSON이 아니면 원문 그대로
+    }
+    return raw;
+}
+
+interface CatalogModel {
+    id: string;
+    providerID: string;
+    name?: string;
+    variants?: { id: string }[];
+    limit?: { context?: number };
+}
+
+interface CatalogAgent {
+    id?: string;
+    name?: string;
+    mode?: string;
+    hidden?: boolean;
+}
+
+interface CatalogProvider {
+    id?: string;
+    name?: string;
+}
+
+function parseCatalog(json: string | null): { models: CatalogModel[]; agents: CatalogAgent[]; providers: CatalogProvider[] } {
+    if (!json) {
+        return { models: [], agents: [], providers: [] };
+    }
+    try {
+        const parsed = JSON.parse(json) as {
+            models?: { data?: CatalogModel[] } | CatalogModel[];
+            agents?: { data?: CatalogAgent[] } | CatalogAgent[];
+            providers?: { data?: CatalogProvider[] } | CatalogProvider[];
+        };
+        const models = Array.isArray(parsed.models) ? parsed.models : (parsed.models?.data ?? []);
+        const agents = (Array.isArray(parsed.agents) ? parsed.agents : (parsed.agents?.data ?? [])).filter(
+            (a) => a.mode === "primary" && a.hidden !== true,
+        );
+        const providers = Array.isArray(parsed.providers) ? parsed.providers : (parsed.providers?.data ?? []);
+        return { models, agents, providers };
+    } catch {
+        return { models: [], agents: [], providers: [] };
+    }
+}
+
+function parseCurrentModel(json: string | null): { id: string; providerID: string; variant?: string } | null {
+    if (!json) {
+        return null;
+    }
+    try {
+        const parsed = JSON.parse(json) as { id?: unknown; providerID?: unknown; variant?: unknown };
+        if (typeof parsed.id !== "string" || typeof parsed.providerID !== "string") {
+            return null;
+        }
+        return {
+            id: parsed.id,
+            providerID: parsed.providerID,
+            variant: typeof parsed.variant === "string" ? parsed.variant : undefined,
+        };
+    } catch {
+        return null;
+    }
+}
+
+// 도구 호출 1건. 접힘 줄에 요약과 +/− 줄 수를, 펼침에 상세를 보여준다.
+function ToolRow({ call, at }: { call: ToolCall; at: string | null }) {
+    const detailLines = toolDetail(call);
+    const counts = editCounts(call);
+    const summary = toolSummary(call);
+    const stampText = stamp(at);
+
+    if (call.truncated) {
+        return (
+            <div>
+                <p className="rounded border border-line bg-ink px-3 py-2 font-mono text-xs text-dim">
+                    ▸ {summary}
+                    {counts && (
+                        <>
+                            {" "}
+                            <span className="text-go">+{counts.added}</span>/
+                            <span className="text-stop">-{counts.removed}</span>
+                            <span className="text-dim"> (diff omitted, too long)</span>
+                        </>
+                    )}
+                </p>
+                {stampText && <p className="mt-1 font-mono text-[10px] text-dim">{stampText}</p>}
+            </div>
+        );
+    }
+
+    return (
+        <div>
+            <details className="rounded border border-line bg-ink px-3 py-2">
+                <summary className="cursor-pointer break-words font-mono text-xs text-dim">
+                    ▸ {summary}
+                    {counts && (
+                        <>
+                            {" "}
+                            <span className={counts.added === 0 ? "text-fog" : "text-go"}>+{counts.added}</span>/
+                            <span className={counts.removed === 0 ? "text-fog" : "text-stop"}>-{counts.removed}</span>
+                        </>
+                    )}
+                </summary>
+                <div className="mt-1 space-y-1">
+                    {detailLines.map((line, i) => (
+                        <p
+                            key={i}
+                            className={`whitespace-pre-wrap font-mono text-xs ${
+                                call.tool === "edit" && line.startsWith("+ ")
+                                    ? "text-go"
+                                    : call.tool === "edit" && line.startsWith("- ")
+                                      ? "text-stop"
+                                      : "text-dim"
+                            }`}
+                        >
+                            {line}
+                        </p>
+                    ))}
+                    {stampText && <p className="font-mono text-[10px] text-dim">{stampText}</p>}
+                </div>
+            </details>
+        </div>
+    );
+}
+
+interface StatsViewProps {
+    stats: Stats;
+    modelName: string;
+    provider: string;
+    contextLimit: number | null;
+    total: number | null;
+    usagePct: number | null;
+}
+
+// 세션 = 컨텍스트 사용량 구간. 그래서 %를 맨 위에 둔다.
+function SessionStatsView({ stats, modelName, provider, contextLimit, total, usagePct }: StatsViewProps) {
+    const groups: { title: string; rows: [string, string][] }[] = [
+        {
+            title: "Tokens",
+            rows: [
+                ["Input", num(stats.input)],
+                ["Output", num(stats.output)],
+                ["Reasoning", num(stats.reasoning)],
+                ["Cache read / write", `${num(stats.cacheRead)} / ${num(stats.cacheWrite)}`],
+            ],
+        },
+        {
+            title: "Messages",
+            rows: [
+                ["Total", num((stats.msgUser ?? 0) + (stats.msgAssistant ?? 0))],
+                ["User", num(stats.msgUser)],
+                ["Assistant", num(stats.msgAssistant)],
+            ],
+        },
+        {
+            title: "Session",
+            rows: [
+                ["Provider", provider],
+                ["Model", modelName],
+                ["Created", stats.createdAt ? new Date(stats.createdAt).toLocaleString() : "-"],
+                ["Cost", stats.cost === null ? "-" : `$${stats.cost.toFixed(2)}`],
+            ],
+        },
+    ];
+    return (
+        <div className="mt-2">
+            <p className="text-lg font-bold text-fog">
+                {usagePct === null ? "-" : `${usagePct}%`}
+                <span className="ml-2 font-mono text-xs font-normal text-dim">
+                    {num(total)} / {num(contextLimit)} tokens
+                </span>
+            </p>
+            <div
+                className="mt-1 h-1.5 w-full overflow-hidden rounded bg-panel"
+                role="progressbar"
+                aria-valuenow={usagePct ?? 0}
+                aria-valuemin={0}
+                aria-valuemax={100}
+            >
+                <div className="h-full rounded bg-go" style={{ width: `${Math.min(100, usagePct ?? 0)}%` }} />
+            </div>
+            <div className="mt-3 space-y-2">
+                {groups.map((group) => (
+                    <div key={group.title} className="rounded border border-line bg-ink px-3 py-2">
+                        <p className="font-mono text-xs font-bold text-dim">{group.title}</p>
+                        <dl className="mt-1 space-y-1">
+                            {group.rows.map(([label, value]) => (
+                                <div key={label} className="flex items-baseline justify-between gap-2">
+                                    <dt className="shrink-0 font-mono text-xs text-dim">{label}</dt>
+                                    <dd className="break-words text-right font-mono text-xs text-fog">{value}</dd>
+                                </div>
+                            ))}
+                        </dl>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
 }
 
 export default function SessionDetailPage() {
@@ -127,6 +354,72 @@ export default function SessionDetailPage() {
     const canWrite = !readOnly && effectiveTarget !== null;
     const lastCommand = thread.data?.lastCommand ?? null;
 
+    const catalog = useMemo(() => parseCatalog(detail.data?.catalogJson ?? null), [detail.data?.catalogJson]);
+    const currentModel = useMemo(() => parseCurrentModel(detail.data?.info.model ?? null), [detail.data?.info.model]);
+    const [agent, setAgent] = useState("");
+    const [modelId, setModelId] = useState("");
+    const [variant, setVariant] = useState("");
+
+    // 상세를 처음 받았을 때 현재 에이전트·모델·variant를 선택 상태로 맞춘다.
+    // 카탈로그에 없는 값(내려간 모델)은 미지정으로 본다 — 없는 값을 선택된 것처럼 보이면 거짓 표시가 된다.
+    useEffect(() => {
+        const info = detail.data?.info;
+        if (!info) {
+            return;
+        }
+        setAgent(info.agent ?? "");
+        const key = currentModel ? `${currentModel.providerID}/${currentModel.id}` : "";
+        const known = catalog.models.some((m) => `${m.providerID}/${m.id}` === key);
+        setModelId(known ? key : "");
+        // OpenCode API는 variant를 안 고른 세션에도 variant:"default"를 붙여서 돌려준다.
+        // 로컬 DB에는 variant 필드가 아예 없다. 즉 "default" = 미지정이다.
+        // 카탈로그 목록에 없는 값(xhigh 등)도 실제로 쓰이므로 그대로 선택지에 넣는다.
+        setVariant(currentModel?.variant && currentModel.variant !== "default" ? currentModel.variant : "");
+    }, [detail.data?.info.id, currentModel, catalog]);
+
+    const providers = useMemo(() => {
+        const groups = new Map<string, CatalogModel[]>();
+        const sorted = [...catalog.models].sort(
+            (a, b) => a.providerID.localeCompare(b.providerID) || (a.name ?? a.id).localeCompare(b.name ?? b.id),
+        );
+        for (const m of sorted) {
+            const list = groups.get(m.providerID) ?? [];
+            list.push(m);
+            groups.set(m.providerID, list);
+        }
+        return [...groups.entries()];
+    }, [catalog]);
+
+    // 모델 id에 "/"가 들어갈 수 있다(예: deepseek/deepseek-v4.1). 값은 "providerID/id" 문자열로
+    // 다루되, 해석은 split이 아니라 카탈로그에서 같은 키를 찾아서 한다.
+    const modelByKey = useMemo(
+        () => new Map(catalog.models.map((m) => [`${m.providerID}/${m.id}`, m])),
+        [catalog],
+    );
+    const variants = useMemo(() => modelByKey.get(modelId)?.variants ?? [], [modelByKey, modelId]);
+    // 카탈로그 목록에 없더라도 이 세션이 실제로 쓰는 variant는 보여준다 (예: xhigh).
+    const variantOptions = useMemo(() => {
+        const ids = variants.map((v) => v.id);
+        const current = currentModel?.variant;
+        if (current && current !== "default" && !ids.includes(current)) {
+            ids.push(current);
+        }
+        return ids;
+    }, [variants, currentModel]);
+
+    const [showJump, setShowJump] = useState(false);
+    const scrollToEnd = useCallback(() => {
+        const el = scrollRef.current;
+        if (el) {
+            el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+        }
+    }, []);
+    const onScrollThread = useCallback(() => {
+        const el = scrollRef.current;
+        if (el) {
+            setShowJump(el.scrollHeight - el.scrollTop - el.clientHeight > 400);
+        }
+    }, []);
     useEffect(() => {
         const el = scrollRef.current;
         if (el && el.scrollHeight - el.scrollTop - el.clientHeight < 400) {
@@ -190,26 +483,92 @@ export default function SessionDetailPage() {
         [sessionId, queue],
     );
 
+    // 모델·에이전트 변경은 명령으로 나간다 (데몬이 OpenCode에 적용).
+    const onClickAgent = useCallback(
+        async (e: React.ChangeEvent<HTMLSelectElement>) => {
+            const value = e.target.value;
+            setAgent(value);
+            if (value.length === 0 || !effectiveTarget) {
+                return;
+            }
+            const ok = await queue(effectiveTarget, "set-agent", { sessionID: sessionId, agent: value });
+            if (ok) {
+                setNotice(`agent -> ${value} queued`);
+            }
+        },
+        [effectiveTarget, sessionId, queue],
+    );
+
+    const onClickModel = useCallback(
+        async (e: React.ChangeEvent<HTMLSelectElement>) => {
+            const value = e.target.value;
+            setModelId(value);
+            setVariant("");
+            const found = modelByKey.get(value);
+            if (!found || !effectiveTarget) {
+                return;
+            }
+            const ok = await queue(effectiveTarget, "set-model", {
+                sessionID: sessionId,
+                model: { id: found.id, providerID: found.providerID },
+            });
+            if (ok) {
+                setNotice(`model -> ${value} queued`);
+            }
+        },
+        [effectiveTarget, modelByKey, sessionId, queue],
+    );
+
+    const onClickVariant = useCallback(
+        async (e: React.ChangeEvent<HTMLSelectElement>) => {
+            const value = e.target.value;
+            setVariant(value);
+            const found = modelByKey.get(modelId);
+            if (!found || !effectiveTarget) {
+                return;
+            }
+            const ok = await queue(effectiveTarget, "set-model", {
+                sessionID: sessionId,
+                model: { id: found.id, providerID: found.providerID, variant: value || undefined },
+            });
+            if (ok) {
+                setNotice(`variant -> ${value || "(none)"} queued`);
+            }
+        },
+        [effectiveTarget, modelByKey, modelId, sessionId, queue],
+    );
+
     const stats = detail.data?.stats;
-    const statRows = useMemo<[string, string][]>(() => {
+    const modelInfo = useMemo(() => {
+        const found = currentModel
+            ? catalog.models.find((m) => m.providerID === currentModel.providerID && m.id === currentModel.id)
+            : undefined;
+        const provider =
+            catalog.providers.find((p) => p.id === currentModel?.providerID)?.name ??
+            currentModel?.providerID ??
+            "?";
+        return {
+            name: found?.name ?? currentModel?.id ?? "(none)",
+            provider,
+            contextLimit: found?.limit?.context ?? null,
+        };
+    }, [catalog, currentModel]);
+    const totalTokens = useMemo(() => {
         if (!stats) {
-            return [];
+            return null;
         }
-        return [
-            ["Tokens", ""],
-            ["Input", num(stats.input)],
-            ["Output", num(stats.output)],
-            ["Reasoning", num(stats.reasoning)],
-            ["Cache read / write", `${num(stats.cacheRead)} / ${num(stats.cacheWrite)}`],
-            ["Messages", ""],
-            ["User", num(stats.msgUser)],
-            ["Assistant", num(stats.msgAssistant)],
-            ["Session", ""],
-            ["Model", detail.data?.info.model ?? "(none)"],
-            ["Created", stats.createdAt ? new Date(stats.createdAt).toLocaleString() : "-"],
-            ["Cost", stats.cost === null ? "-" : `$${stats.cost.toFixed(2)}`],
-        ];
-    }, [stats, detail.data?.info.model]);
+        const parts = [stats.input, stats.output, stats.reasoning, stats.cacheRead, stats.cacheWrite];
+        if (parts.every((p) => p === null)) {
+            return null;
+        }
+        return parts.reduce<number>((sum, p) => sum + (p ?? 0), 0);
+    }, [stats]);
+    const usagePct = useMemo(() => {
+        if (totalTokens === null || !modelInfo.contextLimit) {
+            return null;
+        }
+        return Math.round((totalTokens / modelInfo.contextLimit) * 100);
+    }, [totalTokens, modelInfo.contextLimit]);
 
     if (detail.isLoading) {
         return <main className="px-6 py-10 font-mono text-xs text-dim">loading…</main>;
@@ -239,27 +598,74 @@ export default function SessionDetailPage() {
                     </p>
                 )}
 
-                <div ref={scrollRef} className="scroll-slim mt-3 min-h-0 flex-1 overflow-y-auto pr-2">
+                <div
+                    ref={scrollRef}
+                    onScroll={onScrollThread}
+                    className="scroll-slim mt-3 min-h-0 flex-1 overflow-y-auto pr-2"
+                >
                     {messages.length === 0 && <p className="text-sm text-dim">No synced messages yet.</p>}
                     <ul className="space-y-2">
-                        {messages.map((m) => (
-                            <li key={`${m.id}-${m.seq}`} className={m.role === "user" ? "flex justify-end" : "flex justify-start"}>
-                                <div className="max-w-[85%]">
-                                    <div
-                                        className={
-                                            m.role === "user"
-                                                ? "rounded-lg bg-panel px-3 py-2 text-sm whitespace-pre-wrap"
-                                                : "rounded-lg border border-line bg-panel px-3 py-2"
-                                        }
-                                    >
-                                        {m.role === "user" ? m.body : <MarkdownText body={m.body} />}
+                        {messages.map((m) => {
+                            if (m.kind === "tool") {
+                                const call = parseToolCall(m.body);
+                                if (!call) {
+                                    return (
+                                        <li key={`${m.id}-${m.seq}`} className="max-w-3xl">
+                                            <p className="whitespace-pre-wrap font-mono text-xs text-dim">{m.body}</p>
+                                        </li>
+                                    );
+                                }
+                                return (
+                                    <li key={`${m.id}-${m.seq}`} className="max-w-3xl">
+                                        <ToolRow call={call} at={m.createdAt} />
+                                    </li>
+                                );
+                            }
+                            if (m.kind === "compaction" || m.kind === "summary") {
+                                return (
+                                    <li key={`${m.id}-${m.seq}`} className="border-l-2 border-warn pl-3">
+                                        <details>
+                                            <summary className="cursor-pointer font-mono text-xs text-dim">
+                                                Session compacted. Show summary.
+                                            </summary>
+                                            <p className="mt-1 whitespace-pre-wrap text-sm text-dim">{m.body}</p>
+                                        </details>
+                                    </li>
+                                );
+                            }
+                            return (
+                                <li
+                                    key={`${m.id}-${m.seq}`}
+                                    className={m.role === "user" ? "flex justify-end" : "flex justify-start"}
+                                >
+                                    <div className="max-w-[85%] lg:max-w-3xl">
+                                        <div
+                                            className={
+                                                m.role === "user"
+                                                    ? "rounded-lg bg-panel px-3 py-2 text-sm whitespace-pre-wrap"
+                                                    : "rounded-lg border border-line bg-panel px-3 py-2"
+                                            }
+                                        >
+                                            {m.role === "user" ? m.body : <MarkdownText body={m.body} />}
+                                        </div>
+                                        <p className="mt-1 font-mono text-[10px] text-dim">{stamp(m.createdAt)}</p>
                                     </div>
-                                    <p className="mt-1 font-mono text-[10px] text-dim">{stamp(m.createdAt)}</p>
-                                </div>
-                            </li>
-                        ))}
+                                </li>
+                            );
+                        })}
                     </ul>
                 </div>
+
+                {showJump && (
+                    <button
+                        type="button"
+                        onClick={scrollToEnd}
+                        aria-label="Scroll to bottom"
+                        className="fixed bottom-44 left-1/2 z-10 -translate-x-1/2 rounded-full border border-line bg-panel px-4 py-2 font-mono text-lg text-fog lg:left-[35%]"
+                    >
+                        ↓
+                    </button>
+                )}
 
                 {!readOnly && (
                     <div className="shrink-0 border-t border-line pt-3">
@@ -270,7 +676,7 @@ export default function SessionDetailPage() {
                         {lastCommand && (
                             <p className="font-mono text-xs text-dim">
                                 last {lastCommand.type}: {lastCommand.status}
-                                {lastCommand.result ? ` · ${lastCommand.result.slice(0, 120)}` : ""}
+                                {lastCommand.result ? ` · ${describeCommandResult(lastCommand.result).slice(0, 120)}` : ""}
                             </p>
                         )}
                         <div className="mt-2 rounded border border-line bg-panel p-3">
@@ -303,12 +709,72 @@ export default function SessionDetailPage() {
                                 placeholder={canWrite ? "Type a message... (Enter to send)" : "No active device"}
                                 className="w-full resize-none bg-transparent font-mono text-sm outline-none placeholder:text-dim disabled:opacity-50"
                             />
-                            <div className="mt-1 flex justify-end">
+                            <div className="mt-1 flex flex-wrap items-center gap-2">
+                                {catalog.models.length === 0 && catalog.agents.length === 0 ? (
+                                    <p className="font-mono text-xs text-dim">
+                                        No catalog yet. Run `localagents sync-models` on the PC.
+                                    </p>
+                                ) : (
+                                    <>
+                                        <select
+                                            value={agent}
+                                            onChange={(e) => void onClickAgent(e)}
+                                            disabled={busy || !canWrite}
+                                            aria-label="Agent"
+                                            title={agent || "Agent"}
+                                            className="max-w-40 rounded border border-line bg-ink p-1.5 font-mono text-xs disabled:opacity-50"
+                                        >
+                                            {agent.length === 0 && <option value="">Agent…</option>}
+                                            {catalog.agents.map((a, i) => (
+                                                <option key={a.id ?? i} value={a.id ?? ""}>
+                                                    {a.name ?? labelOf(a.id ?? "")}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <select
+                                            value={modelId}
+                                            onChange={(e) => void onClickModel(e)}
+                                            disabled={busy || !canWrite}
+                                            aria-label="Model"
+                                            title={modelId || "Model"}
+                                            className="max-w-[20rem] rounded border border-line bg-ink p-1.5 font-mono text-xs disabled:opacity-50"
+                                        >
+                                            <option value="" disabled>
+                                                (none)
+                                            </option>
+                                            {providers.map(([providerID, models]) => (
+                                                <optgroup key={providerID} label={providerID}>
+                                                    {models.map((m) => (
+                                                        <option key={`${m.providerID}/${m.id}`} value={`${m.providerID}/${m.id}`}>
+                                                            {m.name ?? m.id}
+                                                        </option>
+                                                    ))}
+                                                </optgroup>
+                                            ))}
+                                        </select>
+                                        <select
+                                            value={variant}
+                                            onChange={(e) => void onClickVariant(e)}
+                                            disabled={busy || !canWrite || modelId.length === 0}
+                                            aria-label="Variant"
+                                            title={variant ? labelOf(variant) : "Default"}
+                                            className="max-w-40 rounded border border-line bg-ink p-1.5 font-mono text-xs disabled:opacity-50"
+                                        >
+                                            <option value="">Default</option>
+                                            {variantOptions.map((id) => (
+                                                <option key={id} value={id}>
+                                                    {labelOf(id)}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </>
+                                )}
+                                <div className="flex-1" />
                                 <button
                                     type="button"
                                     onClick={() => void onClickSend()}
                                     disabled={!canWrite || busy || draft.trim().length === 0}
-                                    className="rounded-full bg-go px-3 py-1 font-mono text-sm font-bold text-ink disabled:opacity-50"
+                                    className="rounded-full bg-go px-3.5 py-1.5 font-mono text-base font-bold text-ink disabled:opacity-50"
                                     aria-label="Send message"
                                 >
                                     ↑
@@ -383,21 +849,39 @@ export default function SessionDetailPage() {
 
                 <details open>
                     <summary className="cursor-pointer font-mono text-sm font-bold text-dim">Session stats</summary>
-                    <dl className="mt-2 space-y-1 font-mono text-xs">
-                        {statRows.map(([label, value]) =>
-                            value === "" ? (
-                                <dt key={label} className="pt-2 text-dim">
-                                    {label}
-                                </dt>
-                            ) : (
-                                <div key={label} className="flex justify-between gap-2">
-                                    <dt className="text-dim">{label}</dt>
-                                    <dd className="truncate text-fog">{value}</dd>
-                                </div>
-                            ),
-                        )}
-                    </dl>
+                    {stats && (
+                        <SessionStatsView
+                            stats={stats}
+                            modelName={modelInfo.name}
+                            provider={modelInfo.provider}
+                            contextLimit={modelInfo.contextLimit}
+                            total={totalTokens}
+                            usagePct={usagePct}
+                        />
+                    )}
                 </details>
+
+                {!readOnly && (
+                    <details>
+                        <summary className="cursor-pointer font-mono text-sm font-bold text-dim">
+                            Move to another PC
+                        </summary>
+                        <div className="mt-2 space-y-2">
+                            <p className="text-xs text-dim">
+                                This session was mirrored from a PC. To continue it elsewhere:
+                            </p>
+                            <div className="rounded border border-line bg-black px-3 py-1.5">
+                                <span className="font-mono text-xs">
+                                    <span className="text-go">$ </span>
+                                    <span className="text-fog">localagents push</span>
+                                </span>
+                            </div>
+                            <p className="font-mono text-[10px] text-dim">
+                                Run on the PC that has this session. Then `localagents pull` on the other PC.
+                            </p>
+                        </div>
+                    </details>
+                )}
             </aside>
         </main>
     );
