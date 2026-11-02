@@ -39,6 +39,10 @@ export const sessionsMeta = pgTable("sessions_meta", {
     msgAssistant: integer("msg_assistant"),
     sessionCreatedAt: timestamp("session_created_at", { withTimezone: true }),
     lastSyncAt: timestamp("last_sync_at", { withTimezone: true }),
+    // 본문(메시지)이 마지막으로 미러링된 시각. 헤더 sync와 구분해 "지금 돌고 있는 세션"을 판정한다.
+    lastBodySyncAt: timestamp("last_body_sync_at", { withTimezone: true }),
+    // 부모 세션. 값이 있으면 에이전트가 만든 자식(서브에이전트) 세션이다.
+    parentId: text("parent_id"),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

@@ -1,0 +1,64 @@
+import { Hono } from "hono";
+import { bindEnv, type AppEnv } from "../lib/env";
+import authRoutes from "./routes/auth";
+import pageRoutes from "./pageGuard";
+import webSessions from "./routes/web/sessions";
+import webMessages from "./routes/web/messages";
+import webCommands from "./routes/web/commands";
+import webDevice from "./routes/web/device";
+import webPairing from "./routes/web/pairing";
+import pairingRoutes from "./routes/pairing";
+import daemonBasic from "./routes/daemon/basic";
+import daemonCommands from "./routes/daemon/commands";
+import daemonHeartbeat from "./routes/daemon/heartbeat";
+import daemonSync from "./routes/daemon/sync";
+import daemonMessages from "./routes/daemon/messages";
+import daemonHandoffs from "./routes/daemon/handoffs";
+import daemonPresign from "./routes/daemon/presign";
+import { requireDevice } from "./middleware/device";
+import { requireSession, type AuthVariables } from "./middleware/auth";
+
+// 단일 워커: /api/* 는 여기서, 나머지는 자산(SPA)으로.
+// 등록 순서가 곧 접근 제어다 — requireSession보다 뒤에 등록된 라우트만 인증 대상.
+const app = new Hono<{ Bindings: AppEnv; Variables: AuthVariables }>();
+
+app.use("*", async (c, next) => {
+    bindEnv(c.env);
+    await next();
+});
+
+// 인증 불필요
+app.route("/api/auth", authRoutes);
+app.route("/api/pairing", pairingRoutes);
+app.get("/api/health", (c) => c.json({ success: true, status: 200 }));
+
+// 페이지 가드 (run_worker_first에 등록된 경로만 도달)
+app.route("/", pageRoutes);
+
+// 여기서부터 세션 인증 (API)
+app.use("/api/web/*", requireSession);
+
+app.route("/api/web/sessions", webSessions);
+app.route("/api/web/messages", webMessages);
+app.route("/api/web/commands", webCommands);
+app.route("/api/web/device", webDevice);
+app.route("/api/web/pairing", webPairing);
+
+// 데몬 채널 (기기 토큰)
+app.use("/api/daemon/*", requireDevice);
+app.route("/api/daemon", daemonBasic);
+app.route("/api/daemon/commands", daemonCommands);
+app.route("/api/daemon/heartbeat", daemonHeartbeat);
+app.route("/api/daemon/sync", daemonSync);
+app.route("/api/daemon/messages", daemonMessages);
+app.route("/api/daemon/handoffs/url", daemonPresign);
+app.route("/api/daemon/handoffs", daemonHandoffs);
+
+app.notFound((c) => c.json({ success: false, status: 404, error: `not found: ${c.req.method} ${c.req.path}` }, 404));
+
+app.onError((error, c) => {
+    console.error(`[worker] ${c.req.method} ${c.req.path}:`, error);
+    return c.json({ success: false, status: 500, error: "internal server error" }, 500);
+});
+
+export default app;

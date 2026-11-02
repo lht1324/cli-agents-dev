@@ -1,6 +1,6 @@
 import { drizzle, type NeonHttpDatabase } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
-import { env } from "../env";
+import { requireEnv } from "../env";
 import * as schema from "./schema";
 
 let cached: NeonHttpDatabase<typeof schema> | null = null;
@@ -16,7 +16,7 @@ export function getDb() {
     if (cached) {
         return cached;
     }
-    const url = env.databaseUrl();
+    const url = requireEnv("DATABASE_URL");
     cached = createNeonClient(url);
     return cached;
 }

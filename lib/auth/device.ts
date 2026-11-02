@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { and, eq, isNull, or, sql } from "drizzle-orm";
-import { getDb } from "@/lib/neon/client";
-import { devices, deviceTokens } from "@/lib/neon/schema";
+import { getDb } from "../neon/client";
+import { devices, deviceTokens } from "../neon/schema";
 
 export interface DeviceAuth {
     deviceId: string;

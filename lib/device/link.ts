@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
-import { getDb } from "@/lib/neon/client";
-import { devices, deviceTokens } from "@/lib/neon/schema";
+import { getDb } from "../neon/client";
+import { devices, deviceTokens } from "../neon/schema";
 
 export interface LinkDeviceInput {
     userId: string;

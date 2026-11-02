@@ -33,3 +33,6 @@ Thumbs.db
 # Skills (PC별 설치, Git 추적 제외)
 .agents/skills/
 skills-lock.json
+.dev.vars*
+*.tsbuildinfo
+node_modules/.tmp/

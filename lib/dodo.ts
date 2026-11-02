@@ -2,17 +2,23 @@
 // 상품 ID 하드코딩 없음 — products.list()를 metadata로 매핑 (tailored-ad dodoProducts.ts 패턴).
 // 모드는 DODO_PAYMENTS_ENVIRONMENT로 명시한다 (test_mode | live_mode. SDK 공식 규약).
 // 키 프리픽스로 판정하지 않는다 — Dodo 신형 키는 sk_test_ 프리픽스가 없다. 런타임 프로브도 Cloudflare(엣지)에선 못 쓴다.
-const API_KEY = process.env.DODO_PAYMENTS_API_KEY ?? "";
+import { optionalEnv } from "./env";
 
-const BASE_URL =
-    process.env.DODO_PAYMENTS_ENVIRONMENT === "test_mode"
+// 워커에서는 모듈 로드 시점에 env가 없다. 호출 시점에 읽는다.
+function apiKey(): string {
+    return optionalEnv("DODO_PAYMENTS_API_KEY");
+}
+
+function baseUrl(): string {
+    return optionalEnv("DODO_PAYMENTS_ENVIRONMENT") === "test_mode"
         ? "https://test.dodopayments.com"
         : "https://live.dodopayments.com";
+}
 
 // products.list 한 방.
 async function dodoGet(path: string): Promise<unknown> {
-    const res = await fetch(`${BASE_URL}${path}`, {
-        headers: { Authorization: `Bearer ${API_KEY}` },
+    const res = await fetch(`${baseUrl()}${path}`, {
+        headers: { Authorization: `Bearer ${apiKey()}` },
         signal: AbortSignal.timeout(30_000),
     });
     if (!res.ok) {
@@ -33,7 +39,7 @@ async function resolveMapping(): Promise<Record<BillingInterval, string>> {
     if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
         return cached.byInterval;
     }
-    if (!API_KEY) {
+    if (!apiKey()) {
         throw new Error("DODO_PAYMENTS_API_KEY is not set");
     }
     const data = (await dodoGet("/products?limit=100")) as {
@@ -68,7 +74,7 @@ async function resolveMapping(): Promise<Record<BillingInterval, string>> {
 
 // 체크아웃을 만들려면 API 키 하나면 된다. 상품은 metadata 매핑으로 해석.
 export function dodoConfigured(): boolean {
-    return Boolean(API_KEY);
+    return Boolean(apiKey());
 }
 
 // 체크아웃 세션 생성. metadata의 user_id는 웹훅으로 구독 상태를 유저에 매핑할 때 쓴다.
@@ -82,12 +88,12 @@ export async function createDodoCheckout(
 ): Promise<{ sessionId: string; checkoutUrl: string | null }> {
     const mapping = await resolveMapping();
     const productId = mapping[interval];
-    const base = BASE_URL;
+    const base = baseUrl();
     const res = await fetch(`${base}/checkouts`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${API_KEY}`,
+            Authorization: `Bearer ${apiKey()}`,
         },
         body: JSON.stringify({
             product_cart: [{ product_id: productId, quantity: 1 }],
@@ -130,11 +136,11 @@ export async function setDodoSubscriptionCancel(
     subscriptionId: string,
     cancelAtNextBillingDate: boolean,
 ): Promise<boolean> {
-    const res = await fetch(`${BASE_URL}/subscriptions/${subscriptionId}`, {
+    const res = await fetch(`${baseUrl()}/subscriptions/${subscriptionId}`, {
         method: "PATCH",
         headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${API_KEY}`,
+            Authorization: `Bearer ${apiKey()}`,
         },
         body: JSON.stringify({ cancel_at_next_billing_date: cancelAtNextBillingDate }),
         signal: AbortSignal.timeout(30_000),

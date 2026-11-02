@@ -1,6 +1,6 @@
 import { apiGet, type DiscoveredServer } from "./server";
 import { cloudPost } from "./cloud";
-import { sessionUsage } from "./localdb";
+import { sessionParentId, sessionUsage } from "./localdb";
 
 interface SessionListItem {
     id: string;
@@ -33,6 +33,7 @@ export async function syncSessions(server: DiscoveredServer, progress = false): 
         msgUser?: number;
         msgAssistant?: number;
         sessionCreatedAt?: number | null;
+        parentId?: string;
     }[] = [];
     const body = (await apiGet(server, "/session")) as { data?: SessionListItem[] } | SessionListItem[];
     const list = Array.isArray(body) ? body : (body.data ?? []);
@@ -80,6 +81,7 @@ export async function syncSessions(server: DiscoveredServer, progress = false): 
             lastReasoning: usage.reasoning,
             lastCacheRead: usage.cacheRead,
             lastCacheWrite: usage.cacheWrite,
+            parentId: sessionParentId(s.id) ?? undefined,
             msgUser: usage.msgUser,
             msgAssistant: usage.msgAssistant,
             sessionCreatedAt: created,

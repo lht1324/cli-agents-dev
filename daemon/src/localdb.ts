@@ -247,6 +247,52 @@ function dbFlavor(): "v1" | "v2" {
     }
 }
 
+// 부모 세션 id. 없으면 null (루트). v2 우선, v1 폴백.
+export function sessionParentId(sessionID: string): string | null {
+    const path = dbPath();
+    if (!path) {
+        return null;
+    }
+    const db = openSqlite(path, { readOnly: true });
+    try {
+        const v2 = db.prepare("SELECT parent_id FROM session_v2 WHERE id = ?").get(sessionID) as
+            | { parent_id: string | null }
+            | undefined;
+        if (v2) {
+            return v2.parent_id ?? null;
+        }
+        const v1 = db.prepare("SELECT parent_id FROM session WHERE id = ?").get(sessionID) as
+            | { parent_id: string | null }
+            | undefined;
+        return v1?.parent_id ?? null;
+    } catch {
+        return null;
+    } finally {
+        db.close();
+    }
+}
+
+// 직계 자식 세션 id 목록.
+export function childSessionIds(parentID: string): string[] {
+    const path = dbPath();
+    if (!path) {
+        return [];
+    }
+    const db = openSqlite(path, { readOnly: true });
+    try {
+        const v2 = db.prepare("SELECT id FROM session_v2 WHERE parent_id = ?").all(parentID) as { id: string }[];
+        if (v2.length > 0) {
+            return v2.map((r) => r.id);
+        }
+        const v1 = db.prepare("SELECT id FROM session WHERE parent_id = ?").all(parentID) as { id: string }[];
+        return v1.map((r) => r.id);
+    } catch {
+        return [];
+    } finally {
+        db.close();
+    }
+}
+
 export function sessionExists(sessionID: string): boolean {
     const path = dbPath();
     if (!path) {

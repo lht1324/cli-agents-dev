@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { getDb, subscriptions } from "@/lib/neon";
+import { getDb, subscriptions } from "./neon";
 
 // 과금 게이트. 단일 플랜 + 30일 no-card 트라이얼 (PLAN-BILLING.md).
 // - 구독 active: 통과.

@@ -7,7 +7,7 @@ import { forkAndRegister } from "./fork";
 import { ensureServer, killOwned, type ManagedServer } from "./serve";
 import { syncSessions } from "./sessions";
 import { setSessionAgent, setSessionModel, syncCatalog, type ModelRef } from "./catalog";
-import { backfillMissing, syncActiveMessages, syncMessages } from "./messages";
+import { backfillMissing, syncCurrentSessions, syncMessages } from "./messages";
 import { checkboxPick, dumpTab, listVersions, pickNumbers, pullVersion, pushTabs, syncOneTab, type HandoffVersion } from "./handoff";
 import { countAll, countNewer, epochOf, findLocalDirByRemote, localRoleCounts, repoForDirectory, sessionExists, setTabDirectory } from "./localdb";
 import { askTyped, isDir, pickDirectory } from "./sysdialog";
@@ -782,9 +782,9 @@ async function onRun(): Promise<void> {
                 await pushPending(server);
                 await syncSessions(server);
                 await syncCatalog(server);
-                const active = await syncActiveMessages(server);
-                if (active.sessions > 0) {
-                    console.log(`active-messages: ${active.sessions} sessions, ${active.rows} rows`);
+                const current = await syncCurrentSessions(server);
+                if (current.sessions > 0) {
+                    console.log(`current-sessions: ${current.sessions} sessions, ${current.rows} rows`);
                 }
             } catch (err) {
                 console.error(`sync failed: ${err instanceof Error ? err.message : err}`);
