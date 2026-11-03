@@ -1,8 +1,21 @@
+import { useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router";
 import { useCheckout } from "@/lib/billingClient";
+import { accountClientAPI } from "@/lib/api/client/accountClientAPI";
 
 // 트라이얼 종료 화면. 랜딩 pricing 섹션과 같은 체크아웃 API를 쓴다.
 export default function BillingLockedPage() {
     const { busy, error, startCheckout } = useCheckout();
+    const navigate = useNavigate();
+
+    // 이미 구독 중인데 직접 URL로 들어온 경우 인박스로 돌려보낸다.
+    const { data } = useQuery({ queryKey: ["account"], queryFn: accountClientAPI.getAccount });
+    useEffect(() => {
+        if (data?.status === "active") {
+            navigate("/sessions", { replace: true });
+        }
+    }, [data?.status, navigate]);
 
     return (
         <main className="mx-auto flex max-w-5xl flex-col items-center px-6 py-24 text-center">

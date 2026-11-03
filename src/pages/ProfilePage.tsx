@@ -2,25 +2,9 @@ import { useCallback, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { CreditCard, Mail, Monitor, ScrollText } from "lucide-react";
-import { getJson } from "@/lib/api";
-import { useSubscriptionActions } from "@/lib/billingClient";
+import { accountClientAPI } from "@/lib/api/client/accountClientAPI";
+import { dodoClientAPI } from "@/lib/api/client/dodoClientAPI";
 
-interface ProfileData {
-    email: string | null;
-    name: string | null;
-    image: string | null;
-    memberSince: string | null;
-    planId: string;
-    status: string | null;
-    interval: string | null;
-    currentPeriodEnd: string | null;
-    trialEndsAt: string | null;
-    cancelAtPeriodEnd: boolean;
-    deviceCount: number;
-    sessionCount: number;
-    daysLeft: number | null;
-    billingBlocked: boolean;
-}
 
 function formatDate(iso: string | null | undefined): string {
     if (!iso) {
@@ -40,12 +24,13 @@ function Row({ label, value }: { label: string; value: string }) {
 
 export default function ProfilePage() {
     const queryClient = useQueryClient();
-    const { busy, error: actionError, cancel, resume } = useSubscriptionActions();
     const [showCancelModal, setShowCancelModal] = useState(false);
+    const [busy, setBusy] = useState<"cancel" | "resume" | null>(null);
+    const [actionError, setActionError] = useState<string | null>(null);
 
     const { data, isLoading, error } = useQuery({
         queryKey: ["account"],
-        queryFn: () => getJson<ProfileData>("/api/web/account"),
+        queryFn: accountClientAPI.getAccount,
     });
 
     const onClickCloseModal = useCallback(() => {
@@ -55,20 +40,38 @@ export default function ProfilePage() {
     }, [busy]);
 
     const onConfirmCancel = useCallback(async () => {
-        const ok = await cancel();
-        if (ok) {
+        setBusy("cancel");
+        setActionError(null);
+        try {
+            const ok = await dodoClientAPI.cancelSubscription();
+            if (!ok) {
+                setActionError("Failed to cancel subscription.");
+                return;
+            }
             setShowCancelModal(false);
             // 세션 목록·인박스 판정도 구독 상태를 본다.
+            await queryClient.invalidateQueries({ queryKey: ["account"] });
             void queryClient.invalidateQueries({ queryKey: ["sessions"] });
+        } finally {
+            setBusy(null);
         }
-    }, [cancel, queryClient]);
+    }, [queryClient]);
 
     const onClickResume = useCallback(async () => {
-        const ok = await resume();
-        if (ok) {
+        setBusy("resume");
+        setActionError(null);
+        try {
+            const ok = await dodoClientAPI.resumeSubscription();
+            if (!ok) {
+                setActionError("Failed to resume subscription.");
+                return;
+            }
+            await queryClient.invalidateQueries({ queryKey: ["account"] });
             void queryClient.invalidateQueries({ queryKey: ["sessions"] });
+        } finally {
+            setBusy(null);
         }
-    }, [resume, queryClient]);
+    }, [queryClient]);
 
     if (isLoading) {
         return <main className="px-6 py-10 font-mono text-xs text-dim">loading…</main>;

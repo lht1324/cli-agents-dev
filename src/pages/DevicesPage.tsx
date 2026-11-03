@@ -1,15 +1,7 @@
 import { useCallback, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Unlink } from "lucide-react";
-import { getJson } from "@/lib/api";
-
-interface DeviceRow {
-    id: string;
-    label: string;
-    platform: string | null;
-    hostname: string | null;
-    lastSeenAt: string | null;
-}
+import { devicesClientAPI, type DeviceRow } from "@/lib/api/client/devicesClientAPI";
 
 type Presence = "online" | "stale" | "offline";
 
@@ -63,9 +55,9 @@ export default function DevicesPage() {
 
     const { data, isLoading, error: loadError } = useQuery({
         queryKey: ["devices"],
-        queryFn: () => getJson<{ items: DeviceRow[] }>("/api/web/account/devices"),
+        queryFn: devicesClientAPI.getDevices,
     });
-    const items = data?.items ?? [];
+    const items = data ?? [];
 
     const onClickUnlink = useCallback((row: DeviceRow) => {
         setError(null);
@@ -84,12 +76,9 @@ export default function DevicesPage() {
         }
         setIsUnlinking(true);
         try {
-            const res = await fetch(`/api/web/devices?deviceId=${encodeURIComponent(unlinkTarget.id)}`, {
-                method: "DELETE",
-            });
-            const body = (await res.json()) as { success: boolean; error?: string };
-            if (!res.ok || !body.success) {
-                setError(body.error ?? "Failed to unlink device.");
+            const ok = await devicesClientAPI.deleteDeviceById(unlinkTarget.id);
+            if (!ok) {
+                setError("Failed to unlink device.");
                 return;
             }
             setUnlinkTarget(null);

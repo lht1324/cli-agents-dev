@@ -24,6 +24,16 @@ webDodo.post("/checkout", async (c) => {
     if (body.interval !== "monthly" && body.interval !== "annual") {
         return getBaseResponse({ success: false, status: 400, error: "interval must be monthly or annual" });
     }
+    // 이미 구독 중이면 새 체크아웃을 만들지 않는다 (중복 결제 방지).
+    // 해지 예약 상태여도 기간이 남아 있으면 active이므로 함께 막힌다.
+    const [existing] = await getDb()
+        .select({ status: subscriptions.status })
+        .from(subscriptions)
+        .where(eq(subscriptions.userId, userId))
+        .limit(1);
+    if (existing?.status === "active") {
+        return getBaseResponse({ success: false, status: 409, error: "already_subscribed" });
+    }
     // 되돌아올 페이지 origin. return_url에는 토큰이 실리지 않으므로 변조 위험이 낮다.
     const origin =
         typeof body.origin === "string" && body.origin.startsWith("http") ? body.origin : new URL(c.req.url).origin;

@@ -1,28 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import SessionsEmptyState from "@/components/SessionsEmptyState";
-
-interface SessionRow {
-    id: string;
-    title: string;
-    status: string;
-    lastSyncAt: string | null;
-    lastBodySyncAt: string | null;
-    updatedAt: string;
-    live: boolean;
-}
-
-interface Waiting {
-    newTabs: number;
-    updatedTabs: number;
-}
-
-interface SessionsResponse {
-    success: boolean;
-    status: number;
-    error?: string;
-    data?: { items: SessionRow[]; waiting: Waiting | null };
-}
+import { sessionsClientAPI, type SessionRow } from "@/lib/api/client/sessionsClientAPI";
 
 // 절대 시각은 모든 행이 같아 의미가 없다. 마지막으로 본문이 올라온 시점을 상대 표기로 보여준다.
 function relativeTime(iso: string | null): string | null {
@@ -43,7 +22,7 @@ function relativeTime(iso: string | null): string | null {
     return `${Math.floor(hours / 24)}d ago`;
 }
 
-function waitingMessage(waiting: Waiting): string {
+function waitingMessage(waiting: { newTabs: number; updatedTabs: number }): string {
     if (waiting.newTabs > 0 && waiting.updatedTabs === 0) {
         return `${waiting.newTabs} new ${waiting.newTabs === 1 ? "session" : "sessions"} from your other PC.`;
     }
@@ -56,22 +35,10 @@ function waitingMessage(waiting: Waiting): string {
 export default function SessionsPage() {
     const { data, isLoading, error } = useQuery({
         queryKey: ["sessions"],
-        queryFn: async (): Promise<{ items: SessionRow[]; waiting: Waiting | null }> => {
-            const res = await fetch("/api/web/sessions");
-            const body = (await res.json()) as SessionsResponse;
-            // 체험 종료(107)면 인박스 대신 이용 정지 화면으로 보낸다.
-            if (res.status === 107) {
-                window.location.href = "/billing/locked";
-                throw new Error("trial_ended");
-            }
-            if (!res.ok || !body.success) {
-                throw new Error(body.error ?? `sessions ${res.status}`);
-            }
-            return { items: body.data?.items ?? [], waiting: body.data?.waiting ?? null };
-        },
+        queryFn: sessionsClientAPI.getSessions,
     });
 
-    const items = data?.items ?? [];
+    const items: SessionRow[] = data?.items ?? [];
     const waiting = data?.waiting ?? null;
 
     return (

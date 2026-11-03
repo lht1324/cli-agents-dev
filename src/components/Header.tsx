@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { authClient } from "@/lib/auth/client";
 import BrandMark from "./BrandMark";
+import { accountClientAPI } from "@/lib/api/client/accountClientAPI";
 
 // 공통 헤더. 유저 메뉴는 직접 만든다 (auth-ui 미사용 — lib/auth/client.ts 주석 참조).
 export default function Header() {
@@ -22,13 +23,8 @@ export default function Header() {
             }
             setUser({ email: u.email ?? null, name: u.name ?? null, image: u.image ?? null });
             // 체험 카운트다운. 유료(null)면 표시하지 않는다.
-            try {
-                const res = await fetch("/api/web/me");
-                const body = (await res.json()) as { data?: { daysLeft?: number | null } };
-                setDaysLeft(typeof body.data?.daysLeft === "number" ? body.data.daysLeft : null);
-            } catch {
-                setDaysLeft(null);
-            }
+            const billing = await accountClientAPI.getBillingStatus();
+            setDaysLeft(typeof billing?.daysLeft === "number" ? billing.daysLeft : null);
         })();
     }, []);
 

@@ -1,14 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router";
-
-interface PairingInfo {
-    device: string;
-    port: string;
-    state: string;
-    label: string;
-    platform: string;
-    hostname: string;
-}
+import { pairingClientAPI, type PairingInfo } from "@/lib/api/client/pairingClientAPI";
 
 function platformLabel(platform: string): string {
     if (platform === "darwin") {
@@ -34,17 +26,12 @@ export default function DeviceAuthorizePage() {
         const data = params.get("data");
         if (data) {
             void (async () => {
-                try {
-                    const res = await fetch(`/api/web/pairing/inspect?data=${encodeURIComponent(data)}`);
-                    const body = (await res.json()) as { success: boolean; data?: PairingInfo; error?: string };
-                    if (!res.ok || !body.success || !body.data) {
-                        setError(body.error ?? "invalid link");
-                        return;
-                    }
-                    setInfo(body.data);
-                } catch {
+                const pairing = await pairingClientAPI.inspectPairing(data);
+                if (!pairing) {
                     setError("invalid link");
+                    return;
                 }
+                setInfo(pairing);
             })();
             return;
         }
@@ -65,25 +52,17 @@ export default function DeviceAuthorizePage() {
         setBusy(true);
         setError(null);
         try {
-            const res = await fetch("/api/web/device/authorize", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    deviceId: info.device,
-                    label: info.label,
-                    platform: info.platform,
-                    hostname: info.hostname,
-                }),
+            const authorized = await pairingClientAPI.authorizeDevice({
+                deviceId: info.device,
+                label: info.label,
+                platform: info.platform,
+                hostname: info.hostname,
             });
-            const body = (await res.json()) as { success: boolean; data?: { token?: string }; error?: string };
-            const token = body.data?.token;
-            if (!res.ok || !body.success || !token) {
-                setError(body.error ?? "failed to connect");
+            if (!authorized) {
+                setError("failed to connect");
                 return;
             }
-            window.location.href = `http://127.0.0.1:${info.port}/callback?token=${encodeURIComponent(token)}&state=${encodeURIComponent(info.state)}`;
-        } catch {
-            setError("failed to connect");
+            window.location.href = `http://127.0.0.1:${info.port}/callback?token=${encodeURIComponent(authorized.token)}&state=${encodeURIComponent(info.state)}`;
         } finally {
             setBusy(false);
         }

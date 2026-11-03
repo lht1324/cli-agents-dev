@@ -3,80 +3,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
 import MarkdownText from "@/components/MarkdownText";
 import { editCounts, parseToolCall, toolDetail, toolSummary, type ToolCall } from "@/lib/toolFormat";
-import { getJson } from "@/lib/api";
-
-interface Info {
-    id: string;
-    title: string;
-    status: string;
-    deviceId: string;
-    agent: string | null;
-    model: string | null;
-    lastSyncAt: string | null;
-    deviceLastSeenAt: string | null;
-    parentId: string | null;
-    readOnly: boolean;
-}
-
-interface SubagentRow {
-    id: string;
-    title: string;
-    synced: boolean;
-}
-
-interface Approval {
-    id: string;
-    deviceId: string;
-    action: string;
-    resources: string;
-    message: string | null;
-}
-
-interface Msg {
-    id: string;
-    seq: number;
-    role: string;
-    kind: string;
-    body: string;
-    createdAt: string | null;
-}
-
-interface Target {
-    deviceId: string;
-    label: string;
-    lastSeenAt: string | null;
-    active: boolean;
-}
-
-interface Stats {
-    cost: number | null;
-    input: number | null;
-    output: number | null;
-    reasoning: number | null;
-    cacheRead: number | null;
-    cacheWrite: number | null;
-    msgUser: number | null;
-    msgAssistant: number | null;
-    createdAt: string | null;
-}
-
-interface Detail {
-    info: Info;
-    approvals: Approval[];
-    messages: Msg[];
-    stats: Stats;
-    targets: Target[];
-    defaultTarget: string | null;
-    catalogJson: string | null;
-    subagents: SubagentRow[];
-}
-
-interface ThreadPayload {
-    messages: Msg[];
-    deviceLastSeenAt: string | null;
-    lastSyncAt: string | null;
-    lastCommand: { type: string; status: string; result: string | null; createdAt: string | null } | null;
-}
+import { sessionsClientAPI, type SessionStats as Stats, type ApprovalRow as Approval } from "@/lib/api/client/sessionsClientAPI";
+import { messagesClientAPI } from "@/lib/api/client/messagesClientAPI";
+import { commandsClientAPI } from "@/lib/api/client/commandsClientAPI";
 
 function stamp(iso: string | null): string | null {
     if (!iso) {
@@ -342,13 +271,13 @@ export default function SessionDetailPage() {
 
     const detail = useQuery({
         queryKey: ["session", sessionId],
-        queryFn: () => getJson<Detail>(`/api/web/sessions/${encodeURIComponent(sessionId)}`),
+        queryFn: () => sessionsClientAPI.getSessionById(sessionId),
         enabled: sessionId.length > 0,
     });
 
     const thread = useQuery({
         queryKey: ["thread", sessionId],
-        queryFn: () => getJson<ThreadPayload>(`/api/web/messages?tabId=${encodeURIComponent(sessionId)}`),
+        queryFn: () => messagesClientAPI.getMessagesBySessionId(sessionId),
         enabled: sessionId.length > 0,
         refetchInterval: 5000,
         refetchIntervalInBackground: false,
@@ -448,14 +377,13 @@ export default function SessionDetailPage() {
             setBusy(true);
             setNotice(null);
             try {
-                const res = await fetch("/api/web/commands", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ deviceId, type, payload: JSON.stringify(payload) }),
+                const ok = await commandsClientAPI.queueCommand({
+                    deviceId,
+                    type: type as "approve" | "message" | "set-agent" | "set-model",
+                    payload,
                 });
-                const body = (await res.json()) as { success: boolean; error?: string };
-                if (!res.ok || !body.success) {
-                    setNotice(`failed: ${body.error ?? res.status}`);
+                if (!ok) {
+                    setNotice("failed to queue command");
                     return false;
                 }
                 void queryClient.invalidateQueries({ queryKey: ["thread", sessionId] });

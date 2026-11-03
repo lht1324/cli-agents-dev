@@ -100,10 +100,14 @@ async function upsertSubscription(
         interval: string | null;
         currentPeriodEnd: Date | null;
         cancelAtPeriodEnd?: boolean;
+        // 구독이 활성화되는 순간 트라이얼을 소진한다.
+        // trial_ends_at을 NULL로 두면 게이트가 "트라이얼 미시작"으로 보고 30일을 다시 준다.
+        consumeTrial?: boolean;
     },
 ): Promise<void> {
     const db = getDb();
-    const { cancelAtPeriodEnd, ...rest } = values;
+    const { cancelAtPeriodEnd, consumeTrial, ...rest } = values;
+    const trialPatch = consumeTrial ? { trialEndsAt: new Date() } : {};
     await db
         .insert(subscriptions)
         .values({
@@ -111,6 +115,7 @@ async function upsertSubscription(
             planId: "pro",
             syncIntervalSec: planOf("pro").syncIntervalSec,
             ...rest,
+            ...trialPatch,
             ...(cancelAtPeriodEnd !== undefined ? { cancelAtPeriodEnd } : {}),
             updatedAt: new Date(),
         })
@@ -118,6 +123,7 @@ async function upsertSubscription(
             target: subscriptions.userId,
             set: {
                 ...rest,
+                ...trialPatch,
                 // 해지 예약은 갱신 이벤트가 명시적으로 풀 때만 되돌린다.
                 // 그 외 이벤트에서 undefined면 기존 값을 유지해야 예약이 지워지지 않는다.
                 ...(cancelAtPeriodEnd !== undefined ? { cancelAtPeriodEnd } : {}),
@@ -172,6 +178,7 @@ webhookDodo.post("/", async (c) => {
                     interval: body.data?.metadata?.interval ?? null,
                     currentPeriodEnd: periodEnd,
                     cancelAtPeriodEnd,
+                    consumeTrial: status === "active",
                 });
                 break;
             }

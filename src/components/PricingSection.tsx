@@ -1,4 +1,5 @@
-import { useCheckout, type BillingInterval } from "@/lib/billingClient";
+import { useCheckout } from "@/lib/billingClient";
+import type { BillingInterval } from "@/lib/api/client/dodoClientAPI";
 
 interface Plan {
     interval: BillingInterval;
