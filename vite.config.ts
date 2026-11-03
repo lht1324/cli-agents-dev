@@ -9,7 +9,9 @@ import { cloudflare } from "@cloudflare/vite-plugin";
 export default defineConfig({
     // 기존 클라 dev 포트 유지 (데몬 baseUrl·문서와 맞춤)
     // dev.localagents.link는 cloudflared 터널로 들어오는 공개 주소다 (Dodo 웹훅 수신용).
-    server: { port: 3004, allowedHosts: ["dev.localagents.link", ".localagents.link"] },
+    // strictPort: 3004가 사용 중이면 다른 포트로 도망가지 않고 즉시 실패한다.
+    // 도망가면 터널(3004)이 죽은 포트를 가리켜 웹훅이 조용히 사라진다.
+    server: { port: 3004, strictPort: true, allowedHosts: ["dev.localagents.link", ".localagents.link"] },
     resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
     plugins: [react(), tailwindcss(), cloudflare({ viteEnvironment: { name: "worker" } })],
     environments: {
