@@ -24,6 +24,7 @@ import daemonPresign from "./routes/daemon/presign";
 import { requireDevice } from "./middleware/device";
 import { requireSession, type AuthVariables } from "./middleware/auth";
 import { bodyLimit } from "./middleware/bodyLimit";
+import { getBaseResponse } from "./utils/getBaseResponse";
 
 // 단일 워커: /api/* 는 여기서, 나머지는 자산(SPA)으로.
 // 등록 순서가 곧 접근 제어다 — requireSession보다 뒤에 등록된 라우트만 인증 대상.
@@ -42,7 +43,7 @@ app.route("/api/pairing", pairingRoutes);
 // Dodo가 직접 부르는 공개 엔드포인트. 서명 검증이 곧 인증이다.
 app.route("/api/webhook/dodo", webhookDodo);
 app.route("/", seoRoutes);
-app.get("/api/health", (c) => c.json({ success: true, status: 200 }));
+app.get("/api/health", () => getBaseResponse({ success: true, status: 200 }));
 
 // 페이지 가드 (run_worker_first에 등록된 경로만 도달)
 app.route("/", pageRoutes);
@@ -70,11 +71,11 @@ app.route("/api/daemon/messages", daemonMessages);
 app.route("/api/daemon/handoffs/url", daemonPresign);
 app.route("/api/daemon/handoffs", daemonHandoffs);
 
-app.notFound((c) => c.json({ success: false, status: 404, error: `not found: ${c.req.method} ${c.req.path}` }, 404));
+app.notFound((c) => getBaseResponse({ success: false, status: 404, error: `not found: ${c.req.method} ${c.req.path}` }));
 
 app.onError((error, c) => {
     console.error(`[worker] ${c.req.method} ${c.req.path}:`, error);
-    return c.json({ success: false, status: 500, error: "internal server error" }, 500);
+    return getBaseResponse({ success: false, status: 500, error: "internal server error" });
 });
 
 export default app;

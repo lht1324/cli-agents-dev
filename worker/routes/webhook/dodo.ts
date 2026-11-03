@@ -3,6 +3,7 @@ import { optionalEnv, type AppEnv } from "../../../lib/env";
 import { getDb } from "../../../lib/neon/client";
 import { subscriptions } from "../../../lib/neon/schema";
 import { planOf } from "../../../lib/plans";
+import { getBaseResponse } from "../../utils/getBaseResponse";
 
 // Dodo 웹훅 수신. Dodo 서버가 외부에서 직접 부르는 공개 엔드포인트라
 // 게이트웨이 내부 헤더 인증을 타지 않는다 — 서명 검증이 곧 인증이다.
@@ -130,23 +131,23 @@ const webhookDodo = new Hono<{ Bindings: AppEnv }>();
 webhookDodo.post("/", async (c) => {
     const key = await webhookKey();
     if (!key) {
-        return c.json({ success: false, status: 503, error: "webhook key not configured" }, 503);
+        return getBaseResponse({ success: false, status: 503, error: "webhook key not configured" });
     }
     // 서명은 원문 바이트 기준이라 text로 읽는다 (json()을 먼저 쓰면 재직렬화로 서명이 깨진다).
     const payload = await c.req.text();
     if (!(await verifySignature(c.req.raw.headers, payload, key))) {
-        return c.json({ success: false, status: 401, error: "invalid signature" }, 401);
+        return getBaseResponse({ success: false, status: 401, error: "invalid signature" });
     }
     let body: WebhookBody;
     try {
         body = JSON.parse(payload) as WebhookBody;
     } catch {
-        return c.json({ success: false, status: 400, error: "invalid JSON" }, 400);
+        return getBaseResponse({ success: false, status: 400, error: "invalid JSON" });
     }
     const userId = body.data?.metadata?.user_id;
     if (!userId || typeof userId !== "string") {
         // 유저 매핑 없는 이벤트는 처리 대상이 아니다. 재시도 시키지 않는다.
-        return c.json({ success: true, status: 200, message: "ignored (no user metadata)" });
+        return getBaseResponse({ success: true, status: 200, message: "ignored (no user metadata)" });
     }
     // 구독 ID는 이벤트 버전별로 필드 위치가 갈린다. subscription_id 우선, id 예비.
     const data = (body.data ?? null) as Record<string, unknown> | null;
@@ -192,9 +193,9 @@ webhookDodo.post("/", async (c) => {
     } catch (error) {
         console.error("[webhook] dodo:", error);
         // DB 장애는 5xx로 반환해 Dodo가 재시도하게 둔다.
-        return c.json({ success: false, status: 500, error: "webhook processing failed" }, 500);
+        return getBaseResponse({ success: false, status: 500, error: "webhook processing failed" });
     }
-    return c.json({ success: true, status: 200 });
+    return getBaseResponse({ success: true, status: 200 });
 });
 
 export default webhookDodo;

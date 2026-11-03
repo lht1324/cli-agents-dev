@@ -1,6 +1,7 @@
 import { createMiddleware } from "hono/factory";
 import { getAuthForRequest } from "../auth";
 import type { AppEnv } from "../../lib/env";
+import { getBaseResponse } from "../utils/getBaseResponse";
 
 // 세션 인증을 한 곳에서 처리한다.
 //   requireSession — API(/api/*). 실패하면 JSON 401
@@ -60,10 +61,10 @@ export const requireSession = createMiddleware<{
         c.header("Set-Cookie", cookie, { append: true });
     }
     if (failed) {
-        return c.json({ success: false, status: 401, error: "unauthorized: session check failed" }, 401);
+        return getBaseResponse({ success: false, status: 401, error: "unauthorized: session check failed" });
     }
     if (!user) {
-        return c.json({ success: false, status: 401, error: "unauthorized" }, 401);
+        return getBaseResponse({ success: false, status: 401, error: "unauthorized" });
     }
     c.set("userId", user.id);
     await next();

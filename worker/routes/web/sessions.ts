@@ -14,6 +14,7 @@ import {
 } from "../../../lib/neon/schema";
 import type { AppEnv } from "../../../lib/env";
 import type { AuthVariables } from "../../middleware/auth";
+import { getBaseResponse } from "../../utils/getBaseResponse";
 
 const sessions = new Hono<{ Bindings: AppEnv; Variables: AuthVariables }>();
 
@@ -24,7 +25,7 @@ sessions.get("/", async (c) => {
     const userId = c.get("userId");
     const gate = await checkBillingGate(userId);
     if (!gate.allowed) {
-        return c.json({ success: false, status: 403, error: "trial_ended" }, 403);
+        return getBaseResponse({ success: false, status: 403, error: "trial_ended" });
     }
     const db = getDb();
     const rows = await db
@@ -85,7 +86,7 @@ sessions.get("/", async (c) => {
     }
     const waiting = newTabs + updatedTabs > 0 ? { newTabs, updatedTabs } : null;
 
-    return c.json({
+    return getBaseResponse({
         success: true,
         status: 200,
         data: {
@@ -107,7 +108,7 @@ sessions.get("/:id", async (c) => {
     const id = c.req.param("id");
     const gate = await checkBillingGate(userId);
     if (!gate.allowed) {
-        return c.json({ success: false, status: 403, error: "trial_ended" }, 403);
+        return getBaseResponse({ success: false, status: 403, error: "trial_ended" });
     }
     const db = getDb();
 
@@ -155,7 +156,7 @@ sessions.get("/:id", async (c) => {
         .innerJoin(devices, eq(sessionsMeta.deviceId, devices.id))
         .where(and(eq(sessionsMeta.id, id), eq(sessionsMeta.userId, userId)));
     if (meta.length === 0) {
-        return c.json({ success: false, status: 404, error: "session not found" }, 404);
+        return getBaseResponse({ success: false, status: 404, error: "session not found" });
     }
 
     // 명령 대상 후보 = 이 세션을 가진 내 기기 중 활성(heartbeat 2분)
@@ -225,7 +226,7 @@ sessions.get("/:id", async (c) => {
         .orderBy(desc(sessionsMeta.updatedAt));
 
     const m0 = meta[0];
-    return c.json({
+    return getBaseResponse({
         success: true,
         status: 200,
         data: {

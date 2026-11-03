@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { checkBillingGate } from "../../../lib/billing";
 import { requireEnv, type AppEnv } from "../../../lib/env";
 import type { DeviceVariables } from "../../middleware/device";
+import { getBaseResponse } from "../../utils/getBaseResponse";
 
 const BUCKET = "localagents-handoffs";
 
@@ -13,20 +14,20 @@ presign.post("/", async (c) => {
     const userId = c.get("userId");
     const gate = await checkBillingGate(userId);
     if (!gate.allowed) {
-        return c.json({ success: false, status: 403, error: "trial_ended" }, 403);
+        return getBaseResponse({ success: false, status: 403, error: "trial_ended" });
     }
 
     let body: { operation?: unknown; key?: unknown };
     try {
         body = (await c.req.json()) as { operation?: unknown; key?: unknown };
     } catch {
-        return c.json({ success: false, status: 400, error: "invalid JSON body" }, 400);
+        return getBaseResponse({ success: false, status: 400, error: "invalid JSON body" });
     }
     if (body.operation !== "upload" && body.operation !== "download") {
-        return c.json({ success: false, status: 400, error: "operation must be upload or download" }, 400);
+        return getBaseResponse({ success: false, status: 400, error: "operation must be upload or download" });
     }
     if (typeof body.key !== "string" || !body.key.startsWith(`${userId}/`)) {
-        return c.json({ success: false, status: 403, error: "key must start with your user id" }, 403);
+        return getBaseResponse({ success: false, status: 403, error: "key must start with your user id" });
     }
 
     const objectKey = encodeURIComponent(body.key);
@@ -48,16 +49,13 @@ presign.post("/", async (c) => {
     });
     if (!res.ok) {
         const text = await res.text();
-        return c.json(
-            { success: false, status: 502, error: `presign failed: ${res.status} ${text.slice(0, 150)}` },
-            502,
-        );
+        return getBaseResponse({ success: false, status: 502, error: `presign failed: ${res.status} ${text.slice(0, 150)}` });
     }
     const signed = (await res.json()) as { url?: string; method?: string; headers?: Record<string, string> };
     if (typeof signed.url !== "string") {
-        return c.json({ success: false, status: 502, error: "presign returned no url" }, 502);
+        return getBaseResponse({ success: false, status: 502, error: "presign returned no url" });
     }
-    return c.json({
+    return getBaseResponse({
         success: true,
         status: 200,
         data: {

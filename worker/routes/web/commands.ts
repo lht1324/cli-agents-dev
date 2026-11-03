@@ -6,6 +6,7 @@ import { getDb } from "../../../lib/neon/client";
 import { commands, devices, sessionsMeta } from "../../../lib/neon/schema";
 import type { AppEnv } from "../../../lib/env";
 import type { AuthVariables } from "../../middleware/auth";
+import { getBaseResponse } from "../../utils/getBaseResponse";
 
 const EXPIRES_IN_MS = 7 * 24 * 60 * 60 * 1000;
 const ACTIVE_MS = 120_000;
@@ -23,20 +24,20 @@ commandsRoute.post("/", async (c) => {
     const userId = c.get("userId");
     const gate = await checkBillingGate(userId);
     if (!gate.allowed) {
-        return c.json({ success: false, status: 403, error: "trial_ended" }, 403);
+        return getBaseResponse({ success: false, status: 403, error: "trial_ended" });
     }
 
     let body: CommandBody;
     try {
         body = (await c.req.json()) as CommandBody;
     } catch {
-        return c.json({ success: false, status: 400, error: "invalid JSON body" }, 400);
+        return getBaseResponse({ success: false, status: 400, error: "invalid JSON body" });
     }
     if (typeof body.deviceId !== "string" || body.deviceId.length === 0) {
-        return c.json({ success: false, status: 400, error: "deviceId is required" }, 400);
+        return getBaseResponse({ success: false, status: 400, error: "deviceId is required" });
     }
     if (typeof body.type !== "string" || body.type.length === 0) {
-        return c.json({ success: false, status: 400, error: "type is required" }, 400);
+        return getBaseResponse({ success: false, status: 400, error: "type is required" });
     }
 
     const db = getDb();
@@ -46,11 +47,11 @@ commandsRoute.post("/", async (c) => {
         .where(and(eq(devices.id, body.deviceId), eq(devices.userId, userId), isNull(devices.unlinkedAt)))
         .limit(1);
     if (target.length === 0) {
-        return c.json({ success: false, status: 404, error: "device not found" }, 404);
+        return getBaseResponse({ success: false, status: 404, error: "device not found" });
     }
     const lastSeen = target[0].lastSeenAt;
     if (!lastSeen || Date.now() - lastSeen.getTime() > ACTIVE_MS) {
-        return c.json({ success: false, status: 409, error: "device is not active" }, 409);
+        return getBaseResponse({ success: false, status: 409, error: "device is not active" });
     }
 
     const payloadText = typeof body.payload === "string" ? body.payload : "{}";
@@ -68,7 +69,7 @@ commandsRoute.post("/", async (c) => {
             .where(and(eq(sessionsMeta.id, tabId), eq(sessionsMeta.userId, userId)))
             .limit(1);
         if (owned.length === 0) {
-            return c.json({ success: false, status: 404, error: "session not found" }, 404);
+            return getBaseResponse({ success: false, status: 404, error: "session not found" });
         }
     }
 
@@ -83,7 +84,7 @@ commandsRoute.post("/", async (c) => {
         idempotencyKey: randomUUID(),
         expiresAt: new Date(Date.now() + EXPIRES_IN_MS),
     });
-    return c.json({ success: true, status: 201, data: { id, status: "pending" } }, 201);
+    return getBaseResponse({ success: true, status: 201, data: { id, status: "pending" } });
 });
 
 export default commandsRoute;

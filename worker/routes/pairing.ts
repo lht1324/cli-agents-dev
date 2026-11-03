@@ -8,6 +8,7 @@ import { getDb } from "../../lib/neon/client";
 import { devices } from "../../lib/neon/schema";
 import type { AppEnv } from "../../lib/env";
 import { loadSessionUser } from "../middleware/auth";
+import { getBaseResponse } from "../utils/getBaseResponse";
 
 // 기기 연결 공개 흐름. 로그인 전에도 호출된다.
 const pairing = new Hono<{ Bindings: AppEnv }>();
@@ -136,13 +137,13 @@ pairing.post("/pack", async (c) => {
     try {
         body = (await c.req.json()) as Record<string, unknown>;
     } catch {
-        return c.json({ success: false, status: 400, error: "invalid JSON body" }, 400);
+        return getBaseResponse({ success: false, status: 400, error: "invalid JSON body" });
     }
     const device = typeof body.device === "string" ? body.device : "";
     const port = typeof body.port === "string" ? body.port : "";
     const state = typeof body.state === "string" ? body.state : "";
     if (!device || !port || !state) {
-        return c.json({ success: false, status: 400, error: "device, port, state are required" }, 400);
+        return getBaseResponse({ success: false, status: 400, error: "device, port, state are required" });
     }
     try {
         const data = sealConnect({
@@ -153,9 +154,9 @@ pairing.post("/pack", async (c) => {
             platform: typeof body.platform === "string" ? body.platform : "",
             hostname: typeof body.hostname === "string" ? body.hostname : "",
         });
-        return c.json({ success: true, status: 200, data: { data } });
+        return getBaseResponse({ success: true, status: 200, data: { data } });
     } catch {
-        return c.json({ success: false, status: 500, error: "packet key is not set" }, 500);
+        return getBaseResponse({ success: false, status: 500, error: "packet key is not set" });
     }
 });
 

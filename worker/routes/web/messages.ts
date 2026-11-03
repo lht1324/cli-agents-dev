@@ -4,6 +4,7 @@ import { getDb } from "../../../lib/neon/client";
 import { cloudMessages, cloudTabs, commands, devices, sessionsMeta } from "../../../lib/neon/schema";
 import type { AppEnv } from "../../../lib/env";
 import type { AuthVariables } from "../../middleware/auth";
+import { getBaseResponse } from "../../utils/getBaseResponse";
 
 // 상세 화면 5초 폴링: 스레드 + presence + 마지막 명령 결과
 const messages = new Hono<{ Bindings: AppEnv; Variables: AuthVariables }>();
@@ -12,7 +13,7 @@ messages.get("/", async (c) => {
     const userId = c.get("userId");
     const tabId = c.req.query("tabId");
     if (!tabId) {
-        return c.json({ success: false, status: 400, error: "tabId is required" }, 400);
+        return getBaseResponse({ success: false, status: 400, error: "tabId is required" });
     }
     const db = getDb();
     const thread = await db
@@ -44,7 +45,7 @@ messages.get("/", async (c) => {
         .orderBy(desc(commands.createdAt))
         .limit(1);
 
-    return c.json({
+    return getBaseResponse({
         success: true,
         status: 200,
         data: {

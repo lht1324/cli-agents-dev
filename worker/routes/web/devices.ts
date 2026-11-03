@@ -11,6 +11,7 @@ import {
 } from "../../../lib/neon/schema";
 import type { AppEnv } from "../../../lib/env";
 import type { AuthVariables } from "../../middleware/auth";
+import { getBaseResponse } from "../../utils/getBaseResponse";
 
 const webDevices = new Hono<{ Bindings: AppEnv; Variables: AuthVariables }>();
 
@@ -22,7 +23,7 @@ webDevices.delete("/", async (c) => {
     const userId = c.get("userId");
     const deviceId = c.req.query("deviceId");
     if (!deviceId) {
-        return c.json({ success: false, status: 400, error: "deviceId required" }, 400);
+        return getBaseResponse({ success: false, status: 400, error: "deviceId required" });
     }
     const db = getDb();
     const [row] = await db
@@ -31,7 +32,7 @@ webDevices.delete("/", async (c) => {
         .where(and(eq(devices.id, deviceId), eq(devices.userId, userId), isNull(devices.unlinkedAt)))
         .limit(1);
     if (!row) {
-        return c.json({ success: false, status: 404, error: "device not found" }, 404);
+        return getBaseResponse({ success: false, status: 404, error: "device not found" });
     }
     const now = new Date();
     await db
@@ -60,7 +61,7 @@ webDevices.delete("/", async (c) => {
         .update(devices)
         .set({ unlinkedAt: now })
         .where(and(eq(devices.id, deviceId), eq(devices.userId, userId)));
-    return c.json({ success: true, status: 200, data: { deviceId } });
+    return getBaseResponse({ success: true, status: 200, data: { deviceId } });
 });
 
 export default webDevices;

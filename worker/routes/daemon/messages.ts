@@ -5,6 +5,7 @@ import { getDb } from "../../../lib/neon/client";
 import { cloudMessages, cloudTabs, sessionLocations, sessionsMeta } from "../../../lib/neon/schema";
 import type { AppEnv } from "../../../lib/env";
 import type { DeviceVariables } from "../../middleware/device";
+import { getBaseResponse } from "../../utils/getBaseResponse";
 
 interface MessageRow {
     sessionID?: unknown;
@@ -25,7 +26,7 @@ daemonMessages.get("/watermark", async (c) => {
     const userId = c.get("userId");
     const sessionID = c.req.query("sessionID");
     if (!sessionID) {
-        return c.json({ success: false, status: 400, error: "sessionID is required" }, 400);
+        return getBaseResponse({ success: false, status: 400, error: "sessionID is required" });
     }
     const rows = await getDb()
         .select({
@@ -39,7 +40,7 @@ daemonMessages.get("/watermark", async (c) => {
         .orderBy(desc(cloudMessages.createdAt), desc(cloudMessages.seq))
         .limit(1);
     const row = rows[0];
-    return c.json({
+    return getBaseResponse({
         success: true,
         status: 200,
         data: row ? { messageId: row.messageId, seq: row.seq, createdAt: row.createdAt.getTime() } : null,
@@ -52,13 +53,13 @@ daemonMessages.post("/", async (c) => {
     const deviceId = c.get("deviceId");
     const gate = await checkBillingGate(userId);
     if (!gate.allowed) {
-        return c.json({ success: false, status: 403, error: "trial_ended" }, 403);
+        return getBaseResponse({ success: false, status: 403, error: "trial_ended" });
     }
     let body: { messages?: unknown };
     try {
         body = (await c.req.json()) as { messages?: unknown };
     } catch {
-        return c.json({ success: false, status: 400, error: "invalid JSON body" }, 400);
+        return getBaseResponse({ success: false, status: 400, error: "invalid JSON body" });
     }
     const rows = Array.isArray(body.messages) ? (body.messages as MessageRow[]) : [];
     const db = getDb();
@@ -120,7 +121,7 @@ daemonMessages.post("/", async (c) => {
             .onConflictDoNothing();
         inserted++;
     }
-    return c.json({ success: true, status: 200, data: { rows: inserted } });
+    return getBaseResponse({ success: true, status: 200, data: { rows: inserted } });
 });
 
 export default daemonMessages;

@@ -1,6 +1,7 @@
 import { createMiddleware } from "hono/factory";
 import { verifyDeviceToken } from "../../lib/auth/device";
 import type { AppEnv } from "../../lib/env";
+import { getBaseResponse } from "../utils/getBaseResponse";
 
 export type DeviceVariables = {
     deviceId: string;
@@ -14,7 +15,7 @@ export const requireDevice = createMiddleware<{
 }>(async (c, next) => {
     const authed = await verifyDeviceToken(c.req.raw);
     if (!authed) {
-        return c.json({ success: false, status: 401, error: "unauthorized" }, 401);
+        return getBaseResponse({ success: false, status: 401, error: "unauthorized" });
     }
     c.set("deviceId", authed.deviceId);
     c.set("userId", authed.userId);

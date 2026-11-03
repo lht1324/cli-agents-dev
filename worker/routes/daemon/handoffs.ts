@@ -5,6 +5,7 @@ import { getDb } from "../../../lib/neon/client";
 import { handoffs } from "../../../lib/neon/schema";
 import type { AppEnv } from "../../../lib/env";
 import type { DeviceVariables } from "../../middleware/device";
+import { getBaseResponse } from "../../utils/getBaseResponse";
 
 const daemonHandoffs = new Hono<{ Bindings: AppEnv; Variables: DeviceVariables }>();
 
@@ -35,7 +36,7 @@ daemonHandoffs.get("/", async (c) => {
         .where(and(eq(handoffs.userId, userId)))
         .orderBy(desc(handoffs.createdAt))
         .limit(50);
-    return c.json({ success: true, status: 200, data: { versions: rows } });
+    return getBaseResponse({ success: true, status: 200, data: { versions: rows } });
 });
 
 interface HandoffBody {
@@ -62,7 +63,7 @@ daemonHandoffs.post("/", async (c) => {
     try {
         body = (await c.req.json()) as HandoffBody;
     } catch {
-        return c.json({ success: false, status: 400, error: "invalid JSON body" }, 400);
+        return getBaseResponse({ success: false, status: 400, error: "invalid JSON body" });
     }
     const db = getDb();
 
@@ -71,14 +72,14 @@ daemonHandoffs.post("/", async (c) => {
             .update(handoffs)
             .set({ receivedBy: deviceId, receivedAt: new Date() })
             .where(and(eq(handoffs.version, body.receivedVersion), eq(handoffs.userId, userId)));
-        return c.json({ success: true, status: 200, data: { received: body.receivedVersion } });
+        return getBaseResponse({ success: true, status: 200, data: { received: body.receivedVersion } });
     }
 
     if (typeof body.tabId !== "string" || typeof body.version !== "string" || typeof body.storageKey !== "string") {
-        return c.json({ success: false, status: 400, error: "tabId, version, storageKey are required" }, 400);
+        return getBaseResponse({ success: false, status: 400, error: "tabId, version, storageKey are required" });
     }
     if (typeof body.sha256 !== "string" || typeof body.baseHash !== "string") {
-        return c.json({ success: false, status: 400, error: "baseHash, sha256 are required" }, 400);
+        return getBaseResponse({ success: false, status: 400, error: "baseHash, sha256 are required" });
     }
 
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
@@ -100,7 +101,7 @@ daemonHandoffs.post("/", async (c) => {
         sha256: body.sha256,
         expiresAt,
     });
-    return c.json({ success: true, status: 201, data: { version: body.version } }, 201);
+    return getBaseResponse({ success: true, status: 201, data: { version: body.version } });
 });
 
 export default daemonHandoffs;

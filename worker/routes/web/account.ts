@@ -5,6 +5,7 @@ import { getDb } from "../../../lib/neon/client";
 import { devices, sessionsMeta, subscriptions } from "../../../lib/neon/schema";
 import type { AppEnv } from "../../../lib/env";
 import type { AuthVariables } from "../../middleware/auth";
+import { getBaseResponse } from "../../utils/getBaseResponse";
 
 const webAccount = new Hono<{ Bindings: AppEnv; Variables: AuthVariables }>();
 
@@ -47,7 +48,7 @@ webAccount.get("/", async (c) => {
         .where(and(eq(sessionsMeta.userId, userId), isNull(sessionsMeta.parentId)));
     const daysLeft = await trialDaysLeft(userId);
 
-    return c.json({
+    return getBaseResponse({
         success: true,
         status: 200,
         data: {
@@ -84,7 +85,7 @@ webAccount.get("/devices", async (c) => {
         .from(devices)
         .where(and(eq(devices.userId, userId), isNull(devices.unlinkedAt)))
         .orderBy(desc(devices.lastSeenAt));
-    return c.json({
+    return getBaseResponse({
         success: true,
         status: 200,
         data: {

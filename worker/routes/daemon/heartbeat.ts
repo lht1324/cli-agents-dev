@@ -5,6 +5,7 @@ import { getDb } from "../../../lib/neon/client";
 import { devices, subscriptions } from "../../../lib/neon/schema";
 import type { AppEnv } from "../../../lib/env";
 import type { DeviceVariables } from "../../middleware/device";
+import { getBaseResponse } from "../../utils/getBaseResponse";
 
 const heartbeat = new Hono<{ Bindings: AppEnv; Variables: DeviceVariables }>();
 
@@ -15,7 +16,7 @@ heartbeat.post("/", async (c) => {
     try {
         body = (await c.req.json()) as { platform?: unknown; hostname?: unknown; label?: unknown };
     } catch {
-        return c.json({ success: false, status: 400, error: "invalid JSON body" }, 400);
+        return getBaseResponse({ success: false, status: 400, error: "invalid JSON body" });
     }
     const platform = typeof body.platform === "string" ? body.platform : null;
     const hostname = typeof body.hostname === "string" ? body.hostname : null;
@@ -49,7 +50,7 @@ heartbeat.post("/", async (c) => {
         .where(eq(subscriptions.userId, userId))
         .limit(1);
     const intervalSec = sub[0]?.interval ?? planOf(sub[0]?.plan ?? DEFAULT_PLAN_ID).syncIntervalSec;
-    return c.json({ success: true, status: 200, data: { intervalSec } });
+    return getBaseResponse({ success: true, status: 200, data: { intervalSec } });
 });
 
 export default heartbeat;

@@ -5,6 +5,7 @@ import { getDb } from "../../../lib/neon/client";
 import { commands } from "../../../lib/neon/schema";
 import type { AppEnv } from "../../../lib/env";
 import type { DeviceVariables } from "../../middleware/device";
+import { getBaseResponse } from "../../utils/getBaseResponse";
 
 const daemonCommands = new Hono<{ Bindings: AppEnv; Variables: DeviceVariables }>();
 
@@ -15,7 +16,7 @@ daemonCommands.get("/pending", async (c) => {
         .select({ count: sql<number>`COUNT(*)` })
         .from(commands)
         .where(and(eq(commands.deviceId, deviceId), eq(commands.status, "pending")));
-    return c.json({ success: true, status: 200, data: { pending: Number(rows[0]?.count ?? 0) } });
+    return getBaseResponse({ success: true, status: 200, data: { pending: Number(rows[0]?.count ?? 0) } });
 });
 
 // 가장 오래된 1건을 원자적으로 claim해서 넘긴다.
@@ -24,7 +25,7 @@ daemonCommands.get("/next", async (c) => {
     const deviceId = c.get("deviceId");
     const gate = await checkBillingGate(userId);
     if (!gate.allowed) {
-        return c.json({ success: false, status: 403, error: "trial_ended" }, 403);
+        return getBaseResponse({ success: false, status: 403, error: "trial_ended" });
     }
     const db = getDb();
     const oldest = await db
@@ -46,7 +47,7 @@ daemonCommands.get("/next", async (c) => {
     if (claimed.length === 0) {
         return new Response(null, { status: 204 });
     }
-    return c.json({ success: true, status: 200, data: claimed[0] });
+    return getBaseResponse({ success: true, status: 200, data: claimed[0] });
 });
 
 // 실행 결과 보고. 본인 기기 명령만 갱신한다.
@@ -57,7 +58,7 @@ daemonCommands.post("/:id/result", async (c) => {
     try {
         body = (await c.req.json()) as { ok?: unknown; data?: unknown; error?: unknown };
     } catch {
-        return c.json({ success: false, status: 400, error: "invalid JSON body" }, 400);
+        return getBaseResponse({ success: false, status: 400, error: "invalid JSON body" });
     }
     const result = JSON.stringify({
         ok: body.ok === true,
@@ -68,7 +69,7 @@ daemonCommands.post("/:id/result", async (c) => {
         .update(commands)
         .set({ status: "done", doneAt: new Date(), result })
         .where(and(eq(commands.id, id), eq(commands.deviceId, deviceId)));
-    return c.json({ success: true, status: 200 });
+    return getBaseResponse({ success: true, status: 200 });
 });
 
 export default daemonCommands;

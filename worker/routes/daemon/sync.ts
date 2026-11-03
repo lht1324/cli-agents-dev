@@ -5,6 +5,7 @@ import { getDb } from "../../../lib/neon/client";
 import { cloudTabs, modelCatalog, pendingApprovals, sessionLocations, sessionsMeta } from "../../../lib/neon/schema";
 import type { AppEnv } from "../../../lib/env";
 import type { DeviceVariables } from "../../middleware/device";
+import { getBaseResponse } from "../../utils/getBaseResponse";
 
 interface SyncSession {
     id?: unknown;
@@ -64,10 +65,10 @@ daemonSync.get("/", async (c) => {
     const deviceId = c.get("deviceId");
     const gate = await checkBillingGate(userId);
     if (!gate.allowed) {
-        return c.json({ success: false, status: 403, error: "trial_ended" }, 403);
+        return getBaseResponse({ success: false, status: 403, error: "trial_ended" });
     }
     const tabs = await getDb().select({ id: cloudTabs.id }).from(cloudTabs).where(eq(cloudTabs.deviceId, deviceId));
-    return c.json({ success: true, status: 200, data: { tabIds: tabs.map((t) => t.id) } });
+    return getBaseResponse({ success: true, status: 200, data: { tabIds: tabs.map((t) => t.id) } });
 });
 
 // 세션 헤더·승인 거울·카탈로그 upsert
@@ -76,13 +77,13 @@ daemonSync.post("/", async (c) => {
     const deviceId = c.get("deviceId");
     const gate = await checkBillingGate(userId);
     if (!gate.allowed) {
-        return c.json({ success: false, status: 403, error: "trial_ended" }, 403);
+        return getBaseResponse({ success: false, status: 403, error: "trial_ended" });
     }
     let body: { sessions?: unknown; approvals?: unknown; catalog?: unknown };
     try {
         body = (await c.req.json()) as { sessions?: unknown; approvals?: unknown; catalog?: unknown };
     } catch {
-        return c.json({ success: false, status: 400, error: "invalid JSON body" }, 400);
+        return getBaseResponse({ success: false, status: 400, error: "invalid JSON body" });
     }
 
     const db = getDb();
@@ -211,7 +212,7 @@ daemonSync.post("/", async (c) => {
             });
     }
 
-    return c.json({ success: true, status: 200, data: { sessions: sessions.length, approvals: approvals.length } });
+    return getBaseResponse({ success: true, status: 200, data: { sessions: sessions.length, approvals: approvals.length } });
 });
 
 export default daemonSync;

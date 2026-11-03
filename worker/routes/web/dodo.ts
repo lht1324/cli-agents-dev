@@ -5,6 +5,7 @@ import { getDb } from "../../../lib/neon/client";
 import { subscriptions } from "../../../lib/neon/schema";
 import type { AppEnv } from "../../../lib/env";
 import type { AuthVariables } from "../../middleware/auth";
+import { getBaseResponse } from "../../utils/getBaseResponse";
 
 const webDodo = new Hono<{ Bindings: AppEnv; Variables: AuthVariables }>();
 
@@ -12,16 +13,16 @@ const webDodo = new Hono<{ Bindings: AppEnv; Variables: AuthVariables }>();
 webDodo.post("/checkout", async (c) => {
     const userId = c.get("userId");
     if (!dodoConfigured()) {
-        return c.json({ success: false, status: 503, error: "billing is not configured" }, 503);
+        return getBaseResponse({ success: false, status: 503, error: "billing is not configured" });
     }
     let body: { interval?: unknown; origin?: unknown };
     try {
         body = (await c.req.json()) as { interval?: unknown; origin?: unknown };
     } catch {
-        return c.json({ success: false, status: 400, error: "invalid JSON body" }, 400);
+        return getBaseResponse({ success: false, status: 400, error: "invalid JSON body" });
     }
     if (body.interval !== "monthly" && body.interval !== "annual") {
-        return c.json({ success: false, status: 400, error: "interval must be monthly or annual" }, 400);
+        return getBaseResponse({ success: false, status: 400, error: "interval must be monthly or annual" });
     }
     // 되돌아올 페이지 origin. return_url에는 토큰이 실리지 않으므로 변조 위험이 낮다.
     const origin =
@@ -48,15 +49,12 @@ webDodo.post("/checkout", async (c) => {
             customer,
         );
         if (!checkout.checkoutUrl) {
-            return c.json({ success: false, status: 502, error: "checkout url missing" }, 502);
+            return getBaseResponse({ success: false, status: 502, error: "checkout url missing" });
         }
-        return c.json(
-            { success: true, status: 201, data: { checkoutUrl: checkout.checkoutUrl, sessionId: checkout.sessionId } },
-            201,
-        );
+        return getBaseResponse({ success: true, status: 201, data: { checkoutUrl: checkout.checkoutUrl, sessionId: checkout.sessionId } });
     } catch (error) {
         console.error("[checkout] dodo:", error);
-        return c.json({ success: false, status: 502, error: "checkout creation failed" }, 502);
+        return getBaseResponse({ success: false, status: 502, error: "checkout creation failed" });
     }
 });
 
@@ -71,17 +69,17 @@ webDodo.post("/cancel", async (c) => {
         .where(eq(subscriptions.userId, userId))
         .limit(1);
     if (!row?.dodoSubscriptionId || row.status !== "active") {
-        return c.json({ success: false, status: 409, error: "no active subscription" }, 409);
+        return getBaseResponse({ success: false, status: 409, error: "no active subscription" });
     }
     const ok = await setDodoSubscriptionCancel(row.dodoSubscriptionId, true);
     if (!ok) {
-        return c.json({ success: false, status: 502, error: "dodo request failed" }, 502);
+        return getBaseResponse({ success: false, status: 502, error: "dodo request failed" });
     }
     await db
         .update(subscriptions)
         .set({ cancelAtPeriodEnd: true, updatedAt: new Date() })
         .where(eq(subscriptions.userId, userId));
-    return c.json({ success: true, status: 200 });
+    return getBaseResponse({ success: true, status: 200 });
 });
 
 // 취소 예약 해제 (자동 갱신 재개).
@@ -94,17 +92,17 @@ webDodo.post("/resume", async (c) => {
         .where(eq(subscriptions.userId, userId))
         .limit(1);
     if (!row?.dodoSubscriptionId || row.status !== "active") {
-        return c.json({ success: false, status: 409, error: "no subscription" }, 409);
+        return getBaseResponse({ success: false, status: 409, error: "no subscription" });
     }
     const ok = await setDodoSubscriptionCancel(row.dodoSubscriptionId, false);
     if (!ok) {
-        return c.json({ success: false, status: 502, error: "dodo request failed" }, 502);
+        return getBaseResponse({ success: false, status: 502, error: "dodo request failed" });
     }
     await db
         .update(subscriptions)
         .set({ cancelAtPeriodEnd: false, updatedAt: new Date() })
         .where(eq(subscriptions.userId, userId));
-    return c.json({ success: true, status: 200 });
+    return getBaseResponse({ success: true, status: 200 });
 });
 
 export default webDodo;
