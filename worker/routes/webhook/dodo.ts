@@ -112,8 +112,8 @@ async function upsertSubscription(
         .insert(subscriptions)
         .values({
             userId,
-            planId: "pro",
-            syncIntervalSec: planOf("pro").syncIntervalSec,
+            planId: "plan-2",
+            syncIntervalSec: planOf("plan-2").syncIntervalSec,
             ...rest,
             ...trialPatch,
             ...(cancelAtPeriodEnd !== undefined ? { cancelAtPeriodEnd } : {}),
@@ -123,6 +123,9 @@ async function upsertSubscription(
             target: subscriptions.userId,
             set: {
                 ...rest,
+                // 기존 트라이얼 행을 업그레이드한다. 이 값이 빠지면 유료인데도 Starter 주기로 동기화된다.
+                planId: "plan-2",
+                syncIntervalSec: planOf("plan-2").syncIntervalSec,
                 ...trialPatch,
                 // 해지 예약은 갱신 이벤트가 명시적으로 풀 때만 되돌린다.
                 // 그 외 이벤트에서 undefined면 기존 값을 유지해야 예약이 지워지지 않는다.
