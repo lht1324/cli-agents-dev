@@ -1,9 +1,11 @@
 # context.md - local-agents
 
-2026-11-04 01:17
+2026-11-04 02:41
 
 ## 프로젝트
-- 폴더: `local-agents` (구 `cli-agents-dev`는 참고용으로만 남김). 서비스명 `localagents`, 도메인 `localagents.link` (dev 터널 `dev.localagents.link`)
+- 폴더: `local-agents` 하나만 남았다. 구 `cli-agents-dev` 폴더는 2026-11-04 삭제(.env.local의 `GITKRAKEN_PAT`만 `.env.legacy.local`로 백업)
+- GitHub 저장소도 `lht1324/local-agents`로 이름 변경(히스토리·리다이렉트 유지). 두 로컬 저장소의 remote fetch/push 모두 새 주소
+- 서비스명 `localagents`, 도메인 `localagents.link` (dev 터널 `dev.localagents.link`)
 - 스택: **Vite 8 + React Router 8(library mode) + Hono on Cloudflare Workers**. TypeScript / Tailwind CSS 4
 - 버전: 웹·데몬 모두 `1.0.0`
 - **레포는 분리하지 않는다**(2026-10-30 결정). 한 레포 + `daemon/` 하위 publishable 패키지.
@@ -80,6 +82,8 @@ worker/index.ts
 - 게이트 `lib/billing.ts`: `active` 통과 / 트라이얼 남음 통과 / 그 외 403 `trial_ended`.
 - **취소 의미**: 예약 취소는 `active` + `cancel_at_period_end`로 기간 끝까지 유지. 대시보드 **즉시 취소**는 `canceled`가 되어 즉시 차단. 둘 다 정상 동작.
 - **이미 구독 중이면 체크아웃 409** → 클라이언트가 `/profile`로 이동(중복 결제 방지).
+- ⚠️ 과거 버그(수정됨): 웹훅이 `planId:"pro"`(없는 id)를 저장하고 기존 행 갱신 시 플랜을 안 써서, Pro 결제해도 Starter(30분)로 동기화됐다. `plan-2`/600초로 수정.
+- Google OAuth 브랜딩: 커스텀 client는 정상이었고, **Google Cloud의 앱 브랜딩 인증·게시** 후 `LocalAgents`로 표시됐다.
 - 테스트 모드 전 경로 실증 완료(2026-11-04). **live 실결제 1건 미실시.**
 
 ## 화면
@@ -100,17 +104,23 @@ worker/index.ts
 - Node 하한 22.13.0(`node:sqlite`). 그 미만은 안내 후 종료.
 - **npm 미게시**. `daemon/`에서 publish 필요.
 
+## 배포·브랜치 (2026-11-04)
+- `feat/vite-hono` → `develop` fast-forward → `master`에 `--no-ff` 릴리즈 머지 완료. 현재 체크아웃 `develop`.
+- **prod 배포 완료**: Workers `localagents` (Version `d4044203`). 구 Next 앱(10-26 배포본)을 대체했다.
+- prod 확인: `/`·`/legal/*` 200, `/sessions` 302 → 로그인, `/api/health` 200, 웹훅 401, Google 로그인 init이 prod Auth(`ep-late-night`)로 연결.
+- 배포 중 수정: 법적 페이지가 `/legal/terms` → `/legal/terms/`로 307 되던 문제. 프리렌더 산출물을 디렉터리 인덱스에서 **파일명(`legal/terms.html`)** 방식으로 바꿔 해결.
+- prod DB에는 아직 세션 0건. 데몬이 dev(`localhost:3004`)를 보고 있어서 정상.
+
 ## 다음 할 일
 
 ### 출시 전 필수
 - [ ] **live $9 실결제 1건** → DB `status=active`·`dodo_subscription_id` 확인 → 환불
-- [ ] **`npm run deploy`** (prod DB 마이그레이션은 완료)
+- [ ] prod 로그인 상태에서 `/`·`/sessions`·`/profile` 렌더 확인 (배포 직후 1회)
 - [ ] prod Dodo 웹훅 URL 확인 (`https://localagents.link/api/webhook/dodo`)
-- [ ] prod 로그인 상태에서 `/`·`/sessions`·`/profile` 렌더 확인
 - [ ] Dodo 브랜드에 법률 3 URL 등록, `support@` 수신 확인
 - [ ] **npm publish** (`daemon/`) → 클린 환경에서 `npx localagents@latest login`
 - [ ] macOS LaunchAgent 1회 검증
-- [ ] `develop` 머지 (`feat/vite-hono` 현재 브랜치)
+- [x] `develop`·`master` 머지 및 prod 배포 (2026-11-04)
 
 ### 출시 후
 - [ ] Workers Builds 자동 배포 (master=production / develop=preview)
@@ -125,14 +135,13 @@ worker/index.ts
 - [ ] MoR: Fungies KYC 대기
 
 ## 커밋 이력 (최근)
+- `1831fad` [Fix] [법적 페이지가 후행 슬래시로 리다이렉트되던 문제]
+- `9c3609d` [Fix] [유료 구독 시 플랜이 Pro로 올라가지 않던 문제]
+- `0a4a755` [Docs] [context.md를 새 스택 기준으로 갱신]
 - `228a49a` [Refactor] [클라이언트 API 계층 도입과 화면의 직접 fetch 제거]
 - `559344e` [Refactor] [API 응답 봉투를 공용 헬퍼로 통일]
-- `524a981` [Chore] [dev 서버가 3004를 못 잡으면 즉시 실패하도록 strictPort 적용]
-- `942f828` [Chore] [개발 서버에 cloudflared 터널 호스트 허용]
-- `e2f036b` [Feature] [페이지별 프리렌더와 로그인 화면 noindex]
-- `3aafcc4` [Update] [세션 목록·상세에서 원본과 달랐던 부분 보완]
-- `d936e19` [Feature] [세션 상세 화면을 기존 앱과 같은 수준으로 마감]
-- `d5911ce` [Feature] [Next.js에서 Vite + React Router + Hono 스택으로 이전]
+- `3dc558d` [Merge] [프리렌더 리다이렉트 수정 배포 반영] (master)
+- `c4acccf` [Merge] [Vite + React Router + Hono 스택 이전을 master에 릴리즈 병합]
 
 ## 아키텍처 요약
 - 로컬 데몬(CLI) + 클라우드 제어서버(Workers + Neon) + 웹 인박스. 데몬은 아웃바운드 폴링.
