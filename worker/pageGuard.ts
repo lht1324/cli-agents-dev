@@ -40,8 +40,21 @@ async function handleGuardedPage(c: PageContext): Promise<Response> {
     return appendSetCookies(await serveSpa(c), setCookies);
 }
 
+// 로그인 뒤 화면에 noindex를 넣는다. 이 화면들은 정적 파일이 아니라
+// 워커가 인증 확인 뒤 돌려주므로, 프리렌더로 미리 만들면 인증 없는 HTML이 노출된다.
 async function serveSpa(c: PageContext): Promise<Response> {
-    return c.env.ASSETS.fetch(c.req.raw);
+    const response = await c.env.ASSETS.fetch(c.req.raw);
+    const type = response.headers.get("content-type") ?? "";
+    if (!type.includes("text/html")) {
+        return response;
+    }
+    const html = await response.text();
+    const patched = /<meta name="robots"/.test(html)
+        ? html.replace(/<meta name="robots" content="[^"]*" \/>/, '<meta name="robots" content="noindex, nofollow" />')
+        : html.replace("</head>", '<meta name="robots" content="noindex, nofollow" /></head>');
+    const headers = new Headers(response.headers);
+    headers.delete("content-length");
+    return new Response(patched, { status: response.status, statusText: response.statusText, headers });
 }
 
 export default pageRoutes;
