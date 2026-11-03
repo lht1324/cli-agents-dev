@@ -79,7 +79,9 @@ for (const page of PAGES) {
         written += 1;
         continue;
     }
-    const file = join(OUT_DIR, page.path, "index.html");
+    // 디렉터리 인덱스(/legal/terms/index.html)로 두면 Cloudflare가 /legal/terms를
+    // /legal/terms/로 리다이렉트한다. 파일명 방식(legal/terms.html)이면 리다이렉트가 없다.
+    const file = join(OUT_DIR, `${page.path}.html`);
     mkdirSync(dirname(file), { recursive: true });
     writeFileSync(file, withMeta(INDEX, page));
     written += 1;
