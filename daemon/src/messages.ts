@@ -2,7 +2,36 @@ import { apiGet, type DiscoveredServer } from "./server";
 import { formatToolExit } from "./tools";
 import { cloudGet, cloudPost } from "./cloud";
 import { isNewer, readCursor, writeCursor } from "./cursors";
-import { readEpochRows } from "./localdb";
+
+interface Watermark {
+    createdAt: number;
+    messageId: string;
+}
+
+// 서버에 저장된 마지막 행. 로컬 커서보다 신뢰한다 (재설치·DB 초기화·다중 기기 대응).
+async function readServerWatermark(sessionID: string): Promise<Watermark | null> {
+    try {
+        const body = (await cloudGet(
+            `/api/daemon/messages/watermark?sessionID=${encodeURIComponent(sessionID)}`,
+        )) as { data?: { createdAt?: unknown; messageId?: unknown } | null };
+        const data = body.data;
+        if (!data || typeof data.createdAt !== "number" || typeof data.messageId !== "string") {
+            return null;
+        }
+        return { createdAt: data.createdAt, messageId: data.messageId };
+    } catch {
+        return null;
+    }
+}
+
+// 둘 중 더 새로운 기준점을 고른다.
+function newerOf(a: Watermark | null, b: Watermark | null): Watermark | null {
+    if (!a) return b;
+    if (!b) return a;
+    if (a.createdAt !== b.createdAt) return a.createdAt > b.createdAt ? a : b;
+    return a.messageId >= b.messageId ? a : b;
+}
+import { childSessionIds, readEpochRows, sessionParentId } from "./localdb";
 import type { PlainRow, ServerMessage } from "./types";
 
 function cap(text: string, limit: number): string {
@@ -121,13 +150,13 @@ async function fetchMessages(server: DiscoveredServer, sessionID: string): Promi
 export async function syncMessages(server: DiscoveredServer, sessionID: string): Promise<{ rows: number }> {
     const messages = await fetchMessages(server, sessionID);
     const rows = flatten(messages);
-    // 차집합: 커서보다 새로운 행만 올린다. 첫 실행은 전부(기준선), 이후는 증분.
-    const cursor = readCursor(sessionID);
+    // 차집합: 기준점보다 새로운 행만 올린다. 기준점은 서버 저장분 우선, 로컬 커서는 보조.
+    const cursor = newerOf(readCursor(sessionID), await readServerWatermark(sessionID));
     const fresh = rows.filter((r) => isNewer(r.createdAt, r.id, cursor));
     if (fresh.length === 0) {
         return { rows: 0 };
     }
-    const result = (await cloudPost("/api/messages", {
+    const result = (await cloudPost("/api/daemon/messages", {
         messages: fresh.map((r) => ({
             sessionID,
             messageId: r.id,
@@ -179,7 +208,7 @@ export async function backfillSession(
     }
     for (let i = 0; i < rows.length; i += 10) {
         const part = rows.slice(i, i + 10);
-        await cloudPost("/api/messages", {
+        await cloudPost("/api/daemon/messages", {
             messages: part.map((r, k) => ({
                 sessionID,
                 messageId: r.id,
@@ -214,7 +243,7 @@ export async function backfillSession(
 
 // 조건부 backfill. 클라우드에 없는 탭만 채운다. session_id 대조.
 export async function backfillMissing(server: DiscoveredServer, only?: string[]): Promise<{ checked: number; filled: number; rows: number }> {
-    const listed = (await cloudGet("/api/sync")) as { data?: { tabIds?: string[] } };
+    const listed = (await cloudGet("/api/daemon/sync")) as { data?: { tabIds?: string[] } };
     const have = new Set(Array.isArray(listed.data?.tabIds) ? listed.data.tabIds : []);
     const body = (await apiGet(server, "/session")) as { data?: { id: string }[] } | { id: string }[];
     const list = Array.isArray(body) ? body : (body.data ?? []);
@@ -246,6 +275,68 @@ export async function backfillMissing(server: DiscoveredServer, only?: string[])
         }
     }
     return { checked: list.length, filled, rows };
+}
+
+interface SessionListRow {
+    id?: string;
+    projectID?: string;
+    time?: { updated?: number };
+}
+
+// 탭(project)별 현재 세션 하나씩만 본문 동기화한다.
+// "세션 = 컨텍스트 사용량 구간"이므로, 지금 돌고 있는 대화만 미러링하면 충분하다.
+// 지난 세션은 이미 올라간 행을 그대로 두고(freeze) 동기화만 멈춘다.
+export async function syncCurrentSessions(server: DiscoveredServer): Promise<{ sessions: number; rows: number }> {
+    const body = (await apiGet(server, "/session")) as { data?: SessionListRow[] } | SessionListRow[];
+    const list = Array.isArray(body) ? body : (body.data ?? []);
+    const latest = new Map<string, { id: string; updated: number }>();
+    for (const s of list) {
+        if (typeof s.id !== "string" || s.id.length === 0) {
+            continue;
+        }
+        // 루트 세션만 "탭의 현재 세션" 후보. 자식은 부모를 통해 따라간다.
+        if (sessionParentId(s.id) !== null) {
+            continue;
+        }
+        const key = typeof s.projectID === "string" && s.projectID.length > 0 ? s.projectID : s.id;
+        const updated = s.time?.updated ?? 0;
+        const cur = latest.get(key);
+        if (!cur || updated > cur.updated) {
+            latest.set(key, { id: s.id, updated });
+        }
+    }
+    // 루트 + 자식 서브트리 전체가 이번 주기의 동기화 대상이다.
+    const targets: string[] = [];
+    const seen = new Set<string>();
+    const addSubtree = (id: string): void => {
+        if (seen.has(id)) {
+            return;
+        }
+        seen.add(id);
+        targets.push(id);
+        for (const child of childSessionIds(id)) {
+            addSubtree(child);
+        }
+    };
+    for (const item of latest.values()) {
+        addSubtree(item.id);
+    }
+
+    let rows = 0;
+    for (const id of targets) {
+        try {
+            rows += (await syncMessages(server, id)).rows;
+        } catch {
+            // 다음 주기가 잡는다
+        }
+    }
+    // 웹의 live 표시용. 새 행이 없어도 "지금 미러링 중"임을 알린다.
+    try {
+        await cloudPost("/api/daemon/sessions/current", { sessionIds: targets });
+    } catch {
+        // 표시는 다음 주기에 다시 시도된다
+    }
+    return { sessions: targets.length, rows };
 }
 
 // 주기 안전망. 스풀 통지가 없어도 최근 활동 세션 본문을 올린다. 최대 5개, 실패는 건너뜀.

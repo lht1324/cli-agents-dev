@@ -8,7 +8,7 @@ interface PresignResult {
 
 // 서명 URL 발급. S3 키는 서버만 들고, 데몬은 URL로 직행한다.
 async function presign(operation: "upload" | "download", key: string): Promise<PresignResult> {
-    const body = (await cloudPost("/api/handoffs/url", { operation, key })) as { data?: PresignResult };
+    const body = (await cloudPost("/api/daemon/handoffs/url", { operation, key })) as { data?: PresignResult };
     if (!body.data?.url) {
         throw new Error("presign returned no url");
     }

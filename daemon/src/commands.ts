@@ -11,7 +11,7 @@ interface CommandRow {
 }
 
 async function fetchNext(token: string): Promise<CommandRow | null> {
-    const res = await fetch(`${baseUrl()}/api/commands/next`, {
+    const res = await fetch(`${baseUrl()}/api/daemon/commands/next`, {
         headers: { Authorization: `Bearer ${token}` },
         signal: AbortSignal.timeout(10000),
     });
@@ -30,7 +30,7 @@ async function reportResult(
     id: string,
     result: ExecResult,
 ): Promise<void> {
-    const res = await fetch(`${baseUrl()}/api/commands/${id}/result`, {
+    const res = await fetch(`${baseUrl()}/api/daemon/commands/${id}/result`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(result),

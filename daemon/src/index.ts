@@ -1,11 +1,13 @@
+#!/usr/bin/env node
 import { apiGet, apiPost, discoverServer, type DiscoveredServer } from "./server";
 import { cloudGet } from "./cloud";
-import { hostInfo, readState, writeState, baseUrl } from "./device";
+import { hostInfo, readState, writeState, baseUrl, clearState } from "./device";
+import { installService, stopService, uninstallService } from "./service";
 import { forkAndRegister } from "./fork";
 import { ensureServer, killOwned, type ManagedServer } from "./serve";
 import { syncSessions } from "./sessions";
 import { setSessionAgent, setSessionModel, syncCatalog, type ModelRef } from "./catalog";
-import { backfillMissing, syncActiveMessages, syncMessages } from "./messages";
+import { backfillMissing, syncCurrentSessions, syncMessages } from "./messages";
 import { checkboxPick, dumpTab, listVersions, pickNumbers, pullVersion, pushTabs, syncOneTab, type HandoffVersion } from "./handoff";
 import { countAll, countNewer, epochOf, findLocalDirByRemote, localRoleCounts, repoForDirectory, sessionExists, setTabDirectory } from "./localdb";
 import { askTyped, isDir, pickDirectory } from "./sysdialog";
@@ -54,7 +56,7 @@ async function onLogout(): Promise<void> {
     }
     // revoke 먼저. 실패하면 상태 유지 (살아있는 토큰 고아 방지).
     // 단 401은 서버에 세션이 없다는 뜻이라 로컬만 비운다.
-    const res = await fetch(`${baseUrl()}/api/device/revoke`, {
+    const res = await fetch(`${baseUrl()}/api/daemon/device/revoke`, {
         method: "POST",
         headers: { Authorization: `Bearer ${state.token}` },
         signal: AbortSignal.timeout(10000),
@@ -69,6 +71,39 @@ async function onLogout(): Promise<void> {
     }
     clearState();
     console.log("logged out.");
+    // 토큰이 없는 데몬이 계속 돌면 401만 반복한다. 유닛은 남기고 프로세스만 멈춘다.
+    const stopped = stopService();
+    if (stopped.ok) {
+        console.log("background service stopped. run `localagents login` to start it again.");
+    }
+}
+
+// 프로그램 제거. 서비스·복사본·상태를 모두 지운다 (logout과 다르다).
+async function onUninstall(): Promise<void> {
+    const state = readState();
+    if (state?.token) {
+        try {
+            await fetch(`${baseUrl()}/api/daemon/device/revoke`, {
+                method: "POST",
+                headers: { Authorization: `Bearer ${state.token}` },
+                signal: AbortSignal.timeout(10000),
+            });
+        } catch {
+            // 오프라인이어도 제거는 진행한다.
+        }
+    }
+    const service = uninstallService();
+    clearState();
+    console.log(service.message);
+    console.log("localagents is no longer running on this machine.");
+}
+
+async function onServiceInstall(): Promise<void> {
+    const res = installService();
+    console.log(res.message);
+    if (!res.ok) {
+        process.exitCode = 1;
+    }
 }
 
 // 토큰 사전 검증. 죽은 토큰이면 작업 전에 로그인 메시지로 끝낸다.
@@ -80,7 +115,7 @@ async function ensureAuth(): Promise<{ deviceId: string; userId: string; token: 
     }
     let res: Response;
     try {
-        res = await fetch(`${baseUrl()}/api/auth/whoami`, {
+        res = await fetch(`${baseUrl()}/api/daemon/whoami`, {
             headers: { Authorization: `Bearer ${state.token}` },
             signal: AbortSignal.timeout(10000),
         });
@@ -280,7 +315,7 @@ async function onWhoami(): Promise<void> {
     if (!state?.token) {
         throw new Error("not logged in. run `localagents login` first");
     }
-    const res = await fetch(`${baseUrl()}/api/auth/whoami`, {
+    const res = await fetch(`${baseUrl()}/api/daemon/whoami`, {
         headers: { Authorization: `Bearer ${state.token}` },
         signal: AbortSignal.timeout(10000),
     });
@@ -314,28 +349,41 @@ async function onStatus(): Promise<void> {
         console.log("pending: unknown (no token)");
         return;
     }
+    // 401이면 로컬 상태에 죽은 토큰이 남아 있다는 뜻이다 (해제·회전). 안내를 위해 기억한다.
+    let unauthorized = false;
     try {
-        const res = await fetch(`${baseUrl()}/api/commands/pending`, {
+        const res = await fetch(`${baseUrl()}/api/daemon/commands/pending`, {
             headers: { Authorization: `Bearer ${state.token}` },
             signal: AbortSignal.timeout(10000),
         });
-        if (!res.ok) {
-            throw new Error(`pending rejected: ${res.status}`);
+        if (res.status === 401) {
+            unauthorized = true;
+            console.log("pending: unknown (not logged in)");
+        } else if (res.status === 403) {
+            console.log("pending: unknown (subscription required)");
+        } else if (!res.ok) {
+            console.log(`pending: unknown (http ${res.status})`);
+        } else {
+            const body = (await res.json()) as { data?: { pending?: number } };
+            console.log(`pending: ${body.data?.pending ?? "?"} commands`);
         }
-        const body = (await res.json()) as { data?: { pending?: number } };
-        console.log(`pending: ${body.data?.pending ?? "?"} commands`);
     } catch {
         console.log("pending: unknown (cloud unreachable)");
     }
     // 과금 상태. 403이면 트라이얼 종료 — 구독 안내를 붙인다.
     try {
-        const res = await fetch(`${baseUrl()}/api/billing/status`, {
+        const res = await fetch(`${baseUrl()}/api/daemon/billing/status`, {
             headers: { Authorization: `Bearer ${state.token}` },
             signal: AbortSignal.timeout(10000),
         });
-        if (res.status === 403) {
+        if (res.status === 401) {
+            unauthorized = true;
+            console.log("billing: unknown (not logged in)");
+        } else if (res.status === 403) {
             console.log("billing: Subscription ended. Subscribe at localagents.link");
-        } else if (res.ok) {
+        } else if (!res.ok) {
+            console.log(`billing: unknown (http ${res.status})`);
+        } else {
             const body = (await res.json()) as {
                 data?: { active?: boolean; daysLeft?: number | null; cancelAtPeriodEnd?: boolean; currentPeriodEnd?: string | null };
             };
@@ -354,7 +402,10 @@ async function onStatus(): Promise<void> {
             }
         }
     } catch {
-        // 도달 실패는 server 줄이 이미 말한다.
+        console.log("billing: unknown (cloud unreachable)");
+    }
+    if (unauthorized) {
+        console.log("hint: this device is no longer signed in. run `localagents login` to reconnect.");
     }
 }
 
@@ -376,7 +427,7 @@ async function onLogin(): Promise<void> {
     const existing = readState();
     if (existing?.token) {
         try {
-            const check = await fetch(`${baseUrl()}/api/auth/whoami`, {
+            const check = await fetch(`${baseUrl()}/api/daemon/whoami`, {
                 headers: { Authorization: `Bearer ${existing.token}` },
                 signal: AbortSignal.timeout(10000),
             });
@@ -430,7 +481,7 @@ async function onLogin(): Promise<void> {
                 hostname: host.hostname,
             });
             // 사전 포장. 브라우저 주소창에 평문이 일순도 안 뜨게 한다. 실패하면 평문 폴백.
-            fetch(`${base}/api/device/pack`, {
+            fetch(`${base}/api/pairing/pack`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -453,8 +504,8 @@ async function onLogin(): Promise<void> {
                 .catch(() => null)
                 .then((data) => {
                     const target = data
-                        ? `${base}/api/device/begin?data=${encodeURIComponent(data)}`
-                        : `${base}/api/device/begin?${params.toString()}`;
+                        ? `${base}/api/pairing/begin?data=${encodeURIComponent(data)}`
+                        : `${base}/api/pairing/begin?${params.toString()}`;
                     const opener =
                         platform() === "darwin" ? "open" : platform() === "win32" ? "start" : "xdg-open";
                     exec(`${opener} "${target}"`);
@@ -469,7 +520,7 @@ async function onLogin(): Promise<void> {
     }).catch((err: unknown) => {
         throw err;
     });
-    const who = await fetch(`${baseUrl()}/api/auth/whoami`, {
+    const who = await fetch(`${baseUrl()}/api/daemon/whoami`, {
         headers: { Authorization: `Bearer ${received.token}` },
         signal: AbortSignal.timeout(10000),
     });
@@ -489,7 +540,7 @@ async function onLogin(): Promise<void> {
         const syncedServer = await ensureServer();
         const sessions = await syncSessions(syncedServer, true);
         // 조건부 backfill. 전부 보여주고 없는 것만 기본 체크. DB 유무는 표시만.
-        const listed = (await cloudGet("/api/sync")) as { data?: { tabIds?: string[] } };
+        const listed = (await cloudGet("/api/daemon/sync")) as { data?: { tabIds?: string[] } };
         const have = new Set(Array.isArray(listed.data?.tabIds) ? listed.data.tabIds : []);
         const body = (await apiGet(syncedServer, "/session")) as { data?: { id: string }[] } | { id: string }[];
         const all = (Array.isArray(body) ? body : (body.data ?? [])).filter((s) => typeof s.id === "string");
@@ -561,6 +612,19 @@ async function onLogin(): Promise<void> {
     } catch (err) {
         console.error(`initial sync failed: ${err instanceof Error ? err.message : err}`);
     }
+    // 백그라운드 상주 등록. 실패해도 로그인은 유효하다 (초기 sync는 이미 끝났다).
+    if (process.argv.includes("--no-service")) {
+        console.log("background service skipped (--no-service).");
+        return;
+    }
+    const service = installService();
+    if (service.ok) {
+        console.log(`${service.message}. keeps syncing after you close the terminal.`);
+        console.log("to remove: localagents uninstall");
+    } else {
+        console.log(`background service was not installed: ${service.message}`);
+        console.log("fix later with: localagents service install");
+    }
 }
 
 async function onFork(sessionID: string | undefined): Promise<void> {
@@ -625,7 +689,7 @@ async function onDoctor(): Promise<void> {
         if (!state?.token) {
             lines.push("cloud: FAIL (no device token)");
         } else {
-            const res = await fetch(`${baseUrl()}/api/heartbeat`, {
+            const res = await fetch(`${baseUrl()}/api/daemon/heartbeat`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${state.token}` },
                 body: JSON.stringify({}),
@@ -649,7 +713,7 @@ async function onHeartbeat(quiet = false): Promise<number> {
         throw new Error("no device token. run `localagents login` again");
     }
     const host = hostInfo();
-    const res = await fetch(`${baseUrl()}/api/heartbeat`, {
+    const res = await fetch(`${baseUrl()}/api/daemon/heartbeat`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${state.token}` },
         body: JSON.stringify({ platform: host.platform, hostname: host.hostname, label: host.label }),
@@ -718,9 +782,9 @@ async function onRun(): Promise<void> {
                 await pushPending(server);
                 await syncSessions(server);
                 await syncCatalog(server);
-                const active = await syncActiveMessages(server);
-                if (active.sessions > 0) {
-                    console.log(`active-messages: ${active.sessions} sessions, ${active.rows} rows`);
+                const current = await syncCurrentSessions(server);
+                if (current.sessions > 0) {
+                    console.log(`current-sessions: ${current.sessions} sessions, ${current.rows} rows`);
                 }
             } catch (err) {
                 console.error(`sync failed: ${err instanceof Error ? err.message : err}`);
@@ -753,7 +817,25 @@ async function onRun(): Promise<void> {
     console.log("run: stopped");
 }
 
+// Node 22.13 미만은 node:sqlite를 쓸 수 없다. 명령을 실행하기 전에 한 번에 알려준다
+// (명령마다 다른 에러로 죽는 것보다 낫다).
+function checkNodeVersion(): boolean {
+    const [major, minor] = process.versions.node.split(".").map((n) => Number(n));
+    if (major > 22 || (major === 22 && minor >= 13)) {
+        return true;
+    }
+    console.error(
+        `localagents requires Node 22.13 or newer (found ${process.version}).\n` +
+            "Node 20 and older are end-of-life. Install Node 22 LTS or newer: https://nodejs.org",
+    );
+    return false;
+}
+
 async function main(): Promise<void> {
+    if (!checkNodeVersion()) {
+        process.exitCode = 1;
+        return;
+    }
     const args = process.argv.slice(2).filter((a) => a !== "--jaeholee");
     const cmd = args[0];
     const advanced = new Set([
@@ -770,7 +852,7 @@ async function main(): Promise<void> {
     // 숨김 진단 명령. 플래그 없이 치면 없는 명령으로 보인다. run은 unit이 쓰니 예외.
     if (cmd && advanced.has(cmd) && !process.argv.includes("--jaeholee")) {
         console.log(`unknown command: ${cmd}`);
-        console.log("usage: localagents <login|logout|status|whoami|push|pull>");
+        console.log("usage: localagents <login|logout|status|whoami|push|pull|uninstall>");
         process.exitCode = 1;
         return;
     }
@@ -778,6 +860,16 @@ async function main(): Promise<void> {
         await onStatus();
     } else if (cmd === "logout") {
         await onLogout();
+    } else if (cmd === "uninstall") {
+        await onUninstall();
+    } else if (cmd === "service") {
+        const sub = args[1];
+        if (sub === "install") {
+            await onServiceInstall();
+        } else {
+            console.log("usage: localagents service install");
+            process.exitCode = 1;
+        }
     } else if (cmd === "whoami") {
         await onWhoami();
     } else if (cmd === "sessions") {
@@ -810,7 +902,7 @@ async function main(): Promise<void> {
         if (cmd) {
             console.log(`unknown command: ${cmd}`);
         }
-        console.log("usage: localagents <login|logout|status|whoami|push|pull>");
+        console.log("usage: localagents <login|logout|status|whoami|push|pull|uninstall>");
         process.exitCode = 1;
     }
     // 1회성 명령이 띄운 서버는 함께 내린다. run은 스스로 관리한다.

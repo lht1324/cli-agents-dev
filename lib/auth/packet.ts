@@ -1,4 +1,5 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
+import { optionalEnv } from "../env";
 
 export interface ConnectPacket {
     device: string;
@@ -16,7 +17,7 @@ export interface ConnectPacket {
 const PACKET_TTL_MS = 10 * 60 * 1000;
 
 function packetKey(): Buffer {
-    const raw = process.env.DEVICE_PACKET_KEY ?? "";
+    const raw = optionalEnv("DEVICE_PACKET_KEY");
     if (/^[0-9a-fA-F]{64}$/.test(raw)) {
         return Buffer.from(raw, "hex");
     }

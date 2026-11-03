@@ -1,0 +1,99 @@
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router";
+import SessionsEmptyState from "@/components/SessionsEmptyState";
+import { sessionsClientAPI, type SessionRow } from "@/lib/api/client/sessionsClientAPI";
+
+// 절대 시각은 모든 행이 같아 의미가 없다. 마지막으로 본문이 올라온 시점을 상대 표기로 보여준다.
+function relativeTime(iso: string | null): string | null {
+    if (!iso) {
+        return null;
+    }
+    const minutes = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+    if (minutes < 1) {
+        return "just now";
+    }
+    if (minutes < 60) {
+        return `${minutes} min ago`;
+    }
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) {
+        return `${hours}h ago`;
+    }
+    return `${Math.floor(hours / 24)}d ago`;
+}
+
+function waitingMessage(waiting: { newTabs: number; updatedTabs: number }): string {
+    if (waiting.newTabs > 0 && waiting.updatedTabs === 0) {
+        return `${waiting.newTabs} new ${waiting.newTabs === 1 ? "session" : "sessions"} from your other PC.`;
+    }
+    if (waiting.newTabs === 0 && waiting.updatedTabs > 0) {
+        return `${waiting.updatedTabs} ${waiting.updatedTabs === 1 ? "session has" : "sessions have"} newer versions from your other PC.`;
+    }
+    return `Updates waiting from your other PC: ${waiting.newTabs} new, ${waiting.updatedTabs} newer versions.`;
+}
+
+export default function SessionsPage() {
+    const { data, isLoading, error } = useQuery({
+        queryKey: ["sessions"],
+        queryFn: sessionsClientAPI.getSessions,
+    });
+
+    const items: SessionRow[] = data?.items ?? [];
+    const waiting = data?.waiting ?? null;
+
+    return (
+        <main className="mx-auto max-w-5xl px-6 py-10">
+            <h1 className="font-mono text-xl font-bold">Sessions</h1>
+
+            {waiting && (
+                <div className="mt-4 rounded border border-line bg-panel p-4">
+                    <p className="text-sm">{waitingMessage(waiting)}</p>
+                    <div className="mt-3 inline-flex items-center gap-3 rounded border border-line bg-black px-3 py-1.5">
+                        <span className="font-mono text-xs">
+                            <span className="text-go">$ </span>
+                            <span className="text-fog">localagents pull</span>
+                        </span>
+                    </div>
+                    <p className="mt-2 font-mono text-xs text-dim">Run this on the PC you want the sessions on.</p>
+                </div>
+            )}
+
+            {isLoading && <p className="mt-4 font-mono text-xs text-dim">loading…</p>}
+            {error && <p className="mt-4 font-mono text-xs text-stop">{error.message}</p>}
+
+            {!isLoading && !error && items.length === 0 && (
+                <div className="mt-4">
+                    <SessionsEmptyState />
+                </div>
+            )}
+
+            {items.length > 0 && (
+                <ul className="mt-4 space-y-2">
+                    {items.map((row) => {
+                        const synced = relativeTime(row.lastBodySyncAt);
+                        return (
+                            <li key={row.id} className="rounded border border-line bg-panel p-4">
+                                <Link to={`/sessions/${row.id}`} className="block">
+                                    <span className="font-bold hover:underline">{row.title || row.id}</span>
+                                    <p className="mt-1 flex flex-wrap items-center gap-2 font-mono text-xs">
+                                        {row.live ? (
+                                            <span className="text-go">● live</span>
+                                        ) : row.lastBodySyncAt ? (
+                                            <span className="text-dim">frozen</span>
+                                        ) : (
+                                            <span className="text-warn">not synced</span>
+                                        )}
+                                        <span className={row.status === "active" ? "text-go" : "text-dim"}>
+                                            {row.status}
+                                        </span>
+                                        <span className="text-dim">{synced ? `synced ${synced}` : "no messages"}</span>
+                                    </p>
+                                </Link>
+                            </li>
+                        );
+                    })}
+                </ul>
+            )}
+        </main>
+    );
+}

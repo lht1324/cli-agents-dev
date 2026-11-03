@@ -1,6 +1,25 @@
 const DEFAULT_PORTS = [4096, 4097, 4098, 4099, 4100, 4101, 4102, 4103, 4104, 4105];
 
+import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { readServerState } from "./device";
+
+// OpenCode 데스크톱 앱이 쓰는 서버는 고정 포트가 아니라 service.json에 적힌다.
+// 여기 붙어야 GUI가 같은 이벤트 스트림을 받아 화면이 실시간으로 갱신된다.
+function readServiceDescriptor(): { url: string; password: string | null } | null {
+    const stateHome = process.env.XDG_STATE_HOME ?? join(homedir(), ".local", "state");
+    try {
+        const raw = readFileSync(join(stateHome, "opencode", "service.json"), "utf8");
+        const parsed = JSON.parse(raw) as { url?: unknown; password?: unknown };
+        if (typeof parsed.url !== "string" || parsed.url.length === 0) {
+            return null;
+        }
+        return { url: parsed.url, password: typeof parsed.password === "string" ? parsed.password : null };
+    } catch {
+        return null;
+    }
+}
 
 function baseUrlFromEnv(): string | null {
     const url = process.env.OPENCODE_SERVER_URL;
@@ -92,6 +111,17 @@ export async function discoverServer(): Promise<DiscoveredServer | null> {
         }
         return null;
     }
+    // 1) 데스크톱 앱의 service 서버 우선 (같은 이벤트 스트림을 봐야 GUI가 갱신된다)
+    const service = readServiceDescriptor();
+    if (service) {
+        const serviceAuth = service.password ? { username: "opencode", password: service.password } : auth;
+        const found = await probeHealth(service.url, serviceAuth);
+        if (found) {
+            return { url: service.url, auth: serviceAuth, version: found.version, prefix: found.prefix };
+        }
+    }
+
+    // 2) 기본 포트 폴백
     for (const port of DEFAULT_PORTS) {
         const url = `http://127.0.0.1:${port}`;
         const found = await probeHealth(url, auth);

@@ -25,7 +25,7 @@ export async function syncCatalog(server: DiscoveredServer): Promise<{ models: n
     } catch {
         // 구버전 서버. 모델 표시명은 ID 폴백.
     }
-    await cloudPost("/api/sync", { catalog: { models, agents, providers } });
+    await cloudPost("/api/daemon/sync", { catalog: { models, agents, providers } });
     const count = (body: unknown): number => {
         const list = (body as { data?: unknown }).data;
         return Array.isArray(list) ? list.length : 0;
