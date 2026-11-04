@@ -26,7 +26,8 @@
 - **단일 dev 서버 3004** (`npm run dev`). Vite가 워커까지 같은 포트에서 돌린다. API 컨테이너·게이트웨이는 없다.
 - `strictPort: true` — 3004가 사용 중이면 다른 포트로 도망가지 않고 실패한다. 터널이 3004만 보므로 조용히 밀리면 웹훅이 유실된다.
 - `allowedHosts: dev.localagents.link` — cloudflared 터널(dev.localagents.link → localhost:3004)로 들어오는 요청 허용.
-- 데몬 baseUrl: `~/.config/localagents/env`의 `LOCALAGENTS_BASE_URL=http://localhost:3004` (대화형 셸은 export 필요).
+- 데몬 baseUrl 기본값은 **`https://localagents.link`** (설치 직후 설정 없이 동작). 개발은 `LOCALAGENTS_BASE_URL`로 덮어쓴다.
+  - 사장님 PC: 셸 `export LOCALAGENTS_BASE_URL=http://localhost:3004` + `~/.config/localagents/env`(서비스용).
 - 데몬 실행: systemd user `localagents.service` → shim `~/.local/bin/localagents` → **`local-agents/daemon/dist/index.js`** (2026-11-03 교체 완료).
 - 데몬 SIGTERM이 즉시 종료되지 않는 문제가 있다. 재시작이 안 되면 `systemctl --user kill -s KILL`.
 

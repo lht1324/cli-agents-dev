@@ -99,8 +99,9 @@ export function readState(): DeviceState | null {
 }
 
 export function baseUrl(): string {
-    // dev: API 컨테이너(3005) 또는 ngrok URL. prod: 배포 도메인.
-    return process.env.LOCALAGENTS_BASE_URL ?? "http://localhost:3005";
+    // 기본값은 배포 도메인. 설치한 사용자는 아무 설정 없이 동작해야 한다.
+    // 개발·자체 호스팅은 LOCALAGENTS_BASE_URL로 덮어쓴다 (예: http://localhost:3004).
+    return process.env.LOCALAGENTS_BASE_URL ?? "https://localagents.link";
 }
 
 export function writeState(state: DeviceState): void {

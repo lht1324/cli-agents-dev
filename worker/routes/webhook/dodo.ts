@@ -192,7 +192,9 @@ webhookDodo.post("/", async (c) => {
                     status: "canceled",
                     interval: body.data?.metadata?.interval ?? null,
                     currentPeriodEnd: periodEnd,
-                    cancelAtPeriodEnd: true,
+                    // Dodo가 보낸 값을 그대로 기록한다. 무조건 true로 적으면
+                    // 즉시 취소인데도 "기간 끝 종료"로 표시된다.
+                    cancelAtPeriodEnd: cancelAtPeriodEnd,
                 });
                 break;
             }
