@@ -13,6 +13,7 @@ import { countAll, countNewer, epochOf, findLocalDirByRemote, localRoleCounts, r
 import { askTyped, isDir, pickDirectory } from "./sysdialog";
 import { execSync } from "node:child_process";
 import { join } from "node:path";
+import { readFileSync } from "node:fs";
 import { readPushMark } from "./pushstate";
 import { listPending, reply, pushPending, type ReplyDecision } from "./permissions";
 import { pollCommands } from "./commands";
@@ -831,6 +832,45 @@ function checkNodeVersion(): boolean {
     return false;
 }
 
+const VERSION: string = (() => {
+    try {
+        const raw = readFileSync(join(__dirname, "..", "package.json"), "utf8");
+        const parsed = JSON.parse(raw) as { version?: unknown };
+        return typeof parsed.version === "string" ? parsed.version : "0.0.0";
+    } catch {
+        return "0.0.0";
+    }
+})();
+
+function printUsage(): void {
+    console.log(`localagents ${VERSION}
+
+Sync OpenCode sessions across your computers.
+
+Usage:
+  localagents <command>
+
+Commands:
+  login       Connect this PC (opens the browser, installs background sync)
+  logout      Revoke this device and stop background sync
+  status      Show device, OpenCode server, last sync, pending commands, plan
+  whoami      Show the signed-in account
+  push        Upload selected sessions to the cloud
+  pull        Download sessions from another PC
+  uninstall   Remove the background service, files and saved state
+
+Options:
+  -h, --help      Show this help
+  -v, --version   Show the version
+
+Environment:
+  LOCALAGENTS_BASE_URL   Server to connect to (default: https://localagents.link)
+  OPENCODE_SERVER_URL    Attach to a specific OpenCode server instead of auto-discovering
+
+Docs: https://localagents.link
+`);
+}
+
 async function main(): Promise<void> {
     if (!checkNodeVersion()) {
         process.exitCode = 1;
@@ -838,6 +878,14 @@ async function main(): Promise<void> {
     }
     const args = process.argv.slice(2).filter((a) => a !== "--jaeholee");
     const cmd = args[0];
+    if (cmd === "-h" || cmd === "--help" || cmd === "help") {
+        printUsage();
+        return;
+    }
+    if (cmd === "-v" || cmd === "--version" || cmd === "version") {
+        console.log(VERSION);
+        return;
+    }
     const advanced = new Set([
         "sessions",
         "heartbeat",
@@ -852,7 +900,7 @@ async function main(): Promise<void> {
     // 숨김 진단 명령. 플래그 없이 치면 없는 명령으로 보인다. run은 unit이 쓰니 예외.
     if (cmd && advanced.has(cmd) && !process.argv.includes("--jaeholee")) {
         console.log(`unknown command: ${cmd}`);
-        console.log("usage: localagents <login|logout|status|whoami|push|pull|uninstall>");
+        console.log("run `localagents --help` for usage.");
         process.exitCode = 1;
         return;
     }
@@ -902,7 +950,7 @@ async function main(): Promise<void> {
         if (cmd) {
             console.log(`unknown command: ${cmd}`);
         }
-        console.log("usage: localagents <login|logout|status|whoami|push|pull|uninstall>");
+        console.log("run `localagents --help` for usage.");
         process.exitCode = 1;
     }
     // 1회성 명령이 띄운 서버는 함께 내린다. run은 스스로 관리한다.
