@@ -1,21 +1,76 @@
-# daemon (`localagents`)
+# localagents
 
-localagents 상주 데몬 뼈대. 같은 PC의 OpenCode 서버를 찾아붙는다.
+Sync OpenCode sessions across your computers. Start a session on one PC, continue it on another. Check in from your phone when you are away from the desk.
 
-## 원칙
+```bash
+npx localagents@latest login
+```
 
-- 기존 serve를 찾아 attach가 기본. 없으면 직접 띄우지 않고 안내만 한다
-- 서버 API経由. db 직접 읽기는 백업 경로로만 둔다
-- 전송은 gzip + 키 `(session_id, seq)`. 로그 INSERT-only
+That connects this PC, registers background sync, and keeps running after you close the terminal.
 
-## 명령
+## Requirements
 
-- `localagents status` — 서버 탐색 + 상태 확인
-- `localagents sessions` — 세션 목록 출력
-- `localagents login` — 페어링. 미구현
+- Node.js 22.13 or newer
+- [OpenCode](https://opencode.ai) installed on the same machine
+- A localagents account (created on first login)
 
-## 다음 단계
+## What it does
 
-- WS 명령 큐 수신 + 주기 푸시
-- fork 실행 + 승인 응답 중계
-- `npx localagents` 배포용 패키지 승격
+- Mirrors your current OpenCode sessions to your account, so a web inbox can show them.
+- Lets you send instructions and answer permission prompts (Allow / Deny) from another device.
+- Moves a session between PCs with `push` and `pull`: full history and context travel with it.
+
+The daemon polls outbound. It does not open ports and does not accept inbound connections.
+
+## Commands
+
+| Command | Description |
+| --- | --- |
+| `localagents login` | Connect this PC. Opens the browser, then installs and starts background sync. |
+| `localagents logout` | Revoke this device and stop background sync. |
+| `localagents status` | Show device, OpenCode server state, last sync, pending commands and plan. |
+| `localagents whoami` | Show the signed-in account. |
+| `localagents push` | Pick sessions and upload them to your account. |
+| `localagents pull` | Download sessions pushed from another PC. |
+| `localagents uninstall` | Remove the background service, copied files, saved state and PATH entry. |
+| `localagents service install` | Re-register the background service (recovery). |
+
+`localagents --help` and `localagents --version` are also available.
+
+## Environment variables
+
+All optional. The defaults work for normal use.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `LOCALAGENTS_BASE_URL` | `https://localagents.link` | Server to connect to. Override for self-hosting or local development. |
+| `OPENCODE_SERVER_URL` | auto-discover | Attach to a specific OpenCode server instead of discovering it. |
+| `OPENCODE_SERVER_USERNAME` | `opencode` | Basic auth username for that server. |
+| `OPENCODE_SERVER_PASSWORD` | from server state | Basic auth password for that server. |
+| `XDG_STATE_HOME` | `~/.local/state` | Where server state is stored. |
+
+## Files it creates
+
+| Path | Purpose |
+| --- | --- |
+| `~/.config/localagents/device.json` | Device token (mode 600) |
+| `~/.config/localagents/cursors.json` | Incremental sync cursors |
+| `~/.config/localagents/env` | Optional environment overrides for the background service |
+| `~/.local/share/localagents/app/` | Installed copy of the daemon |
+| `~/.local/bin/localagents` | Command shim |
+
+Background sync is registered as a systemd user unit on Linux and a LaunchAgent on macOS. Windows is not supported in this version.
+
+## Uninstall
+
+```bash
+npx localagents@latest uninstall
+```
+
+This revokes the device token, stops and removes the service, deletes the copied files and saved state, and removes the PATH entry it added.
+
+## Links
+
+- Website: https://localagents.link
+- Source: https://github.com/lht1324/local-agents
+- Issues: https://github.com/lht1324/local-agents/issues
