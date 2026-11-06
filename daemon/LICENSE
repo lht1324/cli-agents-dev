@@ -1,0 +1,47 @@
+Copyright (c) 2026 Jaeho Lee. All rights reserved.
+
+localagents CLI and daemon (the "Software")
+
+1. Permission
+
+You may install and run the Software on machines you own or control, for your
+personal use or for the internal business use of the organization that employs
+you, in connection with the localagents service at https://localagents.link.
+
+2. Restrictions
+
+You may not:
+
+  a. redistribute, sublicense, sell, rent, or otherwise make the Software
+     available to third parties;
+  b. modify, translate, or create derivative works of the Software;
+  c. reverse engineer, decompile, or disassemble the Software, except to the
+     extent that applicable law expressly permits it;
+  d. remove or alter any copyright, license, or attribution notices;
+  e. use the Software to provide a competing service.
+
+3. Data
+
+The Software connects to the localagents service and transmits session data as
+described in the Privacy Policy at https://localagents.link/legal/privacy.
+You are responsible for having the right to sync the content you choose to sync.
+
+4. No warranty
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+
+5. Limitation of liability
+
+IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+6. Termination
+
+This license terminates automatically if you breach any of its terms. On
+termination you must stop using the Software and remove all copies.
+
+Contact: support@localagents.link

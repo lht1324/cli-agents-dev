@@ -1,6 +1,6 @@
 {
     "name": "localagents",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "Sync OpenCode sessions across your computers. Continue a session on another PC, or check in from your phone.",
     "bin": {
         "localagents": "dist/index.js"
@@ -20,7 +20,7 @@
     "engines": {
         "node": ">=22.13.0"
     },
-    "license": "UNLICENSED",
+    "license": "SEE LICENSE IN LICENSE",
     "homepage": "https://localagents.link",
     "author": "Jaeho Lee",
     "keywords": [
