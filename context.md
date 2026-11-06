@@ -1,6 +1,6 @@
 # context.md - local-agents
 
-2026-11-04 02:41
+2026-11-07 00:40
 
 ## 프로젝트
 - 폴더: `local-agents` 하나만 남았다. 구 `cli-agents-dev` 폴더는 2026-11-04 삭제(.env.local의 `GITKRAKEN_PAT`만 `.env.legacy.local`로 백업)
@@ -103,7 +103,10 @@ worker/index.ts
 - `logout`: 토큰 revoke + 서비스 중지. `uninstall`: 유닛·복사본·상태·PATH 블록 제거.
 - **macOS LaunchAgent는 코드만 있고 미검증**. Windows는 v1 미지원.
 - Node 하한 22.13.0(`node:sqlite`). 그 미만은 안내 후 종료.
-- **npm 미게시**. `daemon/`에서 publish 필요.
+- **npm 게시 완료**: `localagents@1.0.0` (2026-11-07). registry `latest` 확인.
+  - npm 계정 2FA가 꼬여 있다: 보안 키는 등록됐지만 "2FA 미활성" 배너가 뜨고 publish가 403으로 거부된다.
+  - 우회: **Bypass 2FA Granular 토큰**으로 publish. 토큰은 사용 직후 폐기.
+  - 2027-01부터 bypass 토큰의 직접 publish가 제거되고 staged publish + 2FA 승인으로 바뀐다. 그 전에 npm 2FA를 정상화해야 한다.
 
 ## 배포·브랜치 (2026-11-04)
 - `feat/vite-hono` → `develop` fast-forward → `master`에 `--no-ff` 릴리즈 머지 완료. 현재 체크아웃 `develop`.
@@ -136,6 +139,7 @@ worker/index.ts
 - [ ] MoR: Fungies KYC 대기
 
 ## 커밋 이력 (최근)
+- `ff0784f` [Docs] [npm 배포용 README·메타데이터 정리와 --help/--version 추가]
 - `1831fad` [Fix] [법적 페이지가 후행 슬래시로 리다이렉트되던 문제]
 - `9c3609d` [Fix] [유료 구독 시 플랜이 Pro로 올라가지 않던 문제]
 - `0a4a755` [Docs] [context.md를 새 스택 기준으로 갱신]
