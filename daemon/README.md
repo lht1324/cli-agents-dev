@@ -37,18 +37,6 @@ The daemon polls outbound. It does not open ports and does not accept inbound co
 
 `localagents --help` and `localagents --version` are also available.
 
-## Environment variables
-
-All optional. The defaults work for normal use.
-
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `LOCALAGENTS_BASE_URL` | `https://localagents.link` | Server to connect to. Override for self-hosting or local development. |
-| `OPENCODE_SERVER_URL` | auto-discover | Attach to a specific OpenCode server instead of discovering it. |
-| `OPENCODE_SERVER_USERNAME` | `opencode` | Basic auth username for that server. |
-| `OPENCODE_SERVER_PASSWORD` | from server state | Basic auth password for that server. |
-| `XDG_STATE_HOME` | `~/.local/state` | Where server state is stored. |
-
 ## Files it creates
 
 | Path | Purpose |
@@ -68,9 +56,3 @@ npx localagents@latest uninstall
 ```
 
 This revokes the device token, stops and removes the service, deletes the copied files and saved state, and removes the PATH entry it added.
-
-## Links
-
-- Website: https://localagents.link
-- Source: https://github.com/lht1324/local-agents
-- Issues: https://github.com/lht1324/local-agents/issues
