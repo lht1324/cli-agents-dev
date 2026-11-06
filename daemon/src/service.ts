@@ -43,7 +43,9 @@ function run(cmd: string, args: string[]): { ok: boolean; out: string } {
 
 // 지금 실행 중인 dist 디렉토리를 안정 경로로 복사한다.
 function copyPayload(): string {
-    const source = dirname(process.argv[1] ?? "");
+    // npx는 node_modules/.bin의 심볼릭 링크로 실행하므로 process.argv[1]의 dirname에는
+    // index.js가 없다. __dirname은 항상 실제 dist 디렉토리를 가리킨다.
+    const source = __dirname;
     const target = appDir();
     if (!source || !existsSync(join(source, "index.js"))) {
         throw new Error("cannot locate the daemon files to install");
