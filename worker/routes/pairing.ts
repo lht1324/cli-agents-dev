@@ -2,7 +2,6 @@ import { Hono } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { and, eq, isNull } from "drizzle-orm";
 import { unsealConnect, sealConnect } from "../../lib/auth/packet";
-import { checkBillingGate } from "../../lib/billing";
 import { linkDevice } from "../../lib/device/link";
 import { getDb } from "../../lib/neon/client";
 import { devices } from "../../lib/neon/schema";
@@ -91,10 +90,8 @@ pairing.get("/begin", async (c) => {
             .where(and(eq(devices.id, params.device), eq(devices.userId, user.id), isNull(devices.unlinkedAt)))
             .limit(1);
         if (known.length > 0) {
-            const gate = await checkBillingGate(user.id);
-            if (!gate.allowed) {
-                return c.redirect("/billing/locked", 302);
-            }
+            // 자동 연결도 막지 않는다. 기기 연결은 허용하고 사용(동기화)만 게이트한다.
+            // 여기서 막으면 데몬이 콜백을 기다린 채 멈춘다.
             const token = await linkDevice({
                 userId: user.id,
                 deviceId: params.device,
