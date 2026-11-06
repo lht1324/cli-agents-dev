@@ -66,15 +66,22 @@ function copyPayload(): string {
 
 function writeShim(): void {
     const bin = shimPath();
-    // 이미 다른 localagents가 PATH에 있으면 건드리지 않는다 (개발 중인 repo 실행 파일 보존).
+    const desired = `#!/bin/sh\nexec "${process.execPath}" "${join(appDir(), "dist", "index.js")}" "$@"\n`;
     if (existsSync(bin)) {
-        return;
+        const current = readFileSync(bin, "utf8");
+        if (current === desired) {
+            return;
+        }
+        // 살아 있는 다른 설치(개발 중인 repo 등)가 가리키는 shim이면 보존한다.
+        // 반대로 대상 경로가 사라진 낡은 shim(과거 설치 잔재)은 교체해야 한다.
+        // 그대로 두면 `localagents` 명령이 존재하지 않는 파일을 실행해 실패한다.
+        const target = /"([^"]*dist[\\/]index\.js)"/.exec(current);
+        if (target && existsSync(target[1])) {
+            return;
+        }
     }
     mkdirSync(dirname(bin), { recursive: true });
-    writeFileSync(
-        bin,
-        `#!/bin/sh\nexec "${process.execPath}" "${join(appDir(), "dist", "index.js")}" "$@"\n`,
-    );
+    writeFileSync(bin, desired);
     chmodSync(bin, 0o755);
 }
 
