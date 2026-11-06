@@ -59,7 +59,7 @@ export default function DeviceAuthorizePage() {
                 hostname: info.hostname,
             });
             if (!authorized) {
-                setError("failed to connect");
+                setError("Could not connect. Make sure you are signed in, then try again.");
                 return;
             }
             window.location.href = `http://127.0.0.1:${info.port}/callback?token=${encodeURIComponent(authorized.token)}&state=${encodeURIComponent(info.state)}`;
