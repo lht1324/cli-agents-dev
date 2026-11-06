@@ -101,7 +101,7 @@ worker/index.ts
 ## 데몬 배포·자동 실행
 - `login` 성공 직후 백그라운드 서비스 자동 등록(linux systemd / darwin LaunchAgent).
 - `logout`: 토큰 revoke + 서비스 중지. `uninstall`: 유닛·복사본·상태·PATH 블록 제거.
-- **macOS LaunchAgent는 코드만 있고 미검증**. Windows는 v1 미지원.
+- **macOS LaunchAgent 검증 완료** (2026-11-07): npx 설치 → launchd 등록·실행, status/heartbeat 정상. Windows는 v1 미지원.
 - Node 하한 22.13.0(`node:sqlite`). 그 미만은 안내 후 종료.
 - **npm 게시 완료**: `localagents@1.0.0` (2026-11-07). registry `latest` 확인.
   - npm 계정 2FA가 꼬여 있다: 보안 키는 등록됐지만 "2FA 미활성" 배너가 뜨고 publish가 403으로 거부된다.
@@ -139,6 +139,8 @@ worker/index.ts
 - [ ] MoR: Fungies KYC 대기
 
 ## 커밋 이력 (최근)
+- `27692d4` [Fix] [낡은 shim을 교체하지 않아 localagents 명령이 깨지던 문제]
+- `32cb358` [Fix] [npx로 실행할 때 자기 파일을 찾지 못해 서비스를 설치하지 못하던 문제]
 - `ff0784f` [Docs] [npm 배포용 README·메타데이터 정리와 --help/--version 추가]
 - `1831fad` [Fix] [법적 페이지가 후행 슬래시로 리다이렉트되던 문제]
 - `9c3609d` [Fix] [유료 구독 시 플랜이 Pro로 올라가지 않던 문제]
